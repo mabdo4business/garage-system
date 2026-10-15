@@ -1,0 +1,12 @@
+{
+  "app.name": "نظام إدارة الورشة",
+  "login.title": "تسجيل دخول الموظفين",
+  "login.username": "اسم المستخدم",
+  "login.password": "كلمة المرور",
+  "login.submit": "تسجيل الدخول",
+  "login.error": "اسم المستخدم أو كلمة المرور غير صحيحة.",
+  "login.switchLanguage": "English",
+  "home.signedInAs": "تم تسجيل الدخول باسم {name}",
+  "home.signOut": "تسجيل الخروج",
+  "home.businessDate": "تاريخ العمل: {date}"
+}

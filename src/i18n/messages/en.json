@@ -1,0 +1,12 @@
+{
+  "app.name": "Garage Management System",
+  "login.title": "Staff sign-in",
+  "login.username": "Username",
+  "login.password": "Password",
+  "login.submit": "Sign in",
+  "login.error": "The username or password is incorrect.",
+  "login.switchLanguage": "العربية",
+  "home.signedInAs": "Signed in as {name}",
+  "home.signOut": "Sign out",
+  "home.businessDate": "Business date: {date}"
+}
