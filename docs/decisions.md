@@ -25,6 +25,7 @@ Status: ✅ decided · ⏳ open · 🔍 needs professional verification
 | ID | Question | Needed before | Recommended default |
 |---|---|---|---|
 | B-08 | Will the garage bill non-stock items (sublet work, outside machining)? | Increment 1 | Yes, with mandatory cost entry |
+| D-18 (check-in photos) | Minimum number of required check-in photos, and what counts as a valid reason to go below it. Redefined in `docs/spec/02-prd-v0.2.md` §10.3 — later than the PRD v0.1 sense of D-18 below, so this is the live meaning; not previously logged here. | Increment 1 (I1-02) | 4 fixed exterior slots + odometer; fewer only with a mandatory reason, recorded on the repair order |
 | D-6 | Accept customer-supplied parts at launch? | Increment 2 | Not at launch; enable later |
 | D-7 | Allow phone approval at all? | Increment 2 | Yes; outbound call to number on file = verified |
 | D-11 | Diagnostic fee: amount, when charged, when waived | Increment 2 | Pre-authorised at check-in; waive if repairs approved |
@@ -43,7 +44,7 @@ Status: ✅ decided · ⏳ open · 🔍 needs professional verification
 | D-32 | Shared tablet idle lock and approval PIN | Increment 5 | 5 minutes; per-user PIN |
 | B-10 | Backup recovery objectives | Increment 5 | Point-in-time recovery, ≤15 min data loss, restore same day |
 | D-23 | Expenses and P&L in the platform or in accounting software | Increment 6 | Accounting software; platform exports |
-| D-18 / D-3 | WhatsApp vs SMS provider for automated messages | Increment 6 | Staff-initiated sharing at launch |
+| D-18 / D-3 (messaging provider) | WhatsApp vs SMS provider for automated messages — the PRD v0.1 sense of D-18; see D-18 (check-in photos) above for the v0.2 sense | Increment 6 | Staff-initiated sharing at launch |
 | D-28 | Arabic-Indic or Western digits in Arabic | Before launch | Western |
 | D-29 | Brand name, logo and colours | Before launch | — |
 | D-12, D-13, D-14, D-15, D-21, D-22 | Cancellation rules, cash rounding, refund methods, warranty terms, opening hours, document wording | Before launch | See PRD v0.2 §11 |
