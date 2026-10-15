@@ -19,6 +19,9 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
       <h1>{t(locale, "app.name")}</h1>
       <p>{t(locale, "home.signedInAs", { name: session.displayName })}</p>
       <p>{t(locale, "home.businessDate", { date: dubaiDate(new Date()) })}</p>
+      <p>
+        <a href={`/${locale}/search`}>{t(locale, "home.directory")}</a>
+      </p>
       <form method="post" action="/api/auth/logout">
         <input type="hidden" name="locale" value={locale} />
         <button type="submit">{t(locale, "home.signOut")}</button>

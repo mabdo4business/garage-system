@@ -113,6 +113,53 @@ export interface TestDocumentIssueTable {
   snapshot: Json;
 }
 
+export interface CustomerTable {
+  id: Generated<string>;
+  name_en: string | null;
+  name_ar: string | null;
+  mobile: string;
+  mobile_normalized: string;
+  email: string | null;
+  preferred_language: "ar" | "en";
+  marketing_consent: Generated<boolean>;
+  created_at: Generated<Date>;
+  created_by: string | null;
+}
+
+export interface VehicleTable {
+  id: Generated<string>;
+  vin: string | null;
+  make: string;
+  model: string;
+  year: number;
+  colour: string | null;
+  created_at: Generated<Date>;
+  created_by: string | null;
+}
+
+export type Emirate =
+  "abu_dhabi" | "dubai" | "sharjah" | "ajman" | "umm_al_quwain" | "ras_al_khaimah" | "fujairah";
+
+export interface VehiclePlateTable {
+  id: Generated<string>;
+  vehicle_id: string;
+  emirate: Emirate;
+  code: string;
+  number: string;
+  valid_from: Generated<Date>;
+  valid_to: Timestamp | null;
+  changed_by: string | null;
+}
+
+export interface VehicleOwnershipTable {
+  id: Generated<string>;
+  vehicle_id: string;
+  customer_id: string;
+  valid_from: Generated<Date>;
+  valid_to: Timestamp | null;
+  changed_by: string | null;
+}
+
 export interface SchemaMigrationTable {
   version: string;
   checksum: string;
@@ -130,5 +177,9 @@ export interface DB {
   issued_number: IssuedNumberTable;
   test_document: TestDocumentTable;
   test_document_issue: TestDocumentIssueTable;
+  customer: CustomerTable;
+  vehicle: VehicleTable;
+  vehicle_plate: VehiclePlateTable;
+  vehicle_ownership: VehicleOwnershipTable;
   schema_migration: SchemaMigrationTable;
 }

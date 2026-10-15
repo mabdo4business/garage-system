@@ -14,6 +14,7 @@ import type { DB } from "../db/schema";
  * the increment that creates the table registers it in LOCK_TARGETS.
  */
 export const LOCK_RANK = {
+  vehicle: 5, // I1-01: below repair_order so a future check-in can lock vehicle, then repair_order
   repair_order: 10,
   test_document: 15, // Increment 0 stub document; sits at document level
   invoice: 20,
@@ -25,6 +26,7 @@ export const LOCK_RANK = {
 export type LockKind = keyof typeof LOCK_RANK;
 
 const LOCK_TARGETS: Partial<Record<LockKind, { table: keyof DB; column: string }>> = {
+  vehicle: { table: "vehicle", column: "id" },
   test_document: { table: "test_document", column: "id" },
   number_series: { table: "number_series", column: "series" },
 };

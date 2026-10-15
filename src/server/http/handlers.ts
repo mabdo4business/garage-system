@@ -5,6 +5,21 @@ import { authorize, deactivateUser, login, logout } from "../auth/service";
 import { SESSION_COOKIE, sessionPolicy, validateSession, type SessionUser } from "../auth/session";
 import type { DB } from "../db/schema";
 import { createTestDocument, issueTestDocument } from "../test-document/service";
+import {
+  createCustomer,
+  findDuplicateCustomersByMobile,
+  getCustomer,
+  type CustomerInput,
+} from "../customer/service";
+import { searchDirectory } from "../directory/service";
+import {
+  changePlate,
+  createVehicle,
+  findDuplicateVehicles,
+  getVehicle,
+  transferOwnership,
+  type VehicleInput,
+} from "../vehicle/service";
 import { isLocale, DEFAULT_LOCALE } from "../../i18n";
 
 /**
@@ -23,8 +38,17 @@ const STATUS_BY_CODE: Record<string, number> = {
   idempotency_payload_mismatch: 409,
   document_already_issued: 409,
   username_taken: 409,
+  plate_already_active: 409,
   try_again: 503,
 };
+
+function toBool(value: unknown): boolean {
+  return value === true || value === "true" || value === "on" || value === "1";
+}
+
+function toStr(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
 
 export function readCookie(request: Request, name: string): string | undefined {
   const header = request.headers.get("cookie");
@@ -166,6 +190,166 @@ export function createHandlers(db: Kysely<DB>) {
         if (!UUID.test(userId)) return json(404, { error: "not_found" });
         await deactivateUser(db, session, userId);
         return json(200, { ok: true });
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    /** GET /api/search?q=… — the one search box (plate/mobile/name/VIN). */
+    async search(request: Request): Promise<Response> {
+      try {
+        const session = await authorize(db, await currentSession(request), "directory.search");
+        const q = new URL(request.url).searchParams.get("q") ?? "";
+        const result = await searchDirectory(db, session.roles, q);
+        return json(200, result);
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    /** POST /api/customers — JSON/form { nameEn?, nameAr?, mobile, email?, preferredLanguage,
+     * marketingConsent?, confirmDuplicate?, idempotencyKey }. Warns on duplicate mobile (AC-02.4)
+     * unless confirmDuplicate is set. */
+    async createCustomer(request: Request): Promise<Response> {
+      try {
+        if (!sameOrigin(request)) return json(403, { error: "forbidden" });
+        const session = await authorize(db, await currentSession(request), "customer.write");
+        const body = await readBody(request);
+        const input: CustomerInput = {
+          nameEn: toStr(body.nameEn) || null,
+          nameAr: toStr(body.nameAr) || null,
+          mobile: toStr(body.mobile),
+          email: toStr(body.email) || null,
+          preferredLanguage: toStr(body.preferredLanguage) === "ar" ? "ar" : "en",
+          marketingConsent: toBool(body.marketingConsent),
+        };
+        if (!toBool(body.confirmDuplicate)) {
+          const duplicates = await findDuplicateCustomersByMobile(db, input.mobile);
+          if (duplicates.length > 0) {
+            return json(200, { status: "duplicate" as const, matches: duplicates });
+          }
+        }
+        const outcome = await createCustomer(
+          db,
+          { kind: "user", userId: session.userId },
+          input,
+          toStr(body.idempotencyKey),
+        );
+        return json(outcome.replayed ? 200 : 201, { status: "created" as const, ...outcome.result });
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    /** GET /api/customers/:id — mobile/email omitted unless the viewer has customer.read_contact. */
+    async getCustomer(request: Request, customerId: string): Promise<Response> {
+      try {
+        const session = await authorize(db, await currentSession(request), "customer.read", {
+          entityType: "customer",
+          entityId: customerId,
+        });
+        if (!UUID.test(customerId)) return json(404, { error: "not_found" });
+        const profile = await getCustomer(db, session.roles, customerId);
+        if (!profile) return json(404, { error: "not_found" });
+        return json(200, profile);
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    /** POST /api/vehicles — JSON/form vehicle fields + plate parts + ownerCustomerId. Warns on
+     * duplicate VIN or a plate previously active on a different vehicle. */
+    async createVehicle(request: Request): Promise<Response> {
+      try {
+        if (!sameOrigin(request)) return json(403, { error: "forbidden" });
+        const session = await authorize(db, await currentSession(request), "vehicle.write");
+        const body = await readBody(request);
+        const plate = {
+          emirate: toStr(body.plateEmirate) as VehicleInput["plate"]["emirate"],
+          code: toStr(body.plateCode),
+          number: toStr(body.plateNumber),
+        };
+        const input: VehicleInput = {
+          vin: toStr(body.vin) || null,
+          make: toStr(body.make),
+          model: toStr(body.model),
+          year: Number(body.year),
+          colour: toStr(body.colour) || null,
+          plate,
+          ownerCustomerId: toStr(body.ownerCustomerId),
+        };
+        if (!toBool(body.confirmDuplicate)) {
+          const duplicates = await findDuplicateVehicles(db, { vin: input.vin, plate });
+          if (duplicates.length > 0) {
+            return json(200, { status: "duplicate" as const, matches: duplicates });
+          }
+        }
+        const outcome = await createVehicle(
+          db,
+          { kind: "user", userId: session.userId },
+          input,
+          toStr(body.idempotencyKey),
+        );
+        return json(outcome.replayed ? 200 : 201, { status: "created" as const, ...outcome.result });
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    /** GET /api/vehicles/:id — current owner, current plate, plate and ownership history. */
+    async getVehicle(request: Request, vehicleId: string): Promise<Response> {
+      try {
+        await authorize(db, await currentSession(request), "vehicle.read", {
+          entityType: "vehicle",
+          entityId: vehicleId,
+        });
+        if (!UUID.test(vehicleId)) return json(404, { error: "not_found" });
+        const profile = await getVehicle(db, vehicleId);
+        if (!profile) return json(404, { error: "not_found" });
+        return json(200, profile);
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    /** POST /api/vehicles/:id/plate — JSON/form { plateEmirate, plateCode, plateNumber }. */
+    async changeVehiclePlate(request: Request, vehicleId: string): Promise<Response> {
+      try {
+        if (!sameOrigin(request)) return json(403, { error: "forbidden" });
+        const session = await authorize(db, await currentSession(request), "vehicle.write", {
+          entityType: "vehicle",
+          entityId: vehicleId,
+        });
+        if (!UUID.test(vehicleId)) return json(404, { error: "not_found" });
+        const body = await readBody(request);
+        const outcome = await changePlate(db, { kind: "user", userId: session.userId }, vehicleId, {
+          emirate: toStr(body.plateEmirate) as VehicleInput["plate"]["emirate"],
+          code: toStr(body.plateCode),
+          number: toStr(body.plateNumber),
+        });
+        return json(200, outcome.result);
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    /** POST /api/vehicles/:id/transfer-owner — JSON/form { newOwnerCustomerId }. */
+    async transferVehicleOwner(request: Request, vehicleId: string): Promise<Response> {
+      try {
+        if (!sameOrigin(request)) return json(403, { error: "forbidden" });
+        const session = await authorize(db, await currentSession(request), "vehicle.write", {
+          entityType: "vehicle",
+          entityId: vehicleId,
+        });
+        if (!UUID.test(vehicleId)) return json(404, { error: "not_found" });
+        const body = await readBody(request);
+        const outcome = await transferOwnership(
+          db,
+          { kind: "user", userId: session.userId },
+          vehicleId,
+          toStr(body.newOwnerCustomerId),
+        );
+        return json(200, outcome.result);
       } catch (error) {
         return errorResponse(error);
       }
