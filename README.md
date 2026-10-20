@@ -44,7 +44,7 @@ Run the app locally:
 cp .env.example .env
 npm run db:dev              # embedded PostgreSQL in .data/pg; prints DATABASE_URL lines for .env
 npm run user:create -- --username partner.a --name "Partner A" --roles partner
-npm run dev                 # http://localhost:3000
+npm run dev                 # http://localhost:5001
 ```
 
 To run tests against your own PostgreSQL (for example Docker) instead of the embedded one, set
