@@ -40,8 +40,8 @@ TypeScript (strict) · Node 22 · PostgreSQL 16+ · Kysely with plain SQL migrat
    number allocation and the idempotency record. Never write to the database outside a command (reads are fine).
 2. **Every command records at least one audit event** (`ctx.audit`). The runner rejects commands that don't.
 3. **No external side effects inside a command** (PDFs, messages, HTTP calls). Use `ctx.enqueue` (outbox).
-4. **Lock through `ctx.locks.acquire` in canonical order**: repair order → invoice ↑ → revision line ↑ → stock ↑ →
-   number series. Register new lock kinds in `LOCK_RANK`/`LOCK_TARGETS`; never take a lower rank after a higher one.
+4. **Lock through `ctx.locks.acquire` in canonical order**: vehicle ↑ → repair order → invoice ↑ → revision line ↑ →
+   stock ↑ → number series (vehicle first: decision T-04). Register new lock kinds in `LOCK_RANK`/`LOCK_TARGETS`; never take a lower rank after a higher one.
 5. **Money and quantities are never JavaScript numbers.** Use `Money` / `Qty` and split amounts with the pool rule
    (`src/server/core/pool.ts`). Store money as `numeric(14,2)`, quantities as `numeric(18,3)`.
 6. **Issued documents are immutable.** Corrections are new records (credit notes, reversals). The app role has no

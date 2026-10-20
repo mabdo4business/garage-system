@@ -1,5 +1,7 @@
 import type { Kysely } from "kysely";
 import { DomainError } from "../core/errors";
+import { isUuid } from "../core/ids";
+import { idempotencyKeyUsed } from "../command/runner";
 import { logger } from "../core/logger";
 import { authorize, deactivateUser, login, logout } from "../auth/service";
 import { SESSION_COOKIE, sessionPolicy, validateSession, type SessionUser } from "../auth/session";
@@ -15,6 +17,7 @@ import { searchDirectory } from "../directory/service";
 import {
   changePlate,
   createVehicle,
+  duplicateConfirmKey,
   findDuplicateVehicles,
   getVehicle,
   transferOwnership,
@@ -27,8 +30,6 @@ import { isLocale, DEFAULT_LOCALE } from "../../i18n";
  * same code is exercised by tests that call these functions directly with Request objects —
  * i.e. "calling the endpoint directly" without the UI.
  */
-
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const STATUS_BY_CODE: Record<string, number> = {
   unauthenticated: 401,
@@ -78,10 +79,24 @@ function redirect(location: string, headers: Record<string, string> = {}): Respo
   return new Response(null, { status: 303, headers: { location, ...headers } });
 }
 
+function plateFrom(body: Record<string, unknown>): VehicleInput["plate"] {
+  return {
+    emirate: toStr(body.plateEmirate) as VehicleInput["plate"]["emirate"],
+    code: toStr(body.plateCode),
+    number: toStr(body.plateNumber),
+  };
+}
+
 function errorResponse(error: unknown): Response {
   if (error instanceof DomainError) {
     const status = STATUS_BY_CODE[error.code] ?? 400;
-    return json(status, { error: error.code, message: error.message });
+    // Only the field name leaves the server: details may carry ids or other internal context.
+    const field = error.details?.field;
+    return json(status, {
+      error: error.code,
+      message: error.message,
+      ...(typeof field === "string" ? { details: { field } } : {}),
+    });
   }
   logger.error("http.unhandled_error", { error });
   return json(500, { error: "internal_error" });
@@ -165,7 +180,7 @@ export function createHandlers(db: Kysely<DB>) {
           entityType: "test_document",
           entityId: documentId,
         });
-        if (!UUID.test(documentId)) return json(404, { error: "not_found" });
+        if (!isUuid(documentId)) return json(404, { error: "not_found" });
         const body = await readBody(request);
         const outcome = await issueTestDocument(
           db,
@@ -187,7 +202,7 @@ export function createHandlers(db: Kysely<DB>) {
           entityType: "app_user",
           entityId: userId,
         });
-        if (!UUID.test(userId)) return json(404, { error: "not_found" });
+        if (!isUuid(userId)) return json(404, { error: "not_found" });
         await deactivateUser(db, session, userId);
         return json(200, { ok: true });
       } catch (error) {
@@ -209,12 +224,14 @@ export function createHandlers(db: Kysely<DB>) {
 
     /** POST /api/customers — JSON/form { nameEn?, nameAr?, mobile, email?, preferredLanguage,
      * marketingConsent?, confirmDuplicate?, idempotencyKey }. Warns on duplicate mobile (AC-02.4)
-     * unless confirmDuplicate is set. */
+     * unless confirmDuplicate is set. A retry with an already-used key skips the warning so the
+     * original result is replayed. */
     async createCustomer(request: Request): Promise<Response> {
       try {
         if (!sameOrigin(request)) return json(403, { error: "forbidden" });
         const session = await authorize(db, await currentSession(request), "customer.write");
         const body = await readBody(request);
+        const idempotencyKey = toStr(body.idempotencyKey);
         const input: CustomerInput = {
           nameEn: toStr(body.nameEn) || null,
           nameAr: toStr(body.nameAr) || null,
@@ -223,7 +240,10 @@ export function createHandlers(db: Kysely<DB>) {
           preferredLanguage: toStr(body.preferredLanguage) === "ar" ? "ar" : "en",
           marketingConsent: toBool(body.marketingConsent),
         };
-        if (!toBool(body.confirmDuplicate)) {
+        if (
+          !toBool(body.confirmDuplicate) &&
+          !(await idempotencyKeyUsed(db, "customer.create", idempotencyKey))
+        ) {
           const duplicates = await findDuplicateCustomersByMobile(db, input.mobile);
           if (duplicates.length > 0) {
             return json(200, { status: "duplicate" as const, matches: duplicates });
@@ -233,7 +253,7 @@ export function createHandlers(db: Kysely<DB>) {
           db,
           { kind: "user", userId: session.userId },
           input,
-          toStr(body.idempotencyKey),
+          idempotencyKey,
         );
         return json(outcome.replayed ? 200 : 201, { status: "created" as const, ...outcome.result });
       } catch (error) {
@@ -248,7 +268,7 @@ export function createHandlers(db: Kysely<DB>) {
           entityType: "customer",
           entityId: customerId,
         });
-        if (!UUID.test(customerId)) return json(404, { error: "not_found" });
+        if (!isUuid(customerId)) return json(404, { error: "not_found" });
         const profile = await getCustomer(db, session.roles, customerId);
         if (!profile) return json(404, { error: "not_found" });
         return json(200, profile);
@@ -258,17 +278,16 @@ export function createHandlers(db: Kysely<DB>) {
     },
 
     /** POST /api/vehicles — JSON/form vehicle fields + plate parts + ownerCustomerId. Warns on
-     * duplicate VIN or a plate previously active on a different vehicle. */
+     * duplicate VIN or a plate active/previously active on a different vehicle; confirming moves a
+     * still-active plate to the new vehicle (OD-1). Confirming means sending back the
+     * `confirmFor` key from the warning; it only counts for the same VIN and plate. */
     async createVehicle(request: Request): Promise<Response> {
       try {
         if (!sameOrigin(request)) return json(403, { error: "forbidden" });
         const session = await authorize(db, await currentSession(request), "vehicle.write");
         const body = await readBody(request);
-        const plate = {
-          emirate: toStr(body.plateEmirate) as VehicleInput["plate"]["emirate"],
-          code: toStr(body.plateCode),
-          number: toStr(body.plateNumber),
-        };
+        const idempotencyKey = toStr(body.idempotencyKey);
+        const plate = plateFrom(body);
         const input: VehicleInput = {
           vin: toStr(body.vin) || null,
           make: toStr(body.make),
@@ -278,17 +297,22 @@ export function createHandlers(db: Kysely<DB>) {
           plate,
           ownerCustomerId: toStr(body.ownerCustomerId),
         };
-        if (!toBool(body.confirmDuplicate)) {
+        const confirmFor = duplicateConfirmKey({ vin: input.vin, plate });
+        const confirmed = toStr(body.confirmFor) === confirmFor;
+        if (!confirmed && !(await idempotencyKeyUsed(db, "vehicle.create", idempotencyKey))) {
           const duplicates = await findDuplicateVehicles(db, { vin: input.vin, plate });
           if (duplicates.length > 0) {
-            return json(200, { status: "duplicate" as const, matches: duplicates });
+            return json(200, { status: "duplicate" as const, matches: duplicates, confirmFor });
           }
         }
         const outcome = await createVehicle(
           db,
           { kind: "user", userId: session.userId },
           input,
-          toStr(body.idempotencyKey),
+          idempotencyKey,
+          {
+            movePlate: confirmed,
+          },
         );
         return json(outcome.replayed ? 200 : 201, { status: "created" as const, ...outcome.result });
       } catch (error) {
@@ -303,7 +327,7 @@ export function createHandlers(db: Kysely<DB>) {
           entityType: "vehicle",
           entityId: vehicleId,
         });
-        if (!UUID.test(vehicleId)) return json(404, { error: "not_found" });
+        if (!isUuid(vehicleId)) return json(404, { error: "not_found" });
         const profile = await getVehicle(db, vehicleId);
         if (!profile) return json(404, { error: "not_found" });
         return json(200, profile);
@@ -312,7 +336,9 @@ export function createHandlers(db: Kysely<DB>) {
       }
     },
 
-    /** POST /api/vehicles/:id/plate — JSON/form { plateEmirate, plateCode, plateNumber }. */
+    /** POST /api/vehicles/:id/plate — JSON/form { plateEmirate, plateCode, plateNumber,
+     * confirmFor?, idempotencyKey }. Warns like createVehicle when the plate is or was on
+     * another vehicle; confirming moves a still-active plate here. */
     async changeVehiclePlate(request: Request, vehicleId: string): Promise<Response> {
       try {
         if (!sameOrigin(request)) return json(403, { error: "forbidden" });
@@ -320,20 +346,33 @@ export function createHandlers(db: Kysely<DB>) {
           entityType: "vehicle",
           entityId: vehicleId,
         });
-        if (!UUID.test(vehicleId)) return json(404, { error: "not_found" });
+        if (!isUuid(vehicleId)) return json(404, { error: "not_found" });
         const body = await readBody(request);
-        const outcome = await changePlate(db, { kind: "user", userId: session.userId }, vehicleId, {
-          emirate: toStr(body.plateEmirate) as VehicleInput["plate"]["emirate"],
-          code: toStr(body.plateCode),
-          number: toStr(body.plateNumber),
-        });
-        return json(200, outcome.result);
+        const idempotencyKey = toStr(body.idempotencyKey);
+        const plate = plateFrom(body);
+        const confirmFor = duplicateConfirmKey({ plate });
+        const confirmed = toStr(body.confirmFor) === confirmFor;
+        if (!confirmed && !(await idempotencyKeyUsed(db, "vehicle.change_plate", idempotencyKey))) {
+          const duplicates = await findDuplicateVehicles(db, { plate, excludeVehicleId: vehicleId });
+          if (duplicates.length > 0) {
+            return json(200, { status: "duplicate" as const, matches: duplicates, confirmFor });
+          }
+        }
+        const outcome = await changePlate(
+          db,
+          { kind: "user", userId: session.userId },
+          vehicleId,
+          plate,
+          idempotencyKey,
+          { movePlate: confirmed },
+        );
+        return json(200, { status: "changed" as const, ...outcome.result });
       } catch (error) {
         return errorResponse(error);
       }
     },
 
-    /** POST /api/vehicles/:id/transfer-owner — JSON/form { newOwnerCustomerId }. */
+    /** POST /api/vehicles/:id/transfer-owner — JSON/form { newOwnerCustomerId, idempotencyKey }. */
     async transferVehicleOwner(request: Request, vehicleId: string): Promise<Response> {
       try {
         if (!sameOrigin(request)) return json(403, { error: "forbidden" });
@@ -341,13 +380,14 @@ export function createHandlers(db: Kysely<DB>) {
           entityType: "vehicle",
           entityId: vehicleId,
         });
-        if (!UUID.test(vehicleId)) return json(404, { error: "not_found" });
+        if (!isUuid(vehicleId)) return json(404, { error: "not_found" });
         const body = await readBody(request);
         const outcome = await transferOwnership(
           db,
           { kind: "user", userId: session.userId },
           vehicleId,
           toStr(body.newOwnerCustomerId),
+          toStr(body.idempotencyKey),
         );
         return json(200, outcome.result);
       } catch (error) {

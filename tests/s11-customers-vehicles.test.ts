@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import pg from "pg";
 import type { Actor } from "../src/server/command/runner";
 import { ConflictError, ValidationError } from "../src/server/core/errors";
 import { createCustomer, findDuplicateCustomersByMobile, getCustomer } from "../src/server/customer/service";
@@ -14,7 +15,7 @@ import {
   transferOwnership,
   type VehicleInput,
 } from "../src/server/vehicle/service";
-import { createTestDatabase, sqlErrorAs, type TestDatabase } from "./helpers/db";
+import { createTestDatabase, sqlErrorAs, waitForLockWaiters, type TestDatabase } from "./helpers/db";
 import { makeUser, TEST_PASSWORD } from "./helpers/users";
 
 const BASE = "http://localhost:3000";
@@ -163,33 +164,37 @@ describe("S11 — customers and vehicles", () => {
 
     const seedRows = Array.from({ length: 10_000 }, (_, i) => ({
       id: randomUUID(),
+      index: i,
       code: i.toString(36).padStart(3, "0"),
     }));
-    await chunked(seedRows, 1000, (chunk) =>
-      db.app
-        .insertInto("vehicle")
-        .values(chunk.map((row) => ({ id: row.id, make: "Bulk", model: "Filler", year: 2020 })))
-        .execute(),
-    );
-    await chunked(seedRows, 1000, (chunk) =>
-      db.app
-        .insertInto("vehicle_plate")
-        .values(
-          chunk.map((row) => ({
-            vehicle_id: row.id,
-            emirate: "dubai" as const,
-            code: row.code,
-            number: "00000", // every bulk row shares this; only `code` varies, so the active-plate index stays unique
-          })),
-        )
-        .execute(),
-    );
-    await chunked(seedRows, 1000, (chunk) =>
-      db.app
-        .insertInto("vehicle_ownership")
-        .values(chunk.map((row) => ({ vehicle_id: row.id, customer_id: filler.id })))
-        .execute(),
-    );
+    // One transaction: every vehicle must have its current owner by commit (0004).
+    await db.app.transaction().execute(async (seed) => {
+      await chunked(seedRows, 1000, (chunk) =>
+        seed
+          .insertInto("vehicle")
+          .values(chunk.map((row) => ({ id: row.id, make: "Bulk", model: "Filler", year: 2020 })))
+          .execute(),
+      );
+      await chunked(seedRows, 1000, (chunk) =>
+        seed
+          .insertInto("vehicle_plate")
+          .values(
+            chunk.map((row) => ({
+              vehicle_id: row.id,
+              emirate: "dubai" as const,
+              code: row.code,
+              number: String(row.index).padStart(5, "0"), // 00000–09999: realistic spread for partial matches
+            })),
+          )
+          .execute(),
+      );
+      await chunked(seedRows, 1000, (chunk) =>
+        seed
+          .insertInto("vehicle_ownership")
+          .values(chunk.map((row) => ({ vehicle_id: row.id, customer_id: filler.id })))
+          .execute(),
+      );
+    });
 
     const target = await createVehicle(
       db.app,
@@ -210,6 +215,13 @@ describe("S11 — customers and vehicles", () => {
 
     expect(result.vehicles.map((v) => v.id)).toContain(target.result.vehicleId);
     expect(elapsedMs).toBeLessThan(2000);
+
+    // A broad partial match (hundreds of plates contain "12") is still capped and fast.
+    const broadStart = performance.now();
+    const broad = await searchDirectory(db.app, ["service_advisor"], "12");
+    const broadMs = performance.now() - broadStart;
+    expect(broad.vehicles).toHaveLength(25);
+    expect(broadMs).toBeLessThan(2000);
   }, 15_000);
 
   // --- Ownership change keeps history ------------------------------------------------------
@@ -219,7 +231,7 @@ describe("S11 — customers and vehicles", () => {
     const ownerB = await newCustomer({ mobile: "0502222222" });
     const vehicle = await newVehicle(ownerA);
 
-    await transferOwnership(db.app, advisor, vehicle.result.vehicleId, ownerB);
+    await transferOwnership(db.app, advisor, vehicle.result.vehicleId, ownerB, randomUUID());
 
     const rows = await db.app
       .selectFrom("vehicle_ownership")
@@ -239,9 +251,9 @@ describe("S11 — customers and vehicles", () => {
   it("transferring to the current owner is rejected", async () => {
     const owner = await newCustomer({ mobile: "0503333333" });
     const vehicle = await newVehicle(owner);
-    await expect(transferOwnership(db.app, advisor, vehicle.result.vehicleId, owner)).rejects.toThrow(
-      ValidationError,
-    );
+    await expect(
+      transferOwnership(db.app, advisor, vehicle.result.vehicleId, owner, randomUUID()),
+    ).rejects.toThrow(ValidationError);
   });
 
   // --- Plate change keeps history (GAP-26) --------------------------------------------------
@@ -250,11 +262,17 @@ describe("S11 — customers and vehicles", () => {
     const owner = await newCustomer({ mobile: "0504444444" });
     const vehicleA = await newVehicle(owner, { plate: { emirate: "ajman", code: "P1", number: "11111" } });
 
-    await changePlate(db.app, advisor, vehicleA.result.vehicleId, {
-      emirate: "ajman",
-      code: "P2",
-      number: "22222",
-    });
+    await changePlate(
+      db.app,
+      advisor,
+      vehicleA.result.vehicleId,
+      {
+        emirate: "ajman",
+        code: "P2",
+        number: "22222",
+      },
+      randomUUID(),
+    );
 
     const history = await db.app
       .selectFrom("vehicle_plate")
@@ -286,11 +304,17 @@ describe("S11 — customers and vehicles", () => {
 
     const vehicleB = await newVehicle(owner);
     await expect(
-      changePlate(db.app, advisor, vehicleB.result.vehicleId, {
-        emirate: "fujairah",
-        code: "Q1",
-        number: "33333",
-      }),
+      changePlate(
+        db.app,
+        advisor,
+        vehicleB.result.vehicleId,
+        {
+          emirate: "fujairah",
+          code: "Q1",
+          number: "33333",
+        },
+        randomUUID(),
+      ),
     ).rejects.toMatchObject({ code: "plate_already_active" });
   });
 
@@ -429,29 +453,66 @@ describe("S11 — customers and vehicles", () => {
     expect((rejected[0] as PromiseRejectedResult).reason).toMatchObject({ code: "plate_already_active" });
   });
 
-  it("two ownership transfers racing on the same vehicle leave exactly one active owner and no overlap", async () => {
+  /** Every row but the last is closed exactly when the next one opens; only the last is active. */
+  function expectGaplessChain(rows: { valid_from: Date; valid_to: Date | null }[], expectedLength: number) {
+    expect(rows).toHaveLength(expectedLength);
+    for (let i = 0; i < rows.length - 1; i++) {
+      expect(rows[i]!.valid_to).not.toBeNull();
+      expect(rows[i]!.valid_to!.getTime()).toBe(rows[i + 1]!.valid_from.getTime());
+    }
+    expect(rows[rows.length - 1]!.valid_to).toBeNull();
+  }
+
+  it("concurrent ownership transfers on one vehicle all succeed, serialised into a gapless history", async () => {
     const ownerA = await newCustomer({ mobile: "0501414141" });
-    const ownerB = await newCustomer({ mobile: "0501515151" });
-    const ownerC = await newCustomer({ mobile: "0501616161" });
-    const vehicle = await newVehicle(ownerA);
+    const others = [
+      await newCustomer({ mobile: "0501515151" }),
+      await newCustomer({ mobile: "0501616161" }),
+      await newCustomer({ mobile: "0501717171" }),
+    ];
+    // Several rounds: a transaction that starts before, but locks after, another must still succeed.
+    for (let round = 0; round < 5; round++) {
+      const vehicle = await newVehicle(ownerA);
+      const outcomes = await Promise.allSettled(
+        others.map((owner) =>
+          transferOwnership(db.app, advisor, vehicle.result.vehicleId, owner, randomUUID()),
+        ),
+      );
+      expect(outcomes.map((o) => (o.status === "rejected" ? o.reason : "ok"))).toEqual(["ok", "ok", "ok"]);
 
-    await Promise.allSettled([
-      transferOwnership(db.app, advisor, vehicle.result.vehicleId, ownerB),
-      transferOwnership(db.app, advisor, vehicle.result.vehicleId, ownerC),
-    ]);
+      const rows = await db.app
+        .selectFrom("vehicle_ownership")
+        .select(["customer_id", "valid_from", "valid_to"])
+        .where("vehicle_id", "=", vehicle.result.vehicleId)
+        .orderBy("valid_from", "asc")
+        .execute();
+      expectGaplessChain(rows, 4);
+      expect(rows[0]!.customer_id).toBe(ownerA);
+      expect(new Set(rows.slice(1).map((r) => r.customer_id))).toEqual(new Set(others));
+    }
+  });
 
-    const rows = await db.app
-      .selectFrom("vehicle_ownership")
-      .select(["customer_id", "valid_from", "valid_to"])
-      .where("vehicle_id", "=", vehicle.result.vehicleId)
-      .orderBy("valid_from", "asc")
-      .execute();
-    expect(rows.filter((r) => r.valid_to === null)).toHaveLength(1);
-    for (let i = 1; i < rows.length; i++) {
-      expect(rows[i]!.valid_from.getTime()).toBeGreaterThanOrEqual(rows[i - 1]!.valid_from.getTime());
-      if (rows[i - 1]!.valid_to) {
-        expect(rows[i - 1]!.valid_to!.getTime()).toBeLessThanOrEqual(rows[i]!.valid_from.getTime());
-      }
+  it("concurrent plate changes on one vehicle all succeed, serialised into a gapless history", async () => {
+    const owner = await newCustomer({ mobile: "0501818181" });
+    for (let round = 0; round < 5; round++) {
+      const vehicle = await newVehicle(owner);
+      const plates = ["1", "2", "3"].map((n) => ({
+        emirate: "ras_al_khaimah" as const,
+        code: `C${round}`,
+        number: `${n}${n}${n}`,
+      }));
+      const outcomes = await Promise.allSettled(
+        plates.map((plate) => changePlate(db.app, advisor, vehicle.result.vehicleId, plate, randomUUID())),
+      );
+      expect(outcomes.map((o) => (o.status === "rejected" ? o.reason : "ok"))).toEqual(["ok", "ok", "ok"]);
+
+      const rows = await db.app
+        .selectFrom("vehicle_plate")
+        .select(["valid_from", "valid_to"])
+        .where("vehicle_id", "=", vehicle.result.vehicleId)
+        .orderBy("valid_from", "asc")
+        .execute();
+      expectGaplessChain(rows, 4);
     }
   });
 
@@ -468,5 +529,573 @@ describe("S11 — customers and vehicles", () => {
     expect(
       (await sqlErrorAs(db.appUrl, "UPDATE vehicle_ownership SET customer_id = gen_random_uuid()"))?.code,
     ).toBe("42501");
+  });
+});
+
+describe("S11 — I1-01 review fixes", () => {
+  let db: TestDatabase;
+  let advisor: Actor;
+  let advisorToken: string;
+  let technicianToken: string;
+  let handlers: ReturnType<typeof createHandlers>;
+
+  beforeAll(async () => {
+    db = await createTestDatabase();
+    handlers = createHandlers(db.app);
+    const adv = await makeUser(db.app, ["service_advisor"], "advisor");
+    advisor = adv.actor;
+    const tech = await makeUser(db.app, ["technician"], "tech");
+    advisorToken = await signIn(adv.username);
+    technicianToken = await signIn(tech.username);
+  });
+  afterAll(async () => {
+    await db?.destroy();
+  });
+
+  async function signIn(username: string) {
+    return tokenFrom(
+      await handlers.login(form("/api/auth/login", { username, password: TEST_PASSWORD, locale: "en" })),
+    );
+  }
+
+  function request(path: string, init: { token?: string; body?: unknown; origin?: string } = {}) {
+    return new Request(`${BASE}${path}`, {
+      method: init.body === undefined ? "GET" : "POST",
+      body: init.body === undefined ? undefined : JSON.stringify(init.body),
+      headers: {
+        "content-type": "application/json",
+        ...(init.token ? { cookie: `${SESSION_COOKIE}=${encodeURIComponent(init.token)}` } : {}),
+        ...(init.origin ? { origin: init.origin } : {}),
+      },
+    });
+  }
+
+  let mobileCounter = 0;
+  const newCustomer = async (overrides: Partial<Parameters<typeof createCustomer>[2]> = {}) =>
+    (
+      await createCustomer(
+        db.app,
+        advisor,
+        {
+          nameEn: "Review Customer",
+          mobile: `05200${String(mobileCounter++).padStart(5, "0")}`,
+          preferredLanguage: "en",
+          marketingConsent: false,
+          ...overrides,
+        },
+        randomUUID(),
+      )
+    ).result.customerId;
+
+  let plateCounter = 0;
+  const newVehicle = async (
+    ownerCustomerId: string,
+    overrides: Partial<VehicleInput> = {},
+    options: { movePlate?: boolean } = {},
+  ) =>
+    (
+      await createVehicle(
+        db.app,
+        advisor,
+        {
+          make: "Nissan",
+          model: "Patrol",
+          year: 2021,
+          plate: { emirate: "ajman", code: "RV", number: String(20000 + plateCounter++) },
+          ownerCustomerId,
+          ...overrides,
+        },
+        randomUUID(),
+        options,
+      )
+    ).result.vehicleId;
+
+  // --- Finding 3: an unmatched name must not match every customer -------------------------
+
+  it("a search that matches nobody returns nothing, and LIKE wildcards match literally", async () => {
+    await newCustomer({ nameEn: "Somebody Else" });
+    for (const q of ["Zzzznobody", "%%", "__", "971", "05"]) {
+      const result = await searchDirectory(db.app, ["service_advisor"], q);
+      expect({ q, customers: result.customers }).toEqual({ q, customers: [] });
+    }
+  });
+
+  // --- Finding 4: no mobile lookup without customer.read_contact --------------------------
+
+  it("a technician cannot find a customer by mobile number; an advisor can", async () => {
+    const customerId = await newCustomer({ nameEn: "Omar Saeed", mobile: "0559876543" });
+
+    const asTechnician = await searchDirectory(db.app, ["technician"], "0559876");
+    expect(asTechnician.customers).toEqual([]);
+
+    const asAdvisor = await searchDirectory(db.app, ["service_advisor"], "0559876");
+    expect(asAdvisor.customers.map((c) => c.id)).toEqual([customerId]);
+    expect(asAdvisor.customers[0]!.contact).toEqual({ mobile: "0559876543", email: null });
+
+    // By name a technician finds the customer, but without contact details.
+    const byName = await searchDirectory(db.app, ["technician"], "Omar Saeed");
+    expect(byName.customers.map((c) => [c.id, c.contact])).toEqual([[customerId, null]]);
+  });
+
+  it("GET /api/customers/:id omits mobile and email for a technician", async () => {
+    const customerId = await newCustomer({ mobile: "0559876500", email: "omar@example.com" });
+    const asTechnician = await handlers.getCustomer(
+      request(`/api/customers/${customerId}`, { token: technicianToken }),
+      customerId,
+    );
+    expect(asTechnician.status).toBe(200);
+    const body = (await asTechnician.json()) as Record<string, unknown>;
+    expect(body.contact).toBeNull();
+    expect(JSON.stringify(body)).not.toContain("0559876500");
+    expect(JSON.stringify(body)).not.toContain("omar@example.com");
+  });
+
+  // --- Finding 9: a full plate finds the vehicle -----------------------------------------
+
+  it("searching a full plate, with or without the emirate, finds the vehicle", async () => {
+    const owner = await newCustomer();
+    const vehicleId = await newVehicle(owner, { plate: { emirate: "sharjah", code: "SH", number: "54321" } });
+
+    for (const q of ["SH 54321", "SH54321", "sh-54321", "Sharjah SH 54321", "الشارقة SH54321", "54321"]) {
+      const result = await searchDirectory(db.app, ["technician"], q);
+      expect({ q, ids: result.vehicles.map((v) => v.id) }).toEqual({ q, ids: [vehicleId] });
+    }
+    const otherEmirate = await searchDirectory(db.app, ["technician"], "Dubai SH 54321");
+    expect(otherEmirate.vehicles).toEqual([]);
+  });
+
+  // --- Finding 10 / decision OD-1: warn, then move a still-active plate ------------------
+
+  it("a plate active on another vehicle warns; confirming moves it and leaves the old vehicle without a plate", async () => {
+    const owner = await newCustomer();
+    const plate = { emirate: "abu_dhabi" as const, code: "M1", number: "60606" };
+    const vehicleA = await newVehicle(owner, { plate });
+
+    const warned = await handlers.createVehicle(
+      request("/api/vehicles", {
+        token: advisorToken,
+        body: {
+          make: "Lexus",
+          model: "LX",
+          year: 2024,
+          plateEmirate: plate.emirate,
+          plateCode: plate.code,
+          plateNumber: plate.number,
+          ownerCustomerId: owner,
+          idempotencyKey: randomUUID(),
+        },
+      }),
+    );
+    expect(await warned.json()).toMatchObject({
+      status: "duplicate",
+      matches: [{ id: vehicleA, reason: "plate_active" }],
+    });
+
+    // Without confirmation the command itself refuses — the warning is not the only guard.
+    await expect(newVehicle(owner, { plate })).rejects.toMatchObject({ code: "plate_already_active" });
+
+    const vehicleB = await newVehicle(owner, { plate }, { movePlate: true });
+
+    const profileA = await getVehicle(db.app, vehicleA);
+    const profileB = await getVehicle(db.app, vehicleB);
+    expect(profileA!.plate).toBeNull();
+    expect(profileB!.plate).toEqual(plate);
+    expect(profileA!.plateHistory[0]!.validTo!.getTime()).toBe(
+      profileB!.plateHistory[0]!.validFrom.getTime(),
+    );
+
+    const retired = await db.app
+      .selectFrom("audit_event")
+      .select(["details", "before_state"])
+      .where("action", "=", "vehicle.plate_retired")
+      .where("entity_id", "=", vehicleA)
+      .execute();
+    expect(retired).toHaveLength(1);
+    expect(retired[0]!.details).toMatchObject({ reason: "moved_to_vehicle", vehicleId: vehicleB });
+
+    // The vehicle left without a plate can be given a new one.
+    await changePlate(
+      db.app,
+      advisor,
+      vehicleA,
+      { emirate: "abu_dhabi", code: "M2", number: "60607" },
+      randomUUID(),
+    );
+    expect((await getVehicle(db.app, vehicleA))!.plate).toEqual({
+      emirate: "abu_dhabi",
+      code: "M2",
+      number: "60607",
+    });
+
+    // changePlate can move a plate too.
+    const vehicleC = await newVehicle(owner);
+    await expect(changePlate(db.app, advisor, vehicleC, plate, randomUUID())).rejects.toMatchObject({
+      code: "plate_already_active",
+    });
+    await changePlate(db.app, advisor, vehicleC, plate, randomUUID(), { movePlate: true });
+    expect((await getVehicle(db.app, vehicleB))!.plate).toBeNull();
+    expect((await getVehicle(db.app, vehicleC))!.plate).toEqual(plate);
+  });
+
+  it("losing the race for a plate on the unique index is a clean plate_already_active conflict", async () => {
+    const owner = await newCustomer();
+    const plate = { emirate: "dubai" as const, code: "UQ", number: "41414" };
+    const rival = await newVehicle(owner);
+
+    // Another transaction inserts the plate for a different vehicle and holds it uncommitted, so
+    // our insert waits on the unique index and fails with 23505 once the rival commits.
+    const other = new pg.Client({ connectionString: db.appUrl });
+    await other.connect();
+    try {
+      await other.query("BEGIN");
+      await other.query(
+        "INSERT INTO vehicle_plate (vehicle_id, emirate, code, number) VALUES ($1, $2, $3, $4)",
+        [rival, plate.emirate, plate.code, plate.number],
+      );
+      const attempt = newVehicle(owner, { plate }).then(
+        () => "ok",
+        (error: unknown) => error,
+      );
+      await waitForLockWaiters(db, 1);
+      await other.query("COMMIT");
+      expect(await attempt).toMatchObject({ code: "plate_already_active" });
+    } finally {
+      await other.end();
+    }
+  });
+
+  it("two vehicles racing to take the same active plate: the plate ends on exactly one, losers get a clean conflict", async () => {
+    const owner = await newCustomer();
+    const plate = { emirate: "dubai" as const, code: "RC", number: "70707" };
+    const holder = await newVehicle(owner, { plate });
+    const [x, y] = [await newVehicle(owner), await newVehicle(owner)];
+
+    const outcomes = await Promise.allSettled([
+      changePlate(db.app, advisor, x, plate, randomUUID(), { movePlate: true }),
+      changePlate(db.app, advisor, y, plate, randomUUID(), { movePlate: true }),
+    ]);
+    // The second may find the plate moved to a vehicle it did not lock: a clean conflict, not a 500.
+    for (const outcome of outcomes) {
+      if (outcome.status === "rejected") {
+        expect(outcome.reason).toMatchObject({ code: "plate_already_active" });
+      }
+    }
+    const active = await db.app
+      .selectFrom("vehicle_plate")
+      .select("vehicle_id")
+      .where("emirate", "=", plate.emirate)
+      .where("code", "=", plate.code)
+      .where("number", "=", plate.number)
+      .where("valid_to", "is", null)
+      .execute();
+    expect(active).toHaveLength(1);
+    expect([x, y]).toContain(active[0]!.vehicle_id);
+    expect((await getVehicle(db.app, holder))!.plate).toBeNull();
+  });
+
+  // --- Finding 5: a retried create replays instead of warning about itself -----------------
+
+  it("retrying POST /api/customers with the same key replays the result instead of warning", async () => {
+    const body = {
+      nameEn: "Retry Ali",
+      mobile: "0561112222",
+      preferredLanguage: "en",
+      idempotencyKey: randomUUID(),
+    };
+    const first = await handlers.createCustomer(request("/api/customers", { token: advisorToken, body }));
+    expect(first.status).toBe(201);
+    const firstBody = (await first.json()) as { customerId: string };
+
+    const retry = await handlers.createCustomer(request("/api/customers", { token: advisorToken, body }));
+    expect(retry.status).toBe(200);
+    expect(await retry.json()).toEqual({ status: "created", customerId: firstBody.customerId });
+
+    const rows = await db.app
+      .selectFrom("customer")
+      .select("id")
+      .where("mobile_normalized", "=", "561112222")
+      .execute();
+    expect(rows).toHaveLength(1);
+  });
+
+  it("retrying POST /api/vehicles with the same key replays the result instead of warning", async () => {
+    const owner = await newCustomer();
+    const body = {
+      vin: "JTMHV05J604000001",
+      make: "Toyota",
+      model: "Land Cruiser",
+      year: 2023,
+      plateEmirate: "sharjah",
+      plateCode: "RT",
+      plateNumber: "80808",
+      ownerCustomerId: owner,
+      idempotencyKey: randomUUID(),
+    };
+    const first = await handlers.createVehicle(request("/api/vehicles", { token: advisorToken, body }));
+    expect(first.status).toBe(201);
+    const firstBody = (await first.json()) as { vehicleId: string };
+
+    const retry = await handlers.createVehicle(request("/api/vehicles", { token: advisorToken, body }));
+    expect(retry.status).toBe(200);
+    expect(await retry.json()).toEqual({ status: "created", vehicleId: firstBody.vehicleId });
+
+    const rows = await db.app.selectFrom("vehicle").select("id").where("vin", "=", body.vin).execute();
+    expect(rows).toHaveLength(1);
+  });
+
+  it("createVehicle with the same idempotency key creates one vehicle and replays", async () => {
+    const owner = await newCustomer();
+    const key = randomUUID();
+    const input: VehicleInput = {
+      make: "Kia",
+      model: "Sportage",
+      year: 2020,
+      plate: { emirate: "fujairah", code: "ID", number: "90909" },
+      ownerCustomerId: owner,
+    };
+    const first = await createVehicle(db.app, advisor, input, key);
+    const second = await createVehicle(db.app, advisor, input, key);
+    expect(second.replayed).toBe(true);
+    expect(second.result.vehicleId).toBe(first.result.vehicleId);
+    await expect(createVehicle(db.app, advisor, { ...input, year: 2019 }, key)).rejects.toMatchObject({
+      code: "idempotency_payload_mismatch",
+    });
+  });
+
+  // --- Finding 8: malformed ids are validation / not-found errors, never 500 ----------------
+
+  it("malformed ids are rejected cleanly", async () => {
+    const owner = await newCustomer();
+    const vehicleId = await newVehicle(owner);
+
+    await expect(newVehicle("not-a-uuid")).rejects.toThrow(ValidationError);
+    await expect(transferOwnership(db.app, advisor, "not-a-uuid", owner, randomUUID())).rejects.toMatchObject(
+      {
+        code: "not_found",
+      },
+    );
+    await expect(transferOwnership(db.app, advisor, vehicleId, "x", randomUUID())).rejects.toThrow(
+      ValidationError,
+    );
+    await expect(
+      changePlate(db.app, advisor, "x", { emirate: "dubai", code: "A", number: "1" }, randomUUID()),
+    ).rejects.toMatchObject({ code: "not_found" });
+    expect(await getVehicle(db.app, "x")).toBeNull();
+    expect(await getCustomer(db.app, ["partner"], "x")).toBeNull();
+
+    const response = await handlers.transferVehicleOwner(
+      request(`/api/vehicles/${vehicleId}/transfer-owner`, {
+        token: advisorToken,
+        body: { newOwnerCustomerId: "x", idempotencyKey: randomUUID() },
+      }),
+      vehicleId,
+    );
+    expect(response.status).toBe(422);
+    expect(await response.json()).toMatchObject({
+      error: "validation_failed",
+      details: { field: "newOwnerCustomerId" },
+    });
+  });
+
+  // --- Finding 17: handler authorization, 404 and same-origin for plate / transfer / get -----
+
+  it("plate change and transfer handlers: technician 403, bad id 404, cross-origin 403", async () => {
+    const owner = await newCustomer();
+    const other = await newCustomer();
+    const vehicleId = await newVehicle(owner);
+    const plateBody = {
+      plateEmirate: "dubai",
+      plateCode: "HT",
+      plateNumber: "12121",
+      idempotencyKey: randomUUID(),
+    };
+
+    const techPlate = await handlers.changeVehiclePlate(
+      request(`/api/vehicles/${vehicleId}/plate`, { token: technicianToken, body: plateBody }),
+      vehicleId,
+    );
+    expect(techPlate.status).toBe(403);
+    const techTransfer = await handlers.transferVehicleOwner(
+      request(`/api/vehicles/${vehicleId}/transfer-owner`, {
+        token: technicianToken,
+        body: { newOwnerCustomerId: other, idempotencyKey: randomUUID() },
+      }),
+      vehicleId,
+    );
+    expect(techTransfer.status).toBe(403);
+
+    const crossOrigin = await handlers.changeVehiclePlate(
+      request(`/api/vehicles/${vehicleId}/plate`, {
+        token: advisorToken,
+        body: plateBody,
+        origin: "https://evil.example",
+      }),
+      vehicleId,
+    );
+    expect(crossOrigin.status).toBe(403);
+    expect((await getVehicle(db.app, vehicleId))!.plateHistory).toHaveLength(1);
+
+    const badId = await handlers.getVehicle(request("/api/vehicles/nope", { token: advisorToken }), "nope");
+    expect(badId.status).toBe(404);
+    const missing = randomUUID();
+    const notFound = await handlers.getVehicle(
+      request(`/api/vehicles/${missing}`, { token: advisorToken }),
+      missing,
+    );
+    expect(notFound.status).toBe(404);
+
+    const ok = await handlers.changeVehiclePlate(
+      request(`/api/vehicles/${vehicleId}/plate`, { token: advisorToken, body: plateBody }),
+      vehicleId,
+    );
+    expect(ok.status).toBe(200);
+    const transferred = await handlers.transferVehicleOwner(
+      request(`/api/vehicles/${vehicleId}/transfer-owner`, {
+        token: advisorToken,
+        body: { newOwnerCustomerId: other, idempotencyKey: randomUUID() },
+      }),
+      vehicleId,
+    );
+    expect(transferred.status).toBe(200);
+    const asTechnician = await handlers.getVehicle(
+      request(`/api/vehicles/${vehicleId}`, { token: technicianToken }),
+      vehicleId,
+    );
+    expect(await asTechnician.json()).toMatchObject({
+      currentOwnerCustomerId: other,
+      plate: { emirate: "dubai", code: "HT", number: "12121" },
+    });
+  });
+
+  // --- Finding 6: closed history rows and vehicle rows cannot be rewritten ------------------
+
+  it("the application role cannot rewrite or reopen closed history, nor update a vehicle", async () => {
+    const ownerA = await newCustomer();
+    const ownerB = await newCustomer();
+    const vehicleId = await newVehicle(ownerA);
+    await transferOwnership(db.app, advisor, vehicleId, ownerB, randomUUID());
+    await changePlate(
+      db.app,
+      advisor,
+      vehicleId,
+      { emirate: "ajman", code: "GR", number: "31313" },
+      randomUUID(),
+    );
+
+    for (const table of ["vehicle_ownership", "vehicle_plate"]) {
+      const closed = `vehicle_id = '${vehicleId}' AND valid_to IS NOT NULL`;
+      expect(
+        (await sqlErrorAs(db.appUrl, `UPDATE ${table} SET valid_to = '2000-01-01' WHERE ${closed}`))?.code,
+      ).toBe("42501");
+      expect((await sqlErrorAs(db.appUrl, `UPDATE ${table} SET valid_to = NULL WHERE ${closed}`))?.code).toBe(
+        "42501",
+      );
+      // Setting an open row's valid_to back to NULL is also refused.
+      const open = `vehicle_id = '${vehicleId}' AND valid_to IS NULL`;
+      expect((await sqlErrorAs(db.appUrl, `UPDATE ${table} SET valid_to = NULL WHERE ${open}`))?.code).toBe(
+        "42501",
+      );
+    }
+    expect(
+      (await sqlErrorAs(db.appUrl, `UPDATE vehicle SET colour = 'pink' WHERE id = '${vehicleId}'`))?.code,
+    ).toBe("42501");
+    // Row locks still work (they do not fire UPDATE triggers).
+    expect(
+      (await sqlErrorAs(db.appUrl, `SELECT id FROM vehicle WHERE id = '${vehicleId}' FOR UPDATE`))?.code,
+    ).toBeUndefined();
+  });
+
+  it("an active history row cannot be closed in the future, and a vehicle always keeps one current owner", async () => {
+    const owner = await newCustomer();
+    const vehicleId = await newVehicle(owner);
+    const open = `vehicle_id = '${vehicleId}' AND valid_to IS NULL`;
+
+    expect(
+      (await sqlErrorAs(db.appUrl, `UPDATE vehicle_plate SET valid_to = '2999-01-01' WHERE ${open}`))?.code,
+    ).toBe("23514");
+    // Closing the only ownership row, with no replacement, fails at commit.
+    expect(
+      (await sqlErrorAs(db.appUrl, `UPDATE vehicle_ownership SET valid_to = now() WHERE ${open}`))?.code,
+    ).toBe("23514");
+    // A vehicle inserted without an owner fails at commit too.
+    expect(
+      (await sqlErrorAs(db.appUrl, "INSERT INTO vehicle (make, model, year) VALUES ('No', 'Owner', 2020)"))
+        ?.code,
+    ).toBe("23514");
+
+    // Closing a plate now, without a replacement, stays allowed: that is a plate move (OD-1).
+    expect(
+      (await sqlErrorAs(db.appUrl, `UPDATE vehicle_plate SET valid_to = now() WHERE ${open}`))?.code,
+    ).toBe(undefined);
+    const profile = await getVehicle(db.app, vehicleId);
+    expect(profile!.currentOwnerCustomerId).toBe(owner);
+  });
+
+  // --- N2: plate change and transfer replay on a repeated key --------------------------------
+
+  it("changePlate and transferOwnership replay on a repeated idempotency key", async () => {
+    const ownerA = await newCustomer();
+    const ownerB = await newCustomer();
+    const vehicleId = await newVehicle(ownerA);
+
+    const plateKey = randomUUID();
+    const plate = { emirate: "sharjah" as const, code: "RP", number: "51515" };
+    const firstPlate = await changePlate(db.app, advisor, vehicleId, plate, plateKey);
+    const againPlate = await changePlate(db.app, advisor, vehicleId, plate, plateKey);
+    expect([firstPlate.replayed, againPlate.replayed]).toEqual([false, true]);
+
+    const transferKey = randomUUID();
+    const firstTransfer = await transferOwnership(db.app, advisor, vehicleId, ownerB, transferKey);
+    const againTransfer = await transferOwnership(db.app, advisor, vehicleId, ownerB, transferKey);
+    expect([firstTransfer.replayed, againTransfer.replayed]).toEqual([false, true]);
+
+    const profile = await getVehicle(db.app, vehicleId);
+    expect(profile!.plateHistory).toHaveLength(2);
+    expect(profile!.ownershipHistory).toHaveLength(2);
+  });
+
+  // --- N4: the API moves a plate only when confirmFor matches the warned plate ---------------
+
+  it("POST /api/vehicles/:id/plate moves a plate only with the confirmFor key from the warning", async () => {
+    const owner = await newCustomer();
+    const plate = { plateEmirate: "dubai", plateCode: "CF", plateNumber: "61616" };
+    const holder = await newVehicle(owner, { plate: { emirate: "dubai", code: "CF", number: "61616" } });
+    const target = await newVehicle(owner);
+    const post = (body: Record<string, unknown>) =>
+      handlers.changeVehiclePlate(
+        request(`/api/vehicles/${target}/plate`, {
+          token: advisorToken,
+          body: { ...body, idempotencyKey: randomUUID() },
+        }),
+        target,
+      );
+
+    const warned = (await (await post(plate)).json()) as { status: string; confirmFor: string };
+    expect(warned.status).toBe("duplicate");
+
+    // A confirmation for a different plate (or a bare flag) is not a confirmation for this one.
+    expect(await (await post({ ...plate, confirmDuplicate: true })).json()).toMatchObject({
+      status: "duplicate",
+    });
+    expect(await (await post({ ...plate, confirmFor: "|dubai|CF|00000" })).json()).toMatchObject({
+      status: "duplicate",
+    });
+    expect((await getVehicle(db.app, holder))!.plate).not.toBeNull();
+
+    const moved = await post({ ...plate, confirmFor: warned.confirmFor });
+    expect(await moved.json()).toMatchObject({ status: "changed" });
+    expect((await getVehicle(db.app, holder))!.plate).toBeNull();
+  });
+
+  // --- N5: error responses carry only the field name ------------------------------------------
+
+  it("error responses expose details.field only", async () => {
+    const response = await handlers.getCustomer(request(`/api/customers/x`), "x");
+    expect(response.status).toBe(401);
+    const forbidden = await handlers.createVehicle(
+      request("/api/vehicles", { token: technicianToken, body: { idempotencyKey: randomUUID() } }),
+    );
+    expect(forbidden.status).toBe(403);
+    expect(await forbidden.json()).not.toHaveProperty("details");
   });
 });

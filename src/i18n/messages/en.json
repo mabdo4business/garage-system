@@ -10,7 +10,6 @@
   "home.signOut": "Sign out",
   "home.businessDate": "Business date: {date}",
   "home.directory": "Customers & vehicles",
-
   "directory.search.title": "Search customers & vehicles",
   "directory.search.placeholder": "Plate, mobile, name or VIN",
   "directory.search.submit": "Search",
@@ -19,7 +18,6 @@
   "directory.search.vehiclesHeading": "Vehicles",
   "directory.newCustomer": "New customer",
   "directory.newVehicle": "New vehicle",
-
   "customer.new.title": "Register customer",
   "customer.new.nameEn": "Name (English)",
   "customer.new.nameAr": "Name (Arabic)",
@@ -30,16 +28,13 @@
   "customer.new.languageAr": "Arabic",
   "customer.new.marketingConsent": "OK to send marketing messages",
   "customer.new.submit": "Save customer",
-
   "customer.duplicate.heading": "Possible duplicate",
   "customer.duplicate.body": "A customer with this mobile number already exists.",
   "customer.duplicate.createAnyway": "Create a separate customer anyway",
-
   "customer.profile.title": "Customer",
   "customer.profile.contactHidden": "Contact details are hidden for your role.",
   "customer.profile.mobile": "Mobile",
   "customer.profile.email": "Email",
-
   "vehicle.new.title": "Register vehicle",
   "vehicle.new.owner": "Owner customer ID",
   "vehicle.new.vin": "VIN",
@@ -51,11 +46,9 @@
   "vehicle.new.plateCode": "Plate code",
   "vehicle.new.plateNumber": "Plate number",
   "vehicle.new.submit": "Save vehicle",
-
   "vehicle.duplicate.heading": "Possible duplicate",
   "vehicle.duplicate.body": "This VIN or plate was found on another vehicle.",
   "vehicle.duplicate.createAnyway": "Create anyway",
-
   "vehicle.profile.title": "Vehicle",
   "vehicle.profile.owner": "Current owner (customer ID)",
   "vehicle.profile.plate": "Plate",
@@ -65,12 +58,25 @@
   "vehicle.profile.changePlate": "Change plate",
   "vehicle.profile.newOwnerId": "New owner customer ID",
   "vehicle.profile.submit": "Save",
-
   "emirate.abu_dhabi": "Abu Dhabi",
   "emirate.dubai": "Dubai",
   "emirate.sharjah": "Sharjah",
   "emirate.ajman": "Ajman",
   "emirate.umm_al_quwain": "Umm Al Quwain",
   "emirate.ras_al_khaimah": "Ras Al Khaimah",
-  "emirate.fujairah": "Fujairah"
+  "emirate.fujairah": "Fujairah",
+  "customer.new.name": "Name",
+  "vehicle.duplicate.changeAnyway": "Change plate anyway",
+  "vehicle.duplicate.reason.vin": "same VIN",
+  "vehicle.duplicate.reason.plate_active": "has this plate now — confirming moves the plate here",
+  "vehicle.duplicate.reason.plate_previously_active": "had this plate before",
+  "vehicle.profile.noPlate": "No current plate",
+  "error.validationFailed": "Some details are missing or not valid. Check the form and try again.",
+  "error.validationField": "Check “{field}” and try again.",
+  "error.notFound": "The record was not found. Check the ID and try again.",
+  "error.plateAlreadyActive": "This plate was just assigned to another vehicle. Submit again to review it.",
+  "error.tryAgain": "Someone else changed this record at the same time. Please try again.",
+  "error.formReused": "This form was already submitted with different details. Reload the page and try again.",
+  "error.forbidden": "Your role does not allow this action.",
+  "error.signedOut": "Your session has ended. Sign in again."
 }

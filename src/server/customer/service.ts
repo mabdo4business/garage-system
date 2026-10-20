@@ -1,5 +1,6 @@
 import type { Kysely } from "kysely";
 import { ValidationError } from "../core/errors";
+import { isUuid } from "../core/ids";
 import { runCommand, type Actor, type CommandOutcome } from "../command/runner";
 import type { DB } from "../db/schema";
 import { hasPermission } from "../auth/permissions";
@@ -55,25 +56,25 @@ function validate(input: CustomerInput): {
   const nameEn = input.nameEn?.trim() || null;
   const nameAr = input.nameAr?.trim() || null;
   if (!nameEn && !nameAr) {
-    throw new ValidationError("At least one of nameEn or nameAr is required");
+    throw new ValidationError("At least one of nameEn or nameAr is required", { field: "name" });
   }
   if ((nameEn && nameEn.length > 200) || (nameAr && nameAr.length > 200)) {
-    throw new ValidationError("Name must be 1–200 characters");
+    throw new ValidationError("Name must be 1–200 characters", { field: "name" });
   }
   const mobile = input.mobile.trim();
   if (mobile.length < 6 || mobile.length > 20) {
-    throw new ValidationError("Mobile must be 6–20 characters");
+    throw new ValidationError("Mobile must be 6–20 characters", { field: "mobile" });
   }
   const mobileNormalized = normalizeMobile(mobile);
   if (!/^[0-9]{6,15}$/.test(mobileNormalized)) {
-    throw new ValidationError("Mobile must contain 6–15 digits");
+    throw new ValidationError("Mobile must contain 6–15 digits", { field: "mobile" });
   }
   const email = input.email?.trim() || null;
   if (email && (!EMAIL_PATTERN.test(email) || email.length > 254)) {
-    throw new ValidationError("Email is not a valid address");
+    throw new ValidationError("Email is not a valid address", { field: "email" });
   }
   if (input.preferredLanguage !== "ar" && input.preferredLanguage !== "en") {
-    throw new ValidationError("preferredLanguage must be 'ar' or 'en'");
+    throw new ValidationError("preferredLanguage must be 'ar' or 'en'", { field: "preferredLanguage" });
   }
   return {
     nameEn,
@@ -166,6 +167,7 @@ export async function getCustomer(
   viewerRoles: readonly string[],
   id: string,
 ): Promise<CustomerProfile | null> {
+  if (!isUuid(id)) return null;
   const row = await db
     .selectFrom("customer")
     .select(["id", "name_en", "name_ar", "mobile", "email", "preferred_language", "marketing_consent"])

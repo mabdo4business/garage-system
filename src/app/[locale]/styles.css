@@ -51,7 +51,7 @@ body {
 }
 
 table {
-  width: 100%;
+  inline-size: 100%;
   border-collapse: collapse;
   margin-block: 8px 16px;
 }
@@ -60,14 +60,15 @@ th,
 td {
   text-align: start;
   padding: 6px 8px;
-  border-bottom: 1px solid var(--border);
+  border-block-end: 1px solid var(--border);
   font-size: 0.9rem;
 }
 
 ul.results {
   list-style: none;
   padding: 0;
-  margin: 0 0 16px;
+  margin-block: 0 16px;
+  margin-inline: 0;
   display: grid;
   gap: 8px;
 }

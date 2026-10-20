@@ -1,9 +1,9 @@
-import { cookies } from "next/headers";
-import { notFound, redirect } from "next/navigation";
-import { isLocale, t, type MessageKey } from "../../../i18n";
-import { SESSION_COOKIE, validateSession } from "../../../server/auth/session";
+import { notFound } from "next/navigation";
+import { isLocale, t } from "../../../i18n";
 import { getDb } from "../../../server/db/client";
-import { searchDirectory, type DirectoryVehicleResult } from "../../../server/directory/service";
+import { searchDirectory } from "../../../server/directory/service";
+import { requirePagePermission } from "../server-support";
+import { PlateText } from "../vehicles/plate-text";
 
 export const dynamic = "force-dynamic";
 
@@ -16,21 +16,12 @@ export default async function SearchPage({
 }) {
   const { locale } = await params;
   if (!isLocale(locale)) notFound();
-  const db = getDb();
-  const token = (await cookies()).get(SESSION_COOKIE)?.value;
-  const session = await validateSession(db, token);
-  if (!session) redirect(`/${locale}/login`);
+  const session = await requirePagePermission(locale, "directory.search");
 
   const query = await searchParams;
   const q = typeof query.q === "string" ? query.q : "";
-  const result = q ? await searchDirectory(db, session.roles, q) : { customers: [], vehicles: [] };
+  const result = q ? await searchDirectory(getDb(), session.roles, q) : { customers: [], vehicles: [] };
   const noResults = q.length > 0 && result.customers.length === 0 && result.vehicles.length === 0;
-
-  const plateText = (plate: DirectoryVehicleResult["plate"]) => (
-    <span dir="ltr">
-      {t(locale, `emirate.${plate.emirate}` as MessageKey)} {plate.code} {plate.number}
-    </span>
-  );
 
   return (
     <main className="card card-wide">
@@ -40,7 +31,7 @@ export default async function SearchPage({
           name="q"
           defaultValue={q}
           placeholder={t(locale, "directory.search.placeholder")}
-          dir="ltr"
+          dir="auto"
           autoFocus
         />
         <button type="submit">{t(locale, "directory.search.submit")}</button>
@@ -81,7 +72,12 @@ export default async function SearchPage({
             {result.vehicles.map((vehicle) => (
               <li key={vehicle.id}>
                 <a href={`/${locale}/vehicles/${vehicle.id}`}>
-                  {plateText(vehicle.plate)} —{" "}
+                  {vehicle.plate ? (
+                    <PlateText locale={locale} plate={vehicle.plate} />
+                  ) : (
+                    t(locale, "vehicle.profile.noPlate")
+                  )}{" "}
+                  —{" "}
                   <span dir="ltr">
                     {vehicle.make} {vehicle.model} ({vehicle.year})
                   </span>

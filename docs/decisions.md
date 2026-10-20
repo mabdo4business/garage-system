@@ -19,13 +19,17 @@ Status: ✅ decided · ⏳ open · 🔍 needs professional verification
 | T-01 | Quantities use 3 decimals [assumption — confirm before Increment 4] | 2026-10-15 | Technical |
 | T-02 | Arabic screens use Western digits until D-28 is decided | 2026-10-15 | Technical |
 | T-03 | Increment 0 gives `user.deactivate` to partners only | 2026-10-15 | Technical |
+| OD-1 | Plate still active on another vehicle record (US-02.4 "warn"): the advisor is warned and shown that vehicle; on confirmation — which must name the warned plate (`confirmFor`), in the UI and the API alike — the plate moves: the old vehicle's plate row is closed (audited `vehicle.plate_retired`) and that vehicle has no current plate until one is entered. Without confirmation the command refuses. (OD = owner decision taken during the build, outside the spec's D-numbering.) | 2026-10-20 | Owners |
+| T-04 | Lock kind `vehicle` ranks before `repair_order` (rank 5): a command may lock a vehicle and then its repair order, never the reverse. Two vehicles are locked together in ascending id order (plate move). | 2026-10-20 | Technical (I1-01 review) |
+| T-05 | `customer.read_contact` (mobile, email — also searching by mobile): partner, manager, service advisor, accountant. The UI/UX deck excludes only the technician; excluding the store keeper and including the accountant are assumptions [confirm before UAT]. | 2026-10-20 | Technical (I1-01) |
+| T-06 | Input formats not set by the spec [assumptions — confirm before UAT]: plate required at registration (no temporary/export/unplated vehicles yet); plate code 1–4 characters, number 1–5 digits; year 1960–2100; VIN optional, 5–32 characters (not strictly 17, for older/imported vehicles); mobile 6–15 digits after removing +971/00971/leading 0. | 2026-10-20 | Technical (I1-01) |
+| D-18 (check-in photos) | Five fixed check-in photo slots: front, rear, left, right (exterior) and odometer. Fewer only with a mandatory free-text reason recorded on the repair order. Minimum held as configuration. (v0.2 sense of D-18, PRD v0.2 §10.3; the messaging-provider D-18 stays open.) | 2026-10-20 | Owners |
 
 ## Open — needed before the increment shown
 
 | ID | Question | Needed before | Recommended default |
 |---|---|---|---|
 | B-08 | Will the garage bill non-stock items (sublet work, outside machining)? | Increment 1 | Yes, with mandatory cost entry |
-| D-18 (check-in photos) | Minimum number of required check-in photos, and what counts as a valid reason to go below it. Redefined in `docs/spec/02-prd-v0.2.md` §10.3 — later than the PRD v0.1 sense of D-18 below, so this is the live meaning; not previously logged here. | Increment 1 (I1-02) | 4 fixed exterior slots + odometer; fewer only with a mandatory reason, recorded on the repair order |
 | D-6 | Accept customer-supplied parts at launch? | Increment 2 | Not at launch; enable later |
 | D-7 | Allow phone approval at all? | Increment 2 | Yes; outbound call to number on file = verified |
 | D-11 | Diagnostic fee: amount, when charged, when waived | Increment 2 | Pre-authorised at check-in; waive if repairs approved |

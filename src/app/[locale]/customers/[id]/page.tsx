@@ -1,9 +1,8 @@
-import { cookies } from "next/headers";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { isLocale, t } from "../../../../i18n";
-import { SESSION_COOKIE, validateSession } from "../../../../server/auth/session";
 import { getDb } from "../../../../server/db/client";
 import { getCustomer } from "../../../../server/customer/service";
+import { requirePagePermission } from "../../server-support";
 
 export const dynamic = "force-dynamic";
 
@@ -14,12 +13,12 @@ export default async function CustomerProfilePage({
 }) {
   const { locale, id } = await params;
   if (!isLocale(locale)) notFound();
-  const db = getDb();
-  const token = (await cookies()).get(SESSION_COOKIE)?.value;
-  const session = await validateSession(db, token);
-  if (!session) redirect(`/${locale}/login`);
+  const session = await requirePagePermission(locale, "customer.read", {
+    entityType: "customer",
+    entityId: id,
+  });
 
-  const profile = await getCustomer(db, session.roles, id);
+  const profile = await getCustomer(getDb(), session.roles, id);
   if (!profile) notFound();
 
   return (

@@ -10,7 +10,6 @@
   "home.signOut": "تسجيل الخروج",
   "home.businessDate": "تاريخ العمل: {date}",
   "home.directory": "العملاء والمركبات",
-
   "directory.search.title": "البحث عن عملاء ومركبات",
   "directory.search.placeholder": "رقم اللوحة أو الهاتف أو الاسم أو رقم الهيكل",
   "directory.search.submit": "بحث",
@@ -19,7 +18,6 @@
   "directory.search.vehiclesHeading": "المركبات",
   "directory.newCustomer": "عميل جديد",
   "directory.newVehicle": "مركبة جديدة",
-
   "customer.new.title": "تسجيل عميل",
   "customer.new.nameEn": "الاسم (بالإنجليزية)",
   "customer.new.nameAr": "الاسم (بالعربية)",
@@ -30,16 +28,13 @@
   "customer.new.languageAr": "العربية",
   "customer.new.marketingConsent": "موافق على استقبال رسائل تسويقية",
   "customer.new.submit": "حفظ العميل",
-
   "customer.duplicate.heading": "عميل مكرر محتمل",
   "customer.duplicate.body": "يوجد عميل مسجل بنفس رقم الهاتف هذا.",
   "customer.duplicate.createAnyway": "إنشاء عميل مستقل على أي حال",
-
   "customer.profile.title": "العميل",
   "customer.profile.contactHidden": "بيانات الاتصال غير متاحة لدورك الوظيفي.",
   "customer.profile.mobile": "رقم الهاتف",
   "customer.profile.email": "البريد الإلكتروني",
-
   "vehicle.new.title": "تسجيل مركبة",
   "vehicle.new.owner": "رقم تعريف العميل المالك",
   "vehicle.new.vin": "رقم الهيكل (VIN)",
@@ -51,11 +46,9 @@
   "vehicle.new.plateCode": "فئة اللوحة",
   "vehicle.new.plateNumber": "رقم اللوحة",
   "vehicle.new.submit": "حفظ المركبة",
-
   "vehicle.duplicate.heading": "مركبة مكررة محتملة",
   "vehicle.duplicate.body": "تم العثور على رقم الهيكل أو اللوحة هذا في مركبة أخرى.",
   "vehicle.duplicate.createAnyway": "إنشاء على أي حال",
-
   "vehicle.profile.title": "المركبة",
   "vehicle.profile.owner": "المالك الحالي (رقم تعريف العميل)",
   "vehicle.profile.plate": "اللوحة",
@@ -65,12 +58,25 @@
   "vehicle.profile.changePlate": "تغيير اللوحة",
   "vehicle.profile.newOwnerId": "رقم تعريف العميل المالك الجديد",
   "vehicle.profile.submit": "حفظ",
-
   "emirate.abu_dhabi": "أبوظبي",
   "emirate.dubai": "دبي",
   "emirate.sharjah": "الشارقة",
   "emirate.ajman": "عجمان",
   "emirate.umm_al_quwain": "أم القيوين",
   "emirate.ras_al_khaimah": "رأس الخيمة",
-  "emirate.fujairah": "الفجيرة"
+  "emirate.fujairah": "الفجيرة",
+  "customer.new.name": "الاسم",
+  "vehicle.duplicate.changeAnyway": "تغيير اللوحة على أي حال",
+  "vehicle.duplicate.reason.vin": "رقم الهيكل نفسه",
+  "vehicle.duplicate.reason.plate_active": "تحمل هذه اللوحة حاليًا — التأكيد ينقل اللوحة إلى هنا",
+  "vehicle.duplicate.reason.plate_previously_active": "كانت تحمل هذه اللوحة سابقًا",
+  "vehicle.profile.noPlate": "لا توجد لوحة حالية",
+  "error.validationFailed": "بعض البيانات ناقصة أو غير صحيحة. راجع النموذج وحاول مرة أخرى.",
+  "error.validationField": "تحقّق من «{field}» وحاول مرة أخرى.",
+  "error.notFound": "لم يتم العثور على السجل. تحقّق من المعرّف وحاول مرة أخرى.",
+  "error.plateAlreadyActive": "سُجّلت هذه اللوحة للتو على مركبة أخرى. أرسل النموذج مرة أخرى لمراجعتها.",
+  "error.tryAgain": "قام شخص آخر بتعديل هذا السجل في الوقت نفسه. يرجى المحاولة مرة أخرى.",
+  "error.formReused": "أُرسل هذا النموذج سابقًا ببيانات مختلفة. أعد تحميل الصفحة وحاول مرة أخرى.",
+  "error.forbidden": "دورك لا يسمح بهذا الإجراء.",
+  "error.signedOut": "انتهت جلستك. سجّل الدخول مرة أخرى."
 }

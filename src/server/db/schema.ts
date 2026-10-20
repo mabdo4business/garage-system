@@ -146,7 +146,7 @@ export interface VehiclePlateTable {
   emirate: Emirate;
   code: string;
   number: string;
-  valid_from: Generated<Date>;
+  valid_from: Timestamp; // has a DEFAULT; commands pass the instant read under the lock
   valid_to: Timestamp | null;
   changed_by: string | null;
 }
@@ -155,7 +155,7 @@ export interface VehicleOwnershipTable {
   id: Generated<string>;
   vehicle_id: string;
   customer_id: string;
-  valid_from: Generated<Date>;
+  valid_from: Timestamp; // has a DEFAULT; commands pass the instant read under the lock
   valid_to: Timestamp | null;
   changed_by: string | null;
 }

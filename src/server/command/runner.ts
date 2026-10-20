@@ -86,6 +86,22 @@ export function isRetryable(error: unknown): boolean {
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+/**
+ * Plain read: true when `commandName` already committed with this idempotency key. Callers that
+ * show a warning before running a command (e.g. duplicate checks) use it to skip the warning on
+ * a retry, so runCommand replays the original result instead of the warning hiding it.
+ */
+export async function idempotencyKeyUsed(db: Kysely<DB>, commandName: string, key: string): Promise<boolean> {
+  if (!UUID_PATTERN.test(key)) return false;
+  const row = await db
+    .selectFrom("idempotency_key")
+    .select("key")
+    .where("command_name", "=", commandName)
+    .where("key", "=", key)
+    .executeTakeFirst();
+  return row !== undefined;
+}
+
 /** Thrown inside the transaction to leave it (rolling back nothing written) and return a stored result. */
 class ReplaySignal {
   constructor(readonly result: unknown) {}

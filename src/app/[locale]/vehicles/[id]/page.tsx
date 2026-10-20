@@ -1,12 +1,13 @@
-import { cookies } from "next/headers";
-import { notFound, redirect } from "next/navigation";
-import { isLocale, t, type MessageKey } from "../../../../i18n";
+import { randomUUID } from "node:crypto";
+import { notFound } from "next/navigation";
+import { isLocale, t } from "../../../../i18n";
 import { formatDubaiDateTime } from "../../../../i18n/format";
 import { hasPermission } from "../../../../server/auth/permissions";
-import { SESSION_COOKIE, validateSession } from "../../../../server/auth/session";
 import { getDb } from "../../../../server/db/client";
-import { EMIRATES, getVehicle } from "../../../../server/vehicle/service";
-import { changePlateAction, transferOwnerAction } from "./actions";
+import { getVehicle } from "../../../../server/vehicle/service";
+import { requirePagePermission } from "../../server-support";
+import { PlateText } from "../plate-text";
+import { ChangePlateForm, TransferOwnerForm } from "./vehicle-forms";
 
 export const dynamic = "force-dynamic";
 
@@ -17,20 +18,14 @@ export default async function VehicleProfilePage({
 }) {
   const { locale, id } = await params;
   if (!isLocale(locale)) notFound();
-  const db = getDb();
-  const token = (await cookies()).get(SESSION_COOKIE)?.value;
-  const session = await validateSession(db, token);
-  if (!session) redirect(`/${locale}/login`);
+  const session = await requirePagePermission(locale, "vehicle.read", {
+    entityType: "vehicle",
+    entityId: id,
+  });
 
-  const vehicle = await getVehicle(db, id);
+  const vehicle = await getVehicle(getDb(), id);
   if (!vehicle) notFound();
   const canWrite = hasPermission(session.roles, "vehicle.write");
-
-  const plateText = (plate: { emirate: string; code: string; number: string }) => (
-    <span dir="ltr">
-      {t(locale, `emirate.${plate.emirate}` as MessageKey)} {plate.code} {plate.number}
-    </span>
-  );
 
   return (
     <main className="card card-wide">
@@ -42,12 +37,17 @@ export default async function VehicleProfilePage({
         {vehicle.vin ? (
           <>
             {" "}
-            · VIN <span dir="ltr">{vehicle.vin}</span>
+            · {t(locale, "vehicle.new.vin")} <span dir="ltr">{vehicle.vin}</span>
           </>
         ) : null}
       </p>
       <p>
-        {t(locale, "vehicle.profile.plate")}: {plateText(vehicle.plate)}
+        {t(locale, "vehicle.profile.plate")}:{" "}
+        {vehicle.plate ? (
+          <PlateText locale={locale} plate={vehicle.plate} />
+        ) : (
+          <span className="hint">{t(locale, "vehicle.profile.noPlate")}</span>
+        )}
       </p>
       <p>
         {t(locale, "vehicle.profile.owner")}:{" "}
@@ -61,7 +61,9 @@ export default async function VehicleProfilePage({
         <tbody>
           {vehicle.plateHistory.map((row, index) => (
             <tr key={index}>
-              <td>{plateText(row)}</td>
+              <td>
+                <PlateText locale={locale} plate={row} />
+              </td>
               <td dir="ltr">{formatDubaiDateTime(row.validFrom, locale)}</td>
               <td dir="ltr">{row.validTo ? formatDubaiDateTime(row.validTo, locale) : "—"}</td>
             </tr>
@@ -75,8 +77,8 @@ export default async function VehicleProfilePage({
           {vehicle.ownershipHistory.map((row, index) => (
             <tr key={index}>
               <td>
-                <a href={`/${locale}/customers/${row.customerId}`} dir="ltr">
-                  {row.customerId}
+                <a href={`/${locale}/customers/${row.customerId}`}>
+                  {row.customerName ?? <span dir="ltr">{row.customerId}</span>}
                 </a>
               </td>
               <td dir="ltr">{formatDubaiDateTime(row.validFrom, locale)}</td>
@@ -89,32 +91,10 @@ export default async function VehicleProfilePage({
       {canWrite ? (
         <>
           <h2>{t(locale, "vehicle.profile.changePlate")}</h2>
-          <form action={changePlateAction}>
-            <input type="hidden" name="locale" value={locale} />
-            <input type="hidden" name="vehicleId" value={vehicle.id} />
-            <label htmlFor="plateEmirate">{t(locale, "vehicle.new.emirate")}</label>
-            <select id="plateEmirate" name="plateEmirate" defaultValue={vehicle.plate.emirate}>
-              {EMIRATES.map((emirate) => (
-                <option key={emirate} value={emirate}>
-                  {t(locale, `emirate.${emirate}` as MessageKey)}
-                </option>
-              ))}
-            </select>
-            <label htmlFor="plateCode">{t(locale, "vehicle.new.plateCode")}</label>
-            <input id="plateCode" name="plateCode" required dir="ltr" />
-            <label htmlFor="plateNumber">{t(locale, "vehicle.new.plateNumber")}</label>
-            <input id="plateNumber" name="plateNumber" required dir="ltr" />
-            <button type="submit">{t(locale, "vehicle.profile.submit")}</button>
-          </form>
+          <ChangePlateForm locale={locale} vehicleId={vehicle.id} idempotencyKey={randomUUID()} />
 
           <h2>{t(locale, "vehicle.profile.transferOwner")}</h2>
-          <form action={transferOwnerAction}>
-            <input type="hidden" name="locale" value={locale} />
-            <input type="hidden" name="vehicleId" value={vehicle.id} />
-            <label htmlFor="newOwnerCustomerId">{t(locale, "vehicle.profile.newOwnerId")}</label>
-            <input id="newOwnerCustomerId" name="newOwnerCustomerId" required dir="ltr" />
-            <button type="submit">{t(locale, "vehicle.profile.submit")}</button>
-          </form>
+          <TransferOwnerForm locale={locale} vehicleId={vehicle.id} idempotencyKey={randomUUID()} />
         </>
       ) : null}
     </main>

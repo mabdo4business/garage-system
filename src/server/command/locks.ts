@@ -3,8 +3,8 @@ import { LockOrderViolationError, NotFoundError } from "../core/errors";
 import type { DB } from "../db/schema";
 
 /**
- * Canonical lock order — Pre-Implementation Review P0-03:
- *   repair order → invoice(s) ↑ → revision lines ↑ → stock balances ↑ → number sequence (last)
+ * Canonical lock order — Pre-Implementation Review P0-03, with vehicle added ahead (decision T-04):
+ *   vehicle(s) ↑ → repair order → invoice(s) ↑ → revision lines ↑ → stock balances ↑ → number sequence (last)
  *
  * Ranks are fixed. Within one kind, ids are locked in ascending order. Acquiring a lower-ranked
  * kind after a higher-ranked one, or a smaller id after a larger one of the same kind, throws
