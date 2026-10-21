@@ -248,5 +248,6 @@
   "finding.unsharePhoto": "Keep internal",
   "error.inspectionClosed": "This repair order is past inspection; findings can no longer change.",
   "error.alreadyAssigned": "This technician is already assigned.",
-  "error.findingWithdrawn": "This finding was withdrawn and can no longer change."
+  "error.findingWithdrawn": "This finding was withdrawn and can no longer change.",
+  "error.itemAlreadyRecorded": "This checklist item is already recorded. Edit the existing finding instead."
 }

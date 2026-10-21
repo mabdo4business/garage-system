@@ -40,13 +40,15 @@ Status: ✅ decided · ⏳ open · 🔍 needs professional verification
 | OD-11 | Finding photos are internal by default; "show to customer" is chosen per photo. | 2026-10-21 | Owners |
 | T-10 | Fault codes are free text, upper-cased, 2–12 characters of A–Z, 0–9 and "-", at most 10 per finding [assumption — confirm before UAT]. | 2026-10-21 | Technical (I1-03) |
 | T-11 | Assigning (and reassigning) the inspection: manager or partner (B1 names MGR for Checked-in → Diagnosing; the UI/UX deck gives assignments to the manager) [assumption — confirm before UAT]. | 2026-10-21 | Technical (I1-03) |
+| T-12 | A checklist item is recorded at most once per repair order (an active finding per item); a second attempt is refused with "already recorded — edit the existing finding". Withdrawing the finding frees the item. | 2026-10-22 | Technical (I1-03 review) |
+| T-13 | The customer-facing finding view includes fault codes (diagnostic facts, not internal notes; AC-05.3 covers internal notes only) [assumption — owner to confirm before customer pages ship in I2-03]. | 2026-10-22 | Technical (I1-03 review) |
+| B-08 | Non-stock billable items are allowed (sublet work, outside machining, a one-off part bought for a job). Catalogue items are flagged stock-tracked or non-stock; a non-stock line can be invoiced only after its actual cost is entered on the line (Pre-Implementation Review P0-06 point 3). Stock-tracked parts still must be issued before invoicing. | 2026-10-22 | Owners |
 
 ## Open — needed before the increment shown
 
 | ID | Question | Needed before | Recommended default |
 |---|---|---|---|
 | OQ-1 | May one vehicle have two open repair orders at the same time (e.g. a second check-in before the first is delivered)? The spec is silent; I1-02 does not prevent it. | Before I1-06 (workshop board) | Warn at check-in, do not block |
-| B-08 | Will the garage bill non-stock items (sublet work, outside machining)? | Increment 1 | Yes, with mandatory cost entry |
 | D-6 | Accept customer-supplied parts at launch? | Increment 2 | Not at launch; enable later |
 | D-7 | Allow phone approval at all? | Increment 2 | Yes; outbound call to number on file = verified |
 | D-11 | Diagnostic fee: amount, when charged, when waived | Increment 2 | Pre-authorised at check-in; waive if repairs approved |

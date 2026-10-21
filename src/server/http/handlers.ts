@@ -25,8 +25,7 @@ import {
   updateCheckIn,
 } from "../repair-order/check-in";
 import { getPhotoFile, getRepairOrder } from "../repair-order/queries";
-import { hasPermission } from "../auth/permissions";
-import { requireRepairOrderAccess } from "../inspection/access";
+import { requireFindingAccess, requireMediaAccess, requireRepairOrderAccess } from "../inspection/access";
 import {
   addFindingPhoto,
   assignInspection,
@@ -68,6 +67,7 @@ const STATUS_BY_CODE: Record<string, number> = {
   inspection_closed: 409,
   already_assigned: 409,
   finding_withdrawn: 409,
+  item_already_recorded: 409,
   photo_not_discardable: 409,
   photo_not_locked: 409,
   photo_already_excluded: 409,
@@ -142,7 +142,8 @@ function errorResponse(error: unknown): Response {
     };
     return json(status, {
       error: error.code,
-      message: error.message,
+      // "Not found" never says what was looked up (ids would confirm what exists).
+      message: error.code === "not_found" ? "Not found" : error.message,
       ...(Object.keys(details).length > 0 ? { details } : {}),
     });
   }
@@ -613,19 +614,10 @@ export function createHandlers(db: Kysely<DB>, storage: MediaStorage = getMediaS
       try {
         const session = await currentSession(request);
         if (!session) throw new UnauthenticatedError();
+        // Staff with repair_order.read see every photo; a technician only those of the repair order they
+        // are assigned to. Anything else is "not found" and audited (AC2-30), whether or not it exists.
+        await requireMediaAccess(db, session, mediaId);
         const file = await getPhotoFile(db, mediaId);
-        // Staff with repair_order.read see every photo; a technician only those of the repair order
-        // they are assigned to (AC2-30: anything else is "not found" and audited).
-        if (!hasPermission(session.roles, "repair_order.read")) {
-          if (!file?.repairOrderId) {
-            await authorize(db, session, "repair_order.read", {
-              entityType: "media_asset",
-              entityId: mediaId,
-            });
-          } else {
-            await requireRepairOrderAccess(db, session, file.repairOrderId);
-          }
-        }
         const bytes = file ? await storage.get(file.storageKey) : null;
         if (!file || !bytes) return json(404, { error: "not_found" });
         return new Response(Buffer.from(bytes), {
@@ -710,6 +702,7 @@ export function createHandlers(db: Kysely<DB>, storage: MediaStorage = getMediaS
           entityType: "finding",
           entityId: findingId,
         });
+        await requireFindingAccess(db, session, findingId);
         const body = await readBody(request);
         const outcome = await updateFinding(db, session, findingId, findingFrom(body));
         return json(200, outcome.result);
@@ -726,6 +719,7 @@ export function createHandlers(db: Kysely<DB>, storage: MediaStorage = getMediaS
           entityType: "finding",
           entityId: findingId,
         });
+        await requireFindingAccess(db, session, findingId);
         const body = await readBody(request);
         const outcome = await withdrawFinding(db, session, findingId, toStr(body.reason));
         return json(200, outcome.result);
@@ -742,6 +736,7 @@ export function createHandlers(db: Kysely<DB>, storage: MediaStorage = getMediaS
           entityType: "finding",
           entityId: findingId,
         });
+        await requireFindingAccess(db, session, findingId);
         const { maxPhotoBytes } = await getCheckInSettings(db);
         const body = await readLimited(request, maxPhotoBytes + 64 * 1024);
         if (!body) {
@@ -774,6 +769,7 @@ export function createHandlers(db: Kysely<DB>, storage: MediaStorage = getMediaS
           entityType: "media_asset",
           entityId: mediaId,
         });
+        await requireMediaAccess(db, session, mediaId);
         const body = await readBody(request);
         const outcome = await setFindingPhotoVisibility(db, session, mediaId, toStr(body.visibility));
         return json(200, outcome.result);

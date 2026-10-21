@@ -73,6 +73,7 @@ const ERROR_KEYS: Record<string, MessageKey> = {
   inspection_closed: "error.inspectionClosed",
   already_assigned: "error.alreadyAssigned",
   finding_withdrawn: "error.findingWithdrawn",
+  item_already_recorded: "error.itemAlreadyRecorded",
   photo_not_discardable: "error.photoLocked",
   photo_not_locked: "error.photoNotLocked",
   photo_already_excluded: "error.photoAlreadyExcluded",

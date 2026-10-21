@@ -248,5 +248,6 @@
   "finding.unsharePhoto": "إبقاؤها داخلية",
   "error.inspectionClosed": "تجاوز أمر الإصلاح مرحلة الفحص، ولا يمكن تعديل الملاحظات.",
   "error.alreadyAssigned": "هذا الفني معيَّن بالفعل.",
-  "error.findingWithdrawn": "سُحبت هذه الملاحظة ولم تعد قابلة للتعديل."
+  "error.findingWithdrawn": "سُحبت هذه الملاحظة ولم تعد قابلة للتعديل.",
+  "error.itemAlreadyRecorded": "هذا البند مسجّل بالفعل. عدّل الملاحظة الموجودة بدلًا من ذلك."
 }

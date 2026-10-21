@@ -26,9 +26,9 @@ Status values: `not started` · `in progress` · `done (unmerged)` · `done` · 
 
 ## Current position
 
-- **Wave:** 1 · **Increment:** 1 · **Active story:** I1-03 (inspection findings) on `story/I1-03-inspection-findings`; I1-02 committed (unmerged; push and merge it as PR #3, which also repairs `qa`)
-- **Next story:** I1-04 (catalog & tax), once B-08 is decided
-- **Next decision needed:** B-08 (before I1-04); OQ-1 before I1-06
+- **Wave:** 1 · **Increment:** 1 · **Active story:** none; I1-02 and I1-03 committed (unmerged). Push both and merge I1-02 (PR #3, which repairs `qa`), then I1-03
+- **Next story:** I1-04 (catalog & tax): B-08 decided, ready after I1-03
+- **Next decision needed:** OQ-1 (before I1-06)
 
 ### Housekeeping before more feature work
 
@@ -38,7 +38,7 @@ Status values: `not started` · `in progress` · `done (unmerged)` · `done` · 
 - [x] Push `feature/increment-0` and `story/I1-11-app-shell` (I1-01 reached GitHub inside the I1-11 branch)
 - [x] PR `feature/increment-0` → `qa` and merge (PR #1)
 - [x] Merge I1-01 and I1-11 into `qa` (PRs #1 and #2, merged straight to `qa` rather than through `increment/1`)
-- [ ] Push `story/I1-02-repair-order-check-in` and merge it into `qa` (PR #3): `qa` does not build until then, because PR #2 carried part of I1-02 without its new files
+- [ ] Push `story/I1-02-repair-order-check-in` and `story/I1-03-inspection-findings`; merge I1-02 into `qa` (PR #3), then I1-03: `qa` does not build until then, because PR #2 carried part of I1-02 without its new files
 - [ ] Before committing yourself: `git add -A` first. `git commit -a` and most IDE defaults skip new files (this broke `qa` twice)
 - [ ] Rule from now on: every story branch is pushed the same day it is committed
 
@@ -91,8 +91,8 @@ tests pass.
 | I1-01 | Customers & vehicles | M | — | done | `story/I1-01-customers-vehicles` | 2026-10-20 | Migrations 0002–0004; decisions OD-1, T-04, T-05, T-06; in `qa` (PR #1) |
 | I1-11 | Staff app shell | M | — | done | `story/I1-11-app-shell` | 2026-10-21 | Shell, nav per role, tokens/components CSS, UI kit, Playwright e2e; 124 tests + 8 e2e; in `qa` (PR #2) |
 | I1-02 | Repair order & check-in | M | I1-01 | done (unmerged) | `story/I1-02-repair-order-check-in` | 2026-10-21 | Migrations 0005–0006; decisions OD-2–OD-7, B-12, T-07–T-09; 160 tests + 12 e2e; open question OQ-1. Follow-up: cleanup job for unreferenced photo files |
-| I1-03 | Inspection findings | S | I1-02 | in progress | `story/I1-03-inspection-findings` | 2026-10-21 | Includes inspection assignment (OD-8) and AC2-30 scoping; AC-05.2 test moves to I1-05 |
-| I1-04 | Catalog & tax | M | B-08 | not started | | | Blocked until B-08 is decided |
+| I1-03 | Inspection findings | S | I1-02 | done (unmerged) | `story/I1-03-inspection-findings` | 2026-10-22 | Migrations 0007–0008; inspection assignment (OD-8) and AC2-30 scoping; decisions OD-8–OD-11, T-10–T-13; 181 tests + 14 e2e; AC-05.2 test moves to I1-05; checklist content needs owner review (OD-9) |
+| I1-04 | Catalog & tax | M | B-08 | not started | | | B-08 decided 2026-10-22 (non-stock allowed, cost required); ready to start after I1-03 |
 | I1-05 | Estimate (single version) | L | I1-03, I1-04 | not started | | | Split before starting (L) |
 | I1-06 | Workshop execution | M | I1-05 | not started | | | Can run beside I1-07 |
 | I1-07 | Parts for a job (simple) | M | I1-05, I1-04 | not started | | | Can run beside I1-06 |
@@ -261,3 +261,4 @@ versioned customer API built on P-01's sign-in.
 | 2026-10-21 | Created from the full plan: Track A status taken from git history; Tracks B–D added as proposals (D-34, D-35, D-36) |
 | 2026-10-21 | I1-11 committed (done, unmerged); I1-02 planning started |
 | 2026-10-21 | I1-02 committed (done, unmerged); I0, I1-01 and I1-11 marked done (in `qa`); housekeeping updated |
+| 2026-10-22 | B-08 decided (I1-04 unblocked); I1-03 committed (done, unmerged) |
