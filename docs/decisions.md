@@ -24,11 +24,18 @@ Status: ✅ decided · ⏳ open · 🔍 needs professional verification
 | T-05 | `customer.read_contact` (mobile, email — also searching by mobile): partner, manager, service advisor, accountant. The UI/UX deck excludes only the technician; excluding the store keeper and including the accountant are assumptions [confirm before UAT]. | 2026-10-20 | Technical (I1-01) |
 | T-06 | Input formats not set by the spec [assumptions — confirm before UAT]: plate required at registration (no temporary/export/unplated vehicles yet); plate code 1–4 characters, number 1–5 digits; year 1960–2100; VIN optional, 5–32 characters (not strictly 17, for older/imported vehicles); mobile 6–15 digits after removing +971/00971/leading 0. | 2026-10-20 | Technical (I1-01) |
 | D-18 (check-in photos) | Five fixed check-in photo slots: front, rear, left, right (exterior) and odometer. Fewer only with a mandatory free-text reason recorded on the repair order. Minimum held as configuration. (v0.2 sense of D-18, PRD v0.2 §10.3; the messaging-provider D-18 stays open.) | 2026-10-20 | Owners |
+| OD-2 | Check-in is a draft (`check_in`) while details and photos are added; "Complete check-in" validates and creates the repair order in Checked-in in one transaction. Drafts can be abandoned, are never customer-visible and get no number. | 2026-10-21 | Owners |
+| OD-3 | Repair orders get a reference number `RO-000123` from the numbering module (series `repair_order`) when check-in completes. Not a tax document. | 2026-10-21 | Owners |
+| OD-4 | Fuel level is recorded in eighths: E, 1/8 … 7/8, F. | 2026-10-21 | Owners |
+| OD-5 | Check-in also records dashboard warning lights (US-04.1) and an optional promised completion time (US-04.5); empty means "to be confirmed after inspection". | 2026-10-21 | Owners |
+| T-07 | Photo limits where AC2-33 says `[TBD]` [assumptions — confirm before UAT]: largest upload 15 MB; shortest allowed long edge 1280 px; the tablet downscales to a 2560 px long edge (JPEG) before upload; JPEG, PNG and WebP only. Held as configuration (`app_setting`). Odometer in km. | 2026-10-21 | Technical (I1-02) |
+| T-08 | Lock ranks added in I1-02: `check_in` 7 (after vehicle, before repair order), `repair_order` 10 as reserved. | 2026-10-21 | Technical (I1-02) |
 
 ## Open — needed before the increment shown
 
 | ID | Question | Needed before | Recommended default |
 |---|---|---|---|
+| OQ-1 | May one vehicle have two open repair orders at the same time (e.g. a second check-in before the first is delivered)? The spec is silent; I1-02 does not prevent it. | Before I1-06 (workshop board) | Warn at check-in, do not block |
 | B-08 | Will the garage bill non-stock items (sublet work, outside machining)? | Increment 1 | Yes, with mandatory cost entry |
 | D-6 | Accept customer-supplied parts at launch? | Increment 2 | Not at launch; enable later |
 | D-7 | Allow phone approval at all? | Increment 2 | Yes; outbound call to number on file = verified |

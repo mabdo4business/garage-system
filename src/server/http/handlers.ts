@@ -14,6 +14,16 @@ import {
   type CustomerInput,
 } from "../customer/service";
 import { searchDirectory } from "../directory/service";
+import { getMediaStorage, type MediaStorage } from "../media/storage";
+import {
+  addCheckInPhoto,
+  checkInFieldsFrom,
+  completeCheckIn,
+  excludePhoto,
+  startCheckIn,
+  updateCheckIn,
+} from "../repair-order/check-in";
+import { getPhotoFile, getRepairOrder } from "../repair-order/queries";
 import {
   changePlate,
   createVehicle,
@@ -40,6 +50,10 @@ const STATUS_BY_CODE: Record<string, number> = {
   document_already_issued: 409,
   username_taken: 409,
   plate_already_active: 409,
+  check_in_closed: 409,
+  photo_not_discardable: 409,
+  photo_not_locked: 409,
+  photo_already_excluded: 409,
   try_again: 503,
 };
 
@@ -90,12 +104,18 @@ function plateFrom(body: Record<string, unknown>): VehicleInput["plate"] {
 function errorResponse(error: unknown): Response {
   if (error instanceof DomainError) {
     const status = STATUS_BY_CODE[error.code] ?? 400;
-    // Only the field name leaves the server: details may carry ids or other internal context.
+    // Only the field name and a fixed reason code leave the server: details may carry ids or other
+    // internal context.
     const field = error.details?.field;
+    const reason = error.details?.reason;
+    const details = {
+      ...(typeof field === "string" ? { field } : {}),
+      ...(typeof reason === "string" ? { reason } : {}),
+    };
     return json(status, {
       error: error.code,
       message: error.message,
-      ...(typeof field === "string" ? { details: { field } } : {}),
+      ...(Object.keys(details).length > 0 ? { details } : {}),
     });
   }
   logger.error("http.unhandled_error", { error });
@@ -124,7 +144,7 @@ async function readBody(request: Request): Promise<Record<string, unknown>> {
   return Object.fromEntries([...form.entries()].map(([k, v]) => [k, typeof v === "string" ? v : ""]));
 }
 
-export function createHandlers(db: Kysely<DB>) {
+export function createHandlers(db: Kysely<DB>, storage: MediaStorage = getMediaStorage()) {
   async function currentSession(request: Request): Promise<SessionUser | null> {
     return validateSession(db, readCookie(request, SESSION_COOKIE));
   }
@@ -390,6 +410,156 @@ export function createHandlers(db: Kysely<DB>) {
           toStr(body.idempotencyKey),
         );
         return json(200, outcome.result);
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    // ------------------------------------------------------------------ I1-02 check-in
+
+    /** POST /api/check-ins — JSON/form { vehicleId, idempotencyKey }. */
+    async startCheckIn(request: Request): Promise<Response> {
+      try {
+        if (!sameOrigin(request)) return json(403, { error: "forbidden" });
+        const session = await authorize(db, await currentSession(request), "repair_order.check_in");
+        const body = await readBody(request);
+        const outcome = await startCheckIn(
+          db,
+          { kind: "user", userId: session.userId },
+          toStr(body.vehicleId),
+          toStr(body.idempotencyKey),
+        );
+        return json(outcome.replayed ? 200 : 201, outcome.result);
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    /** POST /api/check-ins/:id — JSON/form draft fields (all optional until completion). */
+    async updateCheckIn(request: Request, checkInId: string): Promise<Response> {
+      try {
+        if (!sameOrigin(request)) return json(403, { error: "forbidden" });
+        const session = await authorize(db, await currentSession(request), "repair_order.check_in", {
+          entityType: "check_in",
+          entityId: checkInId,
+        });
+        if (!isUuid(checkInId)) return json(404, { error: "not_found" });
+        const body = await readBody(request);
+        const outcome = await updateCheckIn(
+          db,
+          { kind: "user", userId: session.userId },
+          checkInId,
+          checkInFieldsFrom(body),
+        );
+        return json(200, outcome.result);
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    /** POST /api/check-ins/:id/photos — multipart { slot, idempotencyKey, photo (file) }. */
+    async addCheckInPhoto(request: Request, checkInId: string): Promise<Response> {
+      try {
+        if (!sameOrigin(request)) return json(403, { error: "forbidden" });
+        const session = await authorize(db, await currentSession(request), "repair_order.check_in", {
+          entityType: "check_in",
+          entityId: checkInId,
+        });
+        if (!isUuid(checkInId)) return json(404, { error: "not_found" });
+        const form = await request.formData();
+        const file = form.get("photo");
+        if (!(file instanceof Blob))
+          return json(422, { error: "validation_failed", details: { field: "photo" } });
+        const outcome = await addCheckInPhoto(
+          db,
+          storage,
+          { kind: "user", userId: session.userId },
+          { checkInId, slot: toStr(form.get("slot")), bytes: new Uint8Array(await file.arrayBuffer()) },
+          toStr(form.get("idempotencyKey")),
+        );
+        return json(outcome.replayed ? 200 : 201, outcome.result);
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    /** POST /api/check-ins/:id/complete — JSON/form { idempotencyKey }. */
+    async completeCheckIn(request: Request, checkInId: string): Promise<Response> {
+      try {
+        if (!sameOrigin(request)) return json(403, { error: "forbidden" });
+        const session = await authorize(db, await currentSession(request), "repair_order.check_in", {
+          entityType: "check_in",
+          entityId: checkInId,
+        });
+        if (!isUuid(checkInId)) return json(404, { error: "not_found" });
+        const body = await readBody(request);
+        const outcome = await completeCheckIn(
+          db,
+          { kind: "user", userId: session.userId },
+          checkInId,
+          toStr(body.idempotencyKey),
+        );
+        return json(outcome.replayed ? 200 : 201, outcome.result);
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    /** GET /api/repair-orders/:id — the authorized contact's mobile only with customer.read_contact. */
+    async getRepairOrder(request: Request, repairOrderId: string): Promise<Response> {
+      try {
+        const session = await authorize(db, await currentSession(request), "repair_order.read", {
+          entityType: "repair_order",
+          entityId: repairOrderId,
+        });
+        const view = await getRepairOrder(db, session.roles, repairOrderId);
+        if (!view) return json(404, { error: "not_found" });
+        return json(200, view);
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    /** POST /api/media/:id/exclude — JSON/form { reason }. Manager or partner (AC2-33). */
+    async excludePhoto(request: Request, mediaId: string): Promise<Response> {
+      try {
+        if (!sameOrigin(request)) return json(403, { error: "forbidden" });
+        const session = await authorize(db, await currentSession(request), "media.exclude", {
+          entityType: "media_asset",
+          entityId: mediaId,
+        });
+        if (!isUuid(mediaId)) return json(404, { error: "not_found" });
+        const body = await readBody(request);
+        const outcome = await excludePhoto(
+          db,
+          { kind: "user", userId: session.userId },
+          mediaId,
+          toStr(body.reason),
+        );
+        return json(200, outcome.result);
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    /** GET /api/media/:id — the photo itself, never cached by shared caches. */
+    async getPhoto(request: Request, mediaId: string): Promise<Response> {
+      try {
+        await authorize(db, await currentSession(request), "repair_order.read", {
+          entityType: "media_asset",
+          entityId: mediaId,
+        });
+        const file = await getPhotoFile(db, mediaId);
+        const bytes = file ? await storage.get(file.storageKey) : null;
+        if (!file || !bytes) return json(404, { error: "not_found" });
+        return new Response(Buffer.from(bytes), {
+          status: 200,
+          headers: {
+            "content-type": file.contentType,
+            "cache-control": "private, no-store",
+            "x-content-type-options": "nosniff",
+          },
+        });
       } catch (error) {
         return errorResponse(error);
       }

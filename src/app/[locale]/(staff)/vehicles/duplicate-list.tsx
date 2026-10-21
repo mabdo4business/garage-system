@@ -13,15 +13,19 @@ export function DuplicateVehicleWarning({
   return (
     <Alert tone="warning">
       <p>
-        <strong>{t(locale, "vehicle.duplicate.heading")}</strong> — {t(locale, "vehicle.duplicate.body")}
+        <strong>{t(locale, "vehicle.duplicate.heading")}</strong>
       </p>
+      <p>{t(locale, "vehicle.duplicate.body")}</p>
       <ul>
         {matches.map((match, index) => (
           <li key={`${match.id}-${index}`}>
-            <a href={`/${locale}/vehicles/${match.id}`} dir="ltr">
-              {match.make} {match.model}
-            </a>{" "}
-            — {t(locale, `vehicle.duplicate.reason.${match.reason}`)}
+            <a href={`/${locale}/vehicles/${match.id}`}>
+              <bdi dir="ltr">
+                {match.make} {match.model}
+              </bdi>
+            </a>
+            <br />
+            <span>{t(locale, `vehicle.duplicate.reason.${match.reason}`)}</span>
           </li>
         ))}
       </ul>

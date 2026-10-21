@@ -1,0 +1,103 @@
+/*
+ * Design tokens from the UI/UX deck (docs/ui-ux/ui-ux-deck.html, slide 13). Working palette only:
+ * the final brand is decision D-29. Text/background pairs below meet 4.5:1 contrast in both themes.
+ */
+:root {
+  /* Core palette */
+  --ink: #15202b;
+  --paper: #f4f1ea;
+  --action: #a8461a;
+  --info: #1f5f8b;
+
+  /* Roles */
+  --bg: var(--paper);
+  --surface: #ffffff;
+  --surface-sunken: #ebe6dc;
+  --fg: var(--ink);
+  --muted: #525d68;
+  --border: #d9d2c4;
+  --border-strong: #8a8170; /* field edges: ≥ 3:1 on surface and page (WCAG 1.4.11) */
+  --link: var(--info);
+  --focus: var(--info);
+  --primary-bg: var(--action);
+  --primary-bg-hover: #8f3a14;
+  --primary-fg: #ffffff;
+  --danger-fg: #a12a1f;
+  --danger-bg: #fbe9e6;
+  --danger-border: #e8b4ac;
+  --warning-fg: #7a4b00;
+  --warning-bg: #fdf1d8;
+  --warning-border: #e9cf94;
+  --plate-bg: #ffffff;
+  --plate-border: var(--ink);
+  --nav-bg: var(--ink);
+  --nav-fg: #e8e4dc;
+  --nav-fg-muted: #a9b2bc;
+  --nav-active-bg: #2e4052;
+  --nav-marker: #e07a4a; /* ≥ 3:1 on --nav-active-bg in both themes */
+
+  /* Type: next/font sets --font-rubik, --font-plex, --font-plex-arabic on <html> */
+  --font-heading: var(--font-rubik), var(--font-plex-arabic), system-ui, sans-serif;
+  --font-body: var(--font-plex), var(--font-plex-arabic), system-ui, sans-serif;
+  --text-sm: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.25rem;
+  --text-xl: 1.625rem;
+
+  /* Space, shape, ergonomics (deck slide 15) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --touch: 48px;
+  --shadow-card: 0 1px 2px rgb(21 32 43 / 6%), 0 4px 12px rgb(21 32 43 / 5%);
+
+  color-scheme: light;
+}
+
+/* Arabic: the Arabic face leads both stacks (Rubik has no Arabic glyphs). */
+:root:lang(ar) {
+  --font-heading: var(--font-plex-arabic), var(--font-rubik), system-ui, sans-serif;
+  --font-body: var(--font-plex-arabic), var(--font-plex), system-ui, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f161d;
+    --surface: #18222c;
+    --surface-sunken: #121a22;
+    --fg: #ece8df;
+    --muted: #a9b2bc;
+    --border: #2b3946;
+    --border-strong: #5d7184;
+    --link: #8cc0e6;
+    --focus: #8cc0e6;
+    --primary-bg: #e07a4a;
+    --primary-bg-hover: #ea8d61;
+    --primary-fg: #15202b;
+    --danger-fg: #ffb4a8;
+    --danger-bg: #3a1d1a;
+    --danger-border: #6b302a;
+    --warning-fg: #f3d08a;
+    --warning-bg: #33280f;
+    --warning-border: #5e4a1c;
+    --plate-bg: #ece8df;
+    --plate-border: #ece8df;
+    --nav-bg: #0b1117;
+    --nav-active-bg: #1d2a36;
+    --shadow-card: none;
+    color-scheme: dark;
+  }
+}
+
+/* Tablets in the bay and at check-in: larger body text (deck: 18 px minimum). */
+@media (max-width: 1024px) and (pointer: coarse) {
+  :root {
+    --text-md: 1.125rem;
+  }
+}

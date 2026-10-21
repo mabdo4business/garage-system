@@ -32,13 +32,17 @@ export default async function CustomerProfilePage({
           {profile.nameEn ? (
             <>
               <dt>{t(locale, "customer.new.nameEn")}</dt>
-              <dd dir="ltr">{profile.nameEn}</dd>
+              <dd>
+                <bdi dir="ltr">{profile.nameEn}</bdi>
+              </dd>
             </>
           ) : null}
           {profile.nameAr ? (
             <>
               <dt>{t(locale, "customer.new.nameAr")}</dt>
-              <dd dir="rtl">{profile.nameAr}</dd>
+              <dd>
+                <bdi dir="rtl">{profile.nameAr}</bdi>
+              </dd>
             </>
           ) : null}
           <dt>{t(locale, "customer.new.language")}</dt>
@@ -53,11 +57,15 @@ export default async function CustomerProfilePage({
           {profile.contact ? (
             <>
               <dt>{t(locale, "customer.profile.mobile")}</dt>
-              <dd dir="ltr">{profile.contact.mobile}</dd>
+              <dd>
+                <bdi dir="ltr">{profile.contact.mobile}</bdi>
+              </dd>
               {profile.contact.email ? (
                 <>
                   <dt>{t(locale, "customer.profile.email")}</dt>
-                  <dd dir="ltr">{profile.contact.email}</dd>
+                  <dd>
+                    <bdi dir="ltr">{profile.contact.email}</bdi>
+                  </dd>
                 </>
               ) : null}
             </>
