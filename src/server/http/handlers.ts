@@ -1,5 +1,5 @@
 import type { Kysely } from "kysely";
-import { DomainError } from "../core/errors";
+import { DomainError, UnauthenticatedError } from "../core/errors";
 import { isUuid } from "../core/ids";
 import { idempotencyKeyUsed } from "../command/runner";
 import { logger } from "../core/logger";
@@ -25,6 +25,18 @@ import {
   updateCheckIn,
 } from "../repair-order/check-in";
 import { getPhotoFile, getRepairOrder } from "../repair-order/queries";
+import { hasPermission } from "../auth/permissions";
+import { requireRepairOrderAccess } from "../inspection/access";
+import {
+  addFindingPhoto,
+  assignInspection,
+  recordFinding,
+  setFindingPhotoVisibility,
+  updateFinding,
+  withdrawFinding,
+  type FindingInput,
+} from "../inspection/commands";
+import { getInspection } from "../inspection/queries";
 import {
   changePlate,
   createVehicle,
@@ -53,6 +65,9 @@ const STATUS_BY_CODE: Record<string, number> = {
   plate_already_active: 409,
   check_in_closed: 409,
   owner_changed: 409,
+  inspection_closed: 409,
+  already_assigned: 409,
+  finding_withdrawn: 409,
   photo_not_discardable: 409,
   photo_not_locked: 409,
   photo_already_excluded: 409,
@@ -93,6 +108,17 @@ function json(status: number, body: unknown, headers: Record<string, string> = {
 
 function redirect(location: string, headers: Record<string, string> = {}): Response {
   return new Response(null, { status: 303, headers: { location, ...headers } });
+}
+
+function findingFrom(body: Record<string, unknown>): FindingInput {
+  return {
+    title: toStr(body.title),
+    severity: toStr(body.severity),
+    faultCodes: toStr(body.faultCodes),
+    customerNote: toStr(body.customerNote) || null,
+    internalNote: toStr(body.internalNote) || null,
+    templateItemId: toStr(body.templateItemId) || null,
+  };
 }
 
 function plateFrom(body: Record<string, unknown>): VehicleInput["plate"] {
@@ -585,11 +611,21 @@ export function createHandlers(db: Kysely<DB>, storage: MediaStorage = getMediaS
     /** GET /api/media/:id — the photo itself, never cached by shared caches. */
     async getPhoto(request: Request, mediaId: string): Promise<Response> {
       try {
-        await authorize(db, await currentSession(request), "repair_order.read", {
-          entityType: "media_asset",
-          entityId: mediaId,
-        });
+        const session = await currentSession(request);
+        if (!session) throw new UnauthenticatedError();
         const file = await getPhotoFile(db, mediaId);
+        // Staff with repair_order.read see every photo; a technician only those of the repair order
+        // they are assigned to (AC2-30: anything else is "not found" and audited).
+        if (!hasPermission(session.roles, "repair_order.read")) {
+          if (!file?.repairOrderId) {
+            await authorize(db, session, "repair_order.read", {
+              entityType: "media_asset",
+              entityId: mediaId,
+            });
+          } else {
+            await requireRepairOrderAccess(db, session, file.repairOrderId);
+          }
+        }
         const bytes = file ? await storage.get(file.storageKey) : null;
         if (!file || !bytes) return json(404, { error: "not_found" });
         return new Response(Buffer.from(bytes), {
@@ -603,6 +639,144 @@ export function createHandlers(db: Kysely<DB>, storage: MediaStorage = getMediaS
             "content-disposition": "inline",
           },
         });
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    // ------------------------------------------------------------------ I1-03 inspection
+
+    /** POST /api/repair-orders/:id/inspection/assign — JSON/form { technicianUserId }. Manager or partner. */
+    async assignInspection(request: Request, repairOrderId: string): Promise<Response> {
+      try {
+        if (!sameOrigin(request)) return json(403, { error: "forbidden" });
+        const session = await authorize(db, await currentSession(request), "inspection.assign", {
+          entityType: "repair_order",
+          entityId: repairOrderId,
+        });
+        if (!isUuid(repairOrderId)) return json(404, { error: "not_found" });
+        const body = await readBody(request);
+        const outcome = await assignInspection(db, session, repairOrderId, toStr(body.technicianUserId));
+        return json(200, outcome.result);
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    /** GET /api/repair-orders/:id/inspection — findings with internal notes (staff only, AC2-30 scoped). */
+    async getInspection(request: Request, repairOrderId: string): Promise<Response> {
+      try {
+        const session = await authorize(db, await currentSession(request), "finding.record", {
+          entityType: "repair_order",
+          entityId: repairOrderId,
+        });
+        await requireRepairOrderAccess(db, session, repairOrderId);
+        const view = await getInspection(db, repairOrderId);
+        if (!view) return json(404, { error: "not_found" });
+        return json(200, view);
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    /** POST /api/repair-orders/:id/findings — JSON/form finding fields + idempotencyKey. */
+    async recordFinding(request: Request, repairOrderId: string): Promise<Response> {
+      try {
+        if (!sameOrigin(request)) return json(403, { error: "forbidden" });
+        const session = await authorize(db, await currentSession(request), "finding.record", {
+          entityType: "repair_order",
+          entityId: repairOrderId,
+        });
+        await requireRepairOrderAccess(db, session, repairOrderId);
+        const body = await readBody(request);
+        const outcome = await recordFinding(
+          db,
+          session,
+          repairOrderId,
+          findingFrom(body),
+          toStr(body.idempotencyKey),
+        );
+        return json(outcome.replayed ? 200 : 201, outcome.result);
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    /** POST /api/findings/:id — JSON/form finding fields (replaces them; before/after audited). */
+    async updateFinding(request: Request, findingId: string): Promise<Response> {
+      try {
+        if (!sameOrigin(request)) return json(403, { error: "forbidden" });
+        const session = await authorize(db, await currentSession(request), "finding.record", {
+          entityType: "finding",
+          entityId: findingId,
+        });
+        const body = await readBody(request);
+        const outcome = await updateFinding(db, session, findingId, findingFrom(body));
+        return json(200, outcome.result);
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    /** POST /api/findings/:id/withdraw — JSON/form { reason }. */
+    async withdrawFinding(request: Request, findingId: string): Promise<Response> {
+      try {
+        if (!sameOrigin(request)) return json(403, { error: "forbidden" });
+        const session = await authorize(db, await currentSession(request), "finding.record", {
+          entityType: "finding",
+          entityId: findingId,
+        });
+        const body = await readBody(request);
+        const outcome = await withdrawFinding(db, session, findingId, toStr(body.reason));
+        return json(200, outcome.result);
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    /** POST /api/findings/:id/photos — multipart { idempotencyKey, photo (file) }; starts internal (OD-11). */
+    async addFindingPhoto(request: Request, findingId: string): Promise<Response> {
+      try {
+        if (!sameOrigin(request)) return json(403, { error: "forbidden" });
+        const session = await authorize(db, await currentSession(request), "finding.record", {
+          entityType: "finding",
+          entityId: findingId,
+        });
+        const { maxPhotoBytes } = await getCheckInSettings(db);
+        const body = await readLimited(request, maxPhotoBytes + 64 * 1024);
+        if (!body) {
+          return json(413, { error: "validation_failed", details: { field: "photo", reason: "too_large" } });
+        }
+        const form = await new Response(body, {
+          headers: { "content-type": request.headers.get("content-type") ?? "" },
+        }).formData();
+        const file = form.get("photo");
+        if (!(file instanceof Blob))
+          return json(422, { error: "validation_failed", details: { field: "photo" } });
+        const outcome = await addFindingPhoto(
+          db,
+          storage,
+          session,
+          { findingId, bytes: new Uint8Array(await file.arrayBuffer()) },
+          toStr(form.get("idempotencyKey")),
+        );
+        return json(outcome.replayed ? 200 : 201, outcome.result);
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    /** POST /api/media/:id/visibility — JSON/form { visibility: "internal" | "customer" } for a finding photo. */
+    async setPhotoVisibility(request: Request, mediaId: string): Promise<Response> {
+      try {
+        if (!sameOrigin(request)) return json(403, { error: "forbidden" });
+        const session = await authorize(db, await currentSession(request), "finding.record", {
+          entityType: "media_asset",
+          entityId: mediaId,
+        });
+        const body = await readBody(request);
+        const outcome = await setFindingPhotoVisibility(db, session, mediaId, toStr(body.visibility));
+        return json(200, outcome.result);
       } catch (error) {
         return errorResponse(error);
       }

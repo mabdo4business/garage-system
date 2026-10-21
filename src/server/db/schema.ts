@@ -239,7 +239,8 @@ export interface RepairOrderTable {
 
 export interface MediaAssetTable {
   id: Generated<string>;
-  check_in_id: string;
+  check_in_id: string | null; // null for finding photos (0007)
+  finding_id: Generated<string | null>;
   repair_order_id: string | null;
   slot: PhotoSlot;
   storage_key: string;
@@ -256,6 +257,52 @@ export interface MediaAssetTable {
   excluded_at: Timestamp | null;
   excluded_by: string | null;
   excluded_reason: string | null;
+}
+
+// I1-03 — inspection findings (0007)
+
+export type FindingSeverity = "ok" | "soon" | "urgent";
+
+export interface InspectionAssignmentTable {
+  id: Generated<string>;
+  repair_order_id: string;
+  technician_user_id: string;
+  assigned_at: Generated<Date>;
+  assigned_by: string | null;
+  ended_at: Timestamp | null;
+  ended_by: string | null;
+}
+
+export interface ChecklistTemplateTable {
+  code: string;
+  name_en: string;
+  name_ar: string;
+  position: number;
+}
+
+export interface ChecklistTemplateItemTable {
+  id: Generated<string>;
+  template_code: string;
+  position: number;
+  label_en: string;
+  label_ar: string;
+}
+
+export interface FindingTable {
+  id: Generated<string>;
+  repair_order_id: string;
+  template_item_id: string | null;
+  title: string;
+  severity: FindingSeverity;
+  fault_codes: ColumnType<string[], string[] | undefined, string[]>;
+  customer_note: string | null;
+  internal_note: string | null;
+  status: Generated<"active" | "withdrawn">;
+  withdrawn_reason: string | null;
+  recorded_at: Generated<Date>;
+  recorded_by: string | null;
+  updated_at: Generated<Date>;
+  updated_by: string | null;
 }
 
 export interface DB {
@@ -277,5 +324,9 @@ export interface DB {
   check_in: CheckInTable;
   repair_order: RepairOrderTable;
   media_asset: MediaAssetTable;
+  inspection_assignment: InspectionAssignmentTable;
+  checklist_template: ChecklistTemplateTable;
+  checklist_template_item: ChecklistTemplateItemTable;
+  finding: FindingTable;
   schema_migration: SchemaMigrationTable;
 }

@@ -34,6 +34,12 @@ Status: ✅ decided · ⏳ open · 🔍 needs professional verification
 | OD-6 | Fuel level and keys received are recorded at check-in but do not block completion (B1 requires customer, vehicle, authorized contact, odometer, concerns, and photos or a reason). | 2026-10-21 | Owners |
 | OD-7 | Excluding a check-in photo (AC2-33 "by a manager"): managers and partners. | 2026-10-21 | Owners |
 | T-09 | If the vehicle's owner changes while a check-in is open, completing it is refused ("owner changed") so the advisor starts a fresh check-in for the new owner; nothing is silently reassigned [assumption — confirm before UAT]. | 2026-10-21 | Technical (I1-02 review) |
+| OD-8 | Inspection assignment is built in I1-03: a manager or partner assigns one technician to a repair order's inspection; assigning moves Checked-in → Diagnosing (`ro.diagnosis_started`). Technicians see only repair orders they are assigned to (AC2-30). | 2026-10-21 | Owners |
+| OD-9 | Starter checklist templates (periodic service, AC, electrical) are drafted by Claude in Arabic and English and seeded [owner review — check the items and wording before UAT]. Template editing is E4-S3 (P1). | 2026-10-21 | Owners |
+| OD-10 | Findings can be edited or withdrawn (with a reason) while the repair order is Checked-in or Diagnosing; every change is audited with before/after; nothing is deleted. From I1-05 a finding used in a sent estimate becomes read-only. | 2026-10-21 | Owners |
+| OD-11 | Finding photos are internal by default; "show to customer" is chosen per photo. | 2026-10-21 | Owners |
+| T-10 | Fault codes are free text, upper-cased, 2–12 characters of A–Z, 0–9 and "-", at most 10 per finding [assumption — confirm before UAT]. | 2026-10-21 | Technical (I1-03) |
+| T-11 | Assigning (and reassigning) the inspection: manager or partner (B1 names MGR for Checked-in → Diagnosing; the UI/UX deck gives assignments to the manager) [assumption — confirm before UAT]. | 2026-10-21 | Technical (I1-03) |
 
 ## Open — needed before the increment shown
 

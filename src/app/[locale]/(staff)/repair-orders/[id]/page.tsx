@@ -7,6 +7,8 @@ import { getDb } from "../../../../../server/db/client";
 import { getRepairOrder } from "../../../../../server/repair-order/queries";
 import { requirePagePermission } from "../../../server-support";
 import { ExcludePhotoForm } from "./exclude-photo-form";
+import { getInspection, listTechnicians } from "../../../../../server/inspection/queries";
+import { AssignInspectionForm } from "./inspection/inspection-forms";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +27,12 @@ export default async function RepairOrderPage({
   const ro = await getRepairOrder(getDb(), session.roles, id);
   if (!ro) notFound();
   const canExclude = hasPermission(session.roles, "media.exclude");
+  const canAssign = hasPermission(session.roles, "inspection.assign");
+  const inspection = await getInspection(getDb(), id);
+  const technicians = canAssign ? await listTechnicians(getDb()) : [];
+  const activeFindings = inspection?.findings.filter((finding) => finding.status === "active") ?? [];
+  const countOf = (severity: string) =>
+    activeFindings.filter((finding) => finding.severity === severity).length;
   const vehicleTitle = t(locale, "vehicle.summary", {
     make: ro.make,
     model: ro.model,
@@ -56,7 +64,7 @@ export default async function RepairOrderPage({
             <a href={`/${locale}/customers/${ro.customerId}`}>{ro.customerName}</a>
           </dd>
           <dt>{t(locale, "checkIn.contactName")}</dt>
-          <dd>{ro.contactName}</dd>
+          <dd dir="auto">{ro.contactName}</dd>
           <dt>{t(locale, "checkIn.relationship")}</dt>
           <dd>
             {ro.contactRelationship ? t(locale, `checkIn.relationship.${ro.contactRelationship}`) : none}
@@ -93,11 +101,11 @@ export default async function RepairOrderPage({
             {ro.fuelEighths === null ? none : t(locale, `checkIn.fuel.${ro.fuelEighths}` as MessageKey)}
           </dd>
           <dt>{t(locale, "checkIn.concerns")}</dt>
-          <dd>{ro.concerns}</dd>
+          <dd dir="auto">{ro.concerns}</dd>
           <dt>{t(locale, "checkIn.warningLights")}</dt>
-          <dd>{ro.warningLights ?? none}</dd>
+          <dd dir="auto">{ro.warningLights ?? none}</dd>
           <dt>{t(locale, "checkIn.belongings")}</dt>
-          <dd>{ro.belongings ?? none}</dd>
+          <dd dir="auto">{ro.belongings ?? none}</dd>
           <dt>{t(locale, "checkIn.keysReceived")}</dt>
           <dd>
             {ro.keysReceived === null ? none : <bdi dir="ltr">{ro.keysReceived}</bdi>}
@@ -119,10 +127,42 @@ export default async function RepairOrderPage({
           {ro.photoShortfallReason ? (
             <>
               <dt>{t(locale, "checkIn.shortfallReason")}</dt>
-              <dd>{ro.photoShortfallReason}</dd>
+              <dd dir="auto">{ro.photoShortfallReason}</dd>
             </>
           ) : null}
         </dl>
+      </Card>
+
+      <Card
+        title={t(locale, "inspection.title")}
+        actions={
+          <a className="btn btn-secondary" href={`/${locale}/repair-orders/${ro.id}/inspection`}>
+            {t(locale, "inspection.open")}
+          </a>
+        }
+      >
+        <dl className="detail-list">
+          <dt>{t(locale, "inspection.technician")}</dt>
+          <dd>{inspection?.technician?.displayName ?? t(locale, "inspection.unassigned")}</dd>
+          <dt>{t(locale, "inspection.findings")}</dt>
+          <dd>
+            {activeFindings.length === 0
+              ? t(locale, "inspection.noFindings")
+              : t(locale, "inspection.findingCounts", {
+                  urgent: String(countOf("urgent")),
+                  soon: String(countOf("soon")),
+                  ok: String(countOf("ok")),
+                })}
+          </dd>
+        </dl>
+        {canAssign && (ro.status === "checked_in" || ro.status === "diagnosing") ? (
+          <AssignInspectionForm
+            locale={locale}
+            repairOrderId={ro.id}
+            technicians={technicians}
+            currentTechnicianId={inspection?.technician?.userId ?? null}
+          />
+        ) : null}
       </Card>
 
       <Card title={t(locale, "checkIn.section.photos")}>

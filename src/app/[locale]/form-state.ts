@@ -55,4 +55,14 @@ export const FIELD_LABELS: Record<string, MessageKey> = {
   excludedReason: "repairOrder.excludeReason",
   photo: "checkIn.section.photos",
   slot: "checkIn.section.photos",
+  // I1-03 inspection
+  technicianUserId: "inspection.technician",
+  title: "finding.title",
+  severity: "finding.severity",
+  faultCodes: "finding.faultCodes",
+  customerNote: "finding.customerNote",
+  internalNote: "finding.internalNote",
+  templateItemId: "inspection.checklist",
+  withdrawnReason: "finding.withdrawReason",
+  visibility: "finding.photo",
 };

@@ -48,6 +48,13 @@ export const PERMISSIONS = {
   "repair_order.read": ["partner", "manager", "service_advisor"],
   // AC2-33: after check-in a photo can only be marked excluded, by a manager, with a reason.
   "media.exclude": ["partner", "manager"],
+
+  // I1-03: assigning the inspection (T-11) and recording findings. A technician records findings only
+  // on repair orders whose inspection they are assigned to (checked in the inspection module, AC2-30).
+  "inspection.assign": ["partner", "manager"],
+  "finding.record": ["partner", "manager", "service_advisor", "technician"],
+  // The technician's own list of assigned inspections (menu item "My inspections").
+  "inspection.my_work": ["technician"],
 } as const satisfies Record<string, readonly Role[]>;
 
 export type Permission = keyof typeof PERMISSIONS;

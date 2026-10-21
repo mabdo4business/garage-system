@@ -304,16 +304,31 @@ export async function listOpenWork(
   };
 }
 
-/** For GET /api/media/:id — the caller has already authorized the viewer. */
+/**
+ * For GET /api/media/:id. `repairOrderId` is the repair order the photo belongs to (a locked check-in
+ * photo or a finding photo); null for a check-in still in progress. The caller decides access.
+ */
 export async function getPhotoFile(
   db: Kysely<DB>,
   mediaId: string,
-): Promise<{ storageKey: string; contentType: string } | null> {
+): Promise<{ storageKey: string; contentType: string; repairOrderId: string | null } | null> {
   if (!isUuid(mediaId)) return null;
   const row = await db
     .selectFrom("media_asset")
-    .select(["storage_key", "content_type"])
-    .where("id", "=", mediaId)
+    .leftJoin("finding", "finding.id", "media_asset.finding_id")
+    .select([
+      "media_asset.storage_key",
+      "media_asset.content_type",
+      "media_asset.repair_order_id",
+      "finding.repair_order_id as finding_repair_order_id",
+    ])
+    .where("media_asset.id", "=", mediaId)
     .executeTakeFirst();
-  return row ? { storageKey: row.storage_key, contentType: row.content_type } : null;
+  return row
+    ? {
+        storageKey: row.storage_key,
+        contentType: row.content_type,
+        repairOrderId: row.repair_order_id ?? row.finding_repair_order_id,
+      }
+    : null;
 }

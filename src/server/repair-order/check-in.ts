@@ -330,9 +330,11 @@ export async function discardCheckInPhoto(
     .select("check_in_id")
     .where("id", "=", mediaId)
     .executeTakeFirst();
-  if (!media) throw new NotFoundError("media_asset", mediaId);
+  // Only check-in photos are discarded here; finding photos have their own command.
+  if (!media?.check_in_id) throw new NotFoundError("media_asset", mediaId);
+  const checkInId = media.check_in_id;
   return runCommand(db, { name: "check_in.discard_photo", actor }, async (ctx) => {
-    await lockOpenCheckIn(ctx, media.check_in_id);
+    await lockOpenCheckIn(ctx, checkInId);
     const updated = await ctx.tx
       .updateTable("media_asset")
       .set({ discarded_at: ctx.txTime })
@@ -346,7 +348,7 @@ export async function discardCheckInPhoto(
       action: "check_in.photo_discarded",
       entityType: "media_asset",
       entityId: mediaId,
-      details: { checkInId: media.check_in_id, reason: "removed" },
+      details: { checkInId, reason: "removed" },
     });
     return { mediaId };
   });

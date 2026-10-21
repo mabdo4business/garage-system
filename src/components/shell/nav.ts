@@ -26,6 +26,14 @@ export const NAV_ITEMS: readonly NavItem[] = [
     sections: ["/repair-orders", "/check-ins"],
   },
   {
+    key: "myInspections",
+    label: "nav.myInspections",
+    path: "/inspections",
+    permission: "inspection.my_work",
+    // A technician reaches the inspection screen (under /repair-orders) only from here.
+    sections: ["/inspections", "/repair-orders"],
+  },
+  {
     key: "directory",
     label: "nav.directory",
     path: "/search",
