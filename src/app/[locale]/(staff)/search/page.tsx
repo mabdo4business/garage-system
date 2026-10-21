@@ -92,7 +92,11 @@ export default async function SearchPage({
                     <span className="meta">{t(locale, "vehicle.profile.noPlate")}</span>
                   )}
                   <span dir="ltr">
-                    {vehicle.make} {vehicle.model} ({vehicle.year})
+                    {t(locale, "vehicle.summary", {
+                      make: vehicle.make,
+                      model: vehicle.model,
+                      year: String(vehicle.year),
+                    })}
                   </span>
                 </a>
               </li>

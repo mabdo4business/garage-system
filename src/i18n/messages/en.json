@@ -6,10 +6,8 @@
   "login.submit": "Sign in",
   "login.error": "The username or password is incorrect.",
   "login.switchLanguage": "العربية",
-  "home.signedInAs": "Signed in as {name}",
   "home.signOut": "Sign out",
   "home.businessDate": "Business date: {date}",
-  "home.directory": "Customers & vehicles",
   "directory.search.title": "Search customers & vehicles",
   "directory.search.placeholder": "Plate, mobile, name or VIN",
   "directory.search.submit": "Search",
@@ -49,7 +47,6 @@
   "vehicle.duplicate.heading": "Possible duplicate",
   "vehicle.duplicate.body": "This VIN or plate was found on another vehicle.",
   "vehicle.duplicate.createAnyway": "Create anyway",
-  "vehicle.profile.title": "Vehicle",
   "vehicle.profile.owner": "Current owner",
   "vehicle.profile.plate": "Plate",
   "vehicle.profile.plateHistory": "Plate history",
@@ -57,7 +54,6 @@
   "vehicle.profile.transferOwner": "Transfer owner",
   "vehicle.profile.changePlate": "Change plate",
   "vehicle.profile.newOwnerId": "New owner customer ID",
-  "vehicle.profile.submit": "Save",
   "emirate.abu_dhabi": "Abu Dhabi",
   "emirate.dubai": "Dubai",
   "emirate.sharjah": "Sharjah",
@@ -109,5 +105,7 @@
   "vehicle.profile.current": "Current",
   "vehicle.profile.from": "From",
   "vehicle.profile.to": "To",
-  "vehicle.profile.ownerColumn": "Owner"
+  "vehicle.profile.ownerColumn": "Owner",
+  "common.listSeparator": " · ",
+  "vehicle.summary": "{make} {model} ({year})"
 }

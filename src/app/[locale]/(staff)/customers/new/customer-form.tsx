@@ -25,9 +25,9 @@ export function CustomerForm({ locale, idempotencyKey }: { locale: Locale; idemp
       {duplicate ? (
         <Alert tone="warning">
           <p>
-            <strong>{t(locale, "customer.duplicate.heading")}</strong> —{" "}
-            {t(locale, "customer.duplicate.body")}
+            <strong>{t(locale, "customer.duplicate.heading")}</strong>
           </p>
+          <p>{t(locale, "customer.duplicate.body")}</p>
           <ul>
             {duplicate.matches.map((match) => (
               <li key={match.id}>

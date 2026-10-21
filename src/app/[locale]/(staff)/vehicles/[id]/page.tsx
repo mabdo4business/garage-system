@@ -45,11 +45,15 @@ export default async function VehicleProfilePage({
       <Card>
         <dl className="detail-list">
           <dt>{t(locale, "vehicle.new.year")}</dt>
-          <dd dir="ltr">{vehicle.year}</dd>
+          <dd>
+            <bdi dir="ltr">{vehicle.year}</bdi>
+          </dd>
           {vehicle.vin ? (
             <>
               <dt>{t(locale, "vehicle.new.vin")}</dt>
-              <dd dir="ltr">{vehicle.vin}</dd>
+              <dd>
+                <bdi dir="ltr">{vehicle.vin}</bdi>
+              </dd>
             </>
           ) : null}
           {vehicle.colour ? (

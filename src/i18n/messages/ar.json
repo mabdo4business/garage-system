@@ -6,10 +6,8 @@
   "login.submit": "تسجيل الدخول",
   "login.error": "اسم المستخدم أو كلمة المرور غير صحيحة.",
   "login.switchLanguage": "English",
-  "home.signedInAs": "تم تسجيل الدخول باسم {name}",
   "home.signOut": "تسجيل الخروج",
   "home.businessDate": "تاريخ العمل: {date}",
-  "home.directory": "العملاء والمركبات",
   "directory.search.title": "البحث عن عملاء ومركبات",
   "directory.search.placeholder": "رقم اللوحة أو الهاتف أو الاسم أو رقم الهيكل",
   "directory.search.submit": "بحث",
@@ -49,7 +47,6 @@
   "vehicle.duplicate.heading": "مركبة مكررة محتملة",
   "vehicle.duplicate.body": "تم العثور على رقم الهيكل أو اللوحة هذا في مركبة أخرى.",
   "vehicle.duplicate.createAnyway": "إنشاء على أي حال",
-  "vehicle.profile.title": "المركبة",
   "vehicle.profile.owner": "المالك الحالي",
   "vehicle.profile.plate": "اللوحة",
   "vehicle.profile.plateHistory": "سجل اللوحات",
@@ -57,7 +54,6 @@
   "vehicle.profile.transferOwner": "نقل الملكية",
   "vehicle.profile.changePlate": "تغيير اللوحة",
   "vehicle.profile.newOwnerId": "رقم تعريف العميل المالك الجديد",
-  "vehicle.profile.submit": "حفظ",
   "emirate.abu_dhabi": "أبوظبي",
   "emirate.dubai": "دبي",
   "emirate.sharjah": "الشارقة",
@@ -109,5 +105,7 @@
   "vehicle.profile.current": "حالي",
   "vehicle.profile.from": "من",
   "vehicle.profile.to": "إلى",
-  "vehicle.profile.ownerColumn": "المالك"
+  "vehicle.profile.ownerColumn": "المالك",
+  "common.listSeparator": "، ",
+  "vehicle.summary": "{make} {model} ({year})"
 }
