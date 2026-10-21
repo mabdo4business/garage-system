@@ -69,6 +69,7 @@ const ERROR_KEYS: Record<string, MessageKey> = {
   forbidden: "error.forbidden",
   unauthenticated: "error.signedOut",
   check_in_closed: "error.checkInClosed",
+  owner_changed: "error.ownerChanged",
   photo_not_discardable: "error.photoLocked",
   photo_not_locked: "error.photoNotLocked",
   photo_already_excluded: "error.photoAlreadyExcluded",

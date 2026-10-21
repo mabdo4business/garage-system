@@ -169,10 +169,9 @@
   "checkIn.removePhoto": "حذف",
   "checkIn.uploading": "جارٍ الرفع…",
   "checkIn.photoError.tooLarge": "حجم الصورة كبير جدًا. حاول بصورة أصغر.",
-  "checkIn.photoError.tooSmall": "دقة الصورة منخفضة جدًا ولا تصلح كدليل. التقطها مرة أخرى.",
   "checkIn.photoError.notImage": "هذا الملف ليس صورة JPEG أو PNG أو WebP.",
   "checkIn.photoError.failed": "تعذّر رفع الصورة. تحقّق من الاتصال وحاول مرة أخرى.",
-  "repairOrder.title": "أمر الإصلاح {number}",
+  "repairOrder.title": "أمر الإصلاح",
   "repairOrder.newCheckIn": "استلام جديد",
   "repairOrder.checkInsInProgress": "عمليات استلام قيد التنفيذ",
   "repairOrder.open": "أوامر الإصلاح المفتوحة",
@@ -199,5 +198,6 @@
   "error.checkInClosed": "هذا الاستلام مكتمل أو ملغى ولم يعد قابلًا للتعديل.",
   "error.photoLocked": "هذه الصورة مقفلة ولا يمكن حذفها.",
   "error.photoNotLocked": "صور الاستلام قيد التنفيذ تُحذف ولا تُستبعد.",
-  "error.photoAlreadyExcluded": "هذه الصورة مستبعدة بالفعل."
+  "error.photoAlreadyExcluded": "هذه الصورة مستبعدة بالفعل.",
+  "error.ownerChanged": "تغيّر مالك هذه المركبة بعد بدء الاستلام. ألغِ الاستلام وابدأ استلامًا جديدًا."
 }

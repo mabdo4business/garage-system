@@ -224,11 +224,11 @@ export interface RepairOrderTable {
   contact_mobile: string;
   contact_relationship: ContactRelationship;
   odometer_km: number;
-  fuel_eighths: number;
+  fuel_eighths: number | null; // optional since 0006 (OD-6)
   warning_lights: string | null;
   concerns: string;
   belongings: string | null;
-  keys_received: number;
+  keys_received: number | null;
   key_tag: string | null;
   promised_at: Timestamp | null;
   photo_shortfall_reason: string | null;
