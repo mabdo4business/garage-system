@@ -166,6 +166,98 @@ export interface SchemaMigrationTable {
   applied_at: Generated<Date>;
 }
 
+// I1-02 — repair order & check-in (0005)
+
+export interface AppSettingTable {
+  key: string;
+  value: Json;
+}
+
+export type ContactRelationship = "owner" | "driver" | "company_representative" | "other";
+export type CheckInStatus = "in_progress" | "completed" | "abandoned";
+export type RepairOrderStatus =
+  | "checked_in"
+  | "diagnosing"
+  | "awaiting_approval"
+  | "in_progress"
+  | "qc"
+  | "release_check"
+  | "ready"
+  | "delivered"
+  | "closed"
+  | "cancelled";
+export type PhotoSlot = "front" | "rear" | "left" | "right" | "odometer" | "other";
+export type ImageType = "image/jpeg" | "image/png" | "image/webp";
+
+export interface CheckInTable {
+  id: Generated<string>;
+  customer_id: string;
+  vehicle_id: string;
+  status: Generated<CheckInStatus>;
+  contact_name: string | null;
+  contact_mobile: string | null;
+  contact_mobile_normalized: string | null;
+  contact_relationship: ContactRelationship | null;
+  odometer_km: number | null;
+  fuel_eighths: number | null;
+  warning_lights: string | null;
+  concerns: string | null;
+  belongings: string | null;
+  keys_received: number | null;
+  key_tag: string | null;
+  promised_at: Timestamp | null;
+  photo_shortfall_reason: string | null;
+  abandoned_reason: string | null;
+  created_at: Generated<Date>;
+  created_by: string | null;
+  updated_at: Timestamp;
+}
+
+export interface RepairOrderTable {
+  id: Generated<string>;
+  number: string;
+  status: Generated<RepairOrderStatus>;
+  customer_id: string;
+  vehicle_id: string;
+  check_in_id: string;
+  contact_name: string;
+  contact_mobile: string;
+  contact_relationship: ContactRelationship;
+  odometer_km: number;
+  fuel_eighths: number;
+  warning_lights: string | null;
+  concerns: string;
+  belongings: string | null;
+  keys_received: number;
+  key_tag: string | null;
+  promised_at: Timestamp | null;
+  photo_shortfall_reason: string | null;
+  checked_in_at: Timestamp;
+  checked_in_by: string | null;
+  business_date: DbDate;
+}
+
+export interface MediaAssetTable {
+  id: Generated<string>;
+  check_in_id: string;
+  repair_order_id: string | null;
+  slot: PhotoSlot;
+  storage_key: string;
+  content_type: ImageType;
+  byte_size: number;
+  sha256: string;
+  width: number;
+  height: number;
+  visibility: Generated<"internal" | "customer">;
+  uploaded_at: Generated<Date>;
+  uploaded_by: string | null;
+  discarded_at: Timestamp | null;
+  locked_at: Timestamp | null;
+  excluded_at: Timestamp | null;
+  excluded_by: string | null;
+  excluded_reason: string | null;
+}
+
 export interface DB {
   app_user: AppUserTable;
   user_role: UserRoleTable;
@@ -181,5 +273,9 @@ export interface DB {
   vehicle: VehicleTable;
   vehicle_plate: VehiclePlateTable;
   vehicle_ownership: VehicleOwnershipTable;
+  app_setting: AppSettingTable;
+  check_in: CheckInTable;
+  repair_order: RepairOrderTable;
+  media_asset: MediaAssetTable;
   schema_migration: SchemaMigrationTable;
 }

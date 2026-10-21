@@ -19,6 +19,13 @@ export interface NavItem {
 export const NAV_ITEMS: readonly NavItem[] = [
   { key: "today", label: "nav.today", path: "", permission: null, sections: [] },
   {
+    key: "repairOrders",
+    label: "nav.repairOrders",
+    path: "/repair-orders",
+    permission: "repair_order.read",
+    sections: ["/repair-orders", "/check-ins"],
+  },
+  {
     key: "directory",
     label: "nav.directory",
     path: "/search",

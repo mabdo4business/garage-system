@@ -75,7 +75,8 @@ describe("S12 — staff app shell", () => {
   });
 
   it("marks the section of the current page as active", () => {
-    const [today, directory] = NAV_ITEMS;
+    const item = (key: string) => NAV_ITEMS.find((candidate) => candidate.key === key)!;
+    const [today, directory, repairOrders] = [item("today"), item("directory"), item("repairOrders")];
     expect(pathWithinLocale("/ar")).toBe("");
     expect(pathWithinLocale("/en/vehicles/abc")).toBe("/vehicles/abc");
     expect(isActive(today!, "")).toBe(true);
@@ -84,6 +85,10 @@ describe("S12 — staff app shell", () => {
       expect(isActive(directory!, path)).toBe(true);
     }
     expect(isActive(directory!, "/searching")).toBe(false);
+    for (const path of ["/repair-orders", "/repair-orders/abc", "/check-ins/abc"]) {
+      expect(isActive(repairOrders!, path)).toBe(true);
+      expect(isActive(directory!, path)).toBe(false);
+    }
   });
 
   it.each(LOCALES)(

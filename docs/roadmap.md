@@ -89,7 +89,7 @@ tests pass.
 |---|---|---|---|---|---|---|---|
 | I1-01 | Customers & vehicles | M | — | done (unmerged) | `story/I1-01-customers-vehicles` | 2026-10-20 | Migrations 0002–0004; decisions OD-1, T-04, T-05, T-06; branch not pushed |
 | I1-11 | Staff app shell | M | — | done (unmerged) | `story/I1-11-app-shell` | 2026-10-21 | Shell, nav per role, tokens/components CSS, UI kit, Playwright e2e; 124 tests + 8 e2e; branch not pushed |
-| I1-02 | Repair order & check-in | M | I1-01 | not started | | | Five photo slots per D-18 (check-in photos) |
+| I1-02 | Repair order & check-in | M | I1-01 | in progress | `story/I1-02-repair-order-check-in` | 2026-10-21 | Five photo slots per D-18 (check-in photos); planning |
 | I1-03 | Inspection findings | S | I1-02 | not started | | | |
 | I1-04 | Catalog & tax | M | B-08 | not started | | | Blocked until B-08 is decided |
 | I1-05 | Estimate (single version) | L | I1-03, I1-04 | not started | | | Split before starting (L) |

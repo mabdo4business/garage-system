@@ -68,6 +68,10 @@ const ERROR_KEYS: Record<string, MessageKey> = {
   idempotency_payload_mismatch: "error.formReused",
   forbidden: "error.forbidden",
   unauthenticated: "error.signedOut",
+  check_in_closed: "error.checkInClosed",
+  photo_not_discardable: "error.photoLocked",
+  photo_not_locked: "error.photoNotLocked",
+  photo_already_excluded: "error.photoAlreadyExcluded",
 };
 
 /**

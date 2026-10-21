@@ -165,3 +165,14 @@ export function PlateBadge({
 function cx(...classes: (string | undefined)[]): string {
   return classes.filter(Boolean).join(" ");
 }
+
+/** A status shown in words with a coloured edge (deck: status never by colour alone). */
+export function StatusChip({
+  children,
+  tone = "info",
+}: {
+  children: ReactNode;
+  tone?: "info" | "neutral" | "warning";
+}) {
+  return <span className={`chip chip-${tone}`}>{children}</span>;
+}

@@ -12,7 +12,13 @@ import type { DB } from "../db/schema";
  * required is subject to UAE tax-agent verification (V-2); format is configuration in
  * number_series, so answers do not require code changes.
  */
-export type Series = "invoice" | "credit_note" | "release_note" | "service_record" | "test_document";
+export type Series =
+  | "invoice"
+  | "credit_note"
+  | "release_note"
+  | "service_record"
+  | "repair_order" // I1-02 (OD-3): reference number, not a tax document
+  | "test_document";
 
 export interface AllocatedNumber {
   series: Series;

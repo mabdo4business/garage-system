@@ -7,6 +7,7 @@ import { hasPermission } from "../../../../../server/auth/permissions";
 import { getDb } from "../../../../../server/db/client";
 import { getVehicle } from "../../../../../server/vehicle/service";
 import { requirePagePermission } from "../../../server-support";
+import { CheckInButton } from "../../check-ins/check-in-button";
 import { ChangePlateForm, TransferOwnerForm } from "./vehicle-forms";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +27,7 @@ export default async function VehicleProfilePage({
   const vehicle = await getVehicle(getDb(), id);
   if (!vehicle) notFound();
   const canWrite = hasPermission(session.roles, "vehicle.write");
+  const canCheckIn = hasPermission(session.roles, "repair_order.check_in");
   const when = (instant: Date | null) =>
     instant ? <bdi>{formatDubaiDateTime(instant, locale)}</bdi> : t(locale, "vehicle.profile.current");
 
@@ -40,6 +42,7 @@ export default async function VehicleProfilePage({
             t(locale, "vehicle.profile.noPlate")
           )
         }
+        actions={canCheckIn ? <CheckInButton locale={locale} vehicleId={vehicle.id} /> : undefined}
       />
 
       <Card>

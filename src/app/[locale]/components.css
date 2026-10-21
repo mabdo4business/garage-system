@@ -626,3 +626,174 @@ select:focus-visible {
     font-size: var(--text-md);
   }
 }
+
+/* ---------------------------------------------------------------- Status chip */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: 28px;
+  padding-inline: var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-inline-start-width: 4px;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--fg);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.chip-info {
+  border-inline-start-color: var(--link);
+}
+
+.chip-warning {
+  border-inline-start-color: var(--warning-fg);
+}
+
+/* ---------------------------------------------------------------- Segmented choice (fuel) */
+
+.segmented {
+  display: grid;
+  grid-template-columns: repeat(9, minmax(48px, 1fr));
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.segmented legend {
+  margin-block-end: var(--space-1);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.segmented label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-block-size: var(--touch);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.segmented input {
+  position: absolute;
+  opacity: 0;
+  inline-size: 1px;
+  block-size: 1px;
+}
+
+.segmented label:has(input:checked) {
+  background: var(--primary-bg);
+  border-color: var(--primary-bg);
+  color: var(--primary-fg);
+}
+
+.segmented label:has(input:focus-visible) {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+@media (max-width: 600px) {
+  .segmented {
+    grid-template-columns: repeat(5, minmax(48px, 1fr));
+  }
+}
+
+/* ---------------------------------------------------------------- Photo slots */
+
+.photo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--space-3);
+}
+
+.photo-slot {
+  display: grid;
+  gap: var(--space-2);
+  align-content: start;
+  padding: var(--space-3);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.photo-slot.filled {
+  border-style: solid;
+}
+
+.photo-slot img {
+  inline-size: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+}
+
+.photo-slot .placeholder {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.photo-slot .slot-name {
+  font-weight: 600;
+}
+
+.photo-slot.excluded img {
+  opacity: 0.4;
+}
+
+/* File inputs are hidden behind a full-size label button (camera on tablets). */
+.file-button input[type="file"] {
+  position: absolute;
+  opacity: 0;
+  inline-size: 1px;
+  block-size: 1px;
+}
+
+textarea {
+  min-block-size: calc(var(--touch) * 2);
+  padding: var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: inherit;
+  font: inherit;
+  resize: vertical;
+}
+
+textarea:focus-visible {
+  outline-offset: 0;
+  border-color: var(--focus);
+}
+
+/* ---------------------------------------------------------------- Disclosure (rare actions) */
+
+.disclosure summary {
+  display: flex;
+  align-items: center;
+  min-block-size: var(--touch);
+  padding-inline: var(--space-3);
+  border-radius: var(--radius-md);
+  color: var(--link);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.disclosure summary:hover {
+  background: var(--surface-sunken);
+}
+
+.disclosure[open] summary {
+  margin-block-end: var(--space-2);
+}

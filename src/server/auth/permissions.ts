@@ -41,6 +41,13 @@ export const PERMISSIONS = {
   "customer.read_contact": ["partner", "manager", "service_advisor", "accountant"],
   "customer.write": ["partner", "manager", "service_advisor"],
   "vehicle.write": ["partner", "manager", "service_advisor"],
+
+  // I1-02: check-in at the counter. Technicians see repair orders only through their own assigned
+  // jobs (I1-06, AC2-30), so they get no repair_order.* permission yet.
+  "repair_order.check_in": ["partner", "manager", "service_advisor"],
+  "repair_order.read": ["partner", "manager", "service_advisor"],
+  // AC2-33: after check-in a photo can only be marked excluded, by a manager, with a reason.
+  "media.exclude": ["partner", "manager"],
 } as const satisfies Record<string, readonly Role[]>;
 
 export type Permission = keyof typeof PERMISSIONS;
