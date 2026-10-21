@@ -36,6 +36,8 @@ Vitest against a real PostgreSQL.
 npm install                 # on your Mac, installs the macOS binaries
 npm test                    # starts an embedded PostgreSQL automatically; no Docker needed
 npm run check               # typecheck + lint + format check + tests
+npx playwright install chromium   # once, for the browser tests
+npm run test:e2e            # browser tests: AR/EN flows at desktop and tablet widths
 ```
 
 Run the app locally:

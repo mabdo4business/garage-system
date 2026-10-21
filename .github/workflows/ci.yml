@@ -11,7 +11,7 @@ permissions:
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -22,5 +22,10 @@ jobs:
       # Typecheck, lint, format check and all tests (an embedded PostgreSQL starts automatically).
       - run: npm run check
       - run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+      # Browser tests (I1-11): Arabic/English flows at desktop and tablet widths against a throwaway database.
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
         env:
           NEXT_TELEMETRY_DISABLED: "1"

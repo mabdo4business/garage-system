@@ -51,6 +51,9 @@ Status: ✅ decided · ⏳ open · 🔍 needs professional verification
 | D-18 / D-3 (messaging provider) | WhatsApp vs SMS provider for automated messages — the PRD v0.1 sense of D-18; see D-18 (check-in photos) above for the v0.2 sense | Increment 6 | Staff-initiated sharing at launch |
 | D-28 | Arabic-Indic or Western digits in Arabic | Before launch | Western |
 | D-29 | Brand name, logo and colours | Before launch | — |
+| D-34 | Build the public website (Track B in `docs/roadmap.md`) now, and which pages? | Wave 3 (before opening) | Yes: W-01–W-05 and W-07 before opening, inside the same Next.js app; W-06 after I5-05 |
+| D-35 | Bring the customer portal (Track C phase C2, was P2) forward to straight after opening? | After opening | Yes, as a PWA, after the lawyer's review V-1 |
+| D-36 | Native mobile app (Track D): when and with what technology? | 60–90 days after opening | Only when the start conditions in `docs/roadmap.md` Track D are met; React Native with Expo |
 | D-12, D-13, D-14, D-15, D-21, D-22 | Cancellation rules, cash rounding, refund methods, warranty terms, opening hours, document wording | Before launch | See PRD v0.2 §11 |
 
 ## Professional verification

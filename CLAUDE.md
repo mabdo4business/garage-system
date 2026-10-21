@@ -6,6 +6,7 @@ Arabic (RTL) and English, AED, Asia/Dubai.
 ## Read first
 
 - Implementation plan and current increment: @docs/implementation-plan.md
+- Progress tracker (status of every story, all four tracks, current position): @docs/roadmap.md
 - Specification (later documents win when they disagree): `docs/spec/` — newest is
   `docs/spec/06-amendment-v0.2.2.md`. Do not paste the specs into context wholesale; open the section you need.
 - Decisions taken and still open: @docs/decisions.md
@@ -19,6 +20,7 @@ TypeScript (strict) · Node 22 · PostgreSQL 16+ · Kysely with plain SQL migrat
 
 - `npm run check` — typecheck + lint + format check + all tests. **Must pass before every commit.**
 - `npm test` / `npx vitest run tests/<file>` — tests (starts an embedded PostgreSQL by itself)
+- `npm run test:e2e` — browser tests (Playwright; own throwaway database, app on port 5002). First time: `npx playwright install chromium`
 - `npm run typecheck`, `npm run lint`, `npm run format`
 - `npm run build` — Next.js production build
 - `npm run db:dev` then `npm run dev` — run the app locally (see README)
@@ -65,6 +67,8 @@ TypeScript (strict) · Node 22 · PostgreSQL 16+ · Kysely with plain SQL migrat
 4. Run `npm run check`. Never claim a test passed without running it and reading the output.
 5. Ask the `integrity-reviewer` subagent to review the diff; fix what it finds.
 6. Commit on a feature branch with a message naming the story ID. Do not push or merge without the owner's say-so.
+7. Keep `docs/roadmap.md` current: `in progress` when a story starts, `done (unmerged)` in the story's own commit,
+   `blocked` (with the decision ID) when an open decision stops it. Never start a story whose status is `proposed`.
 
 ## Things to avoid
 

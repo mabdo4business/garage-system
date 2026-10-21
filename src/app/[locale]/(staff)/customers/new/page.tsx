@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { notFound } from "next/navigation";
-import { isLocale, t } from "../../../../i18n";
-import { requirePagePermission } from "../../server-support";
+import { Card, PageHeader } from "../../../../../components/ui";
+import { isLocale, t } from "../../../../../i18n";
+import { requirePagePermission } from "../../../server-support";
 import { CustomerForm } from "./customer-form";
 
 export const dynamic = "force-dynamic";
@@ -12,9 +13,11 @@ export default async function NewCustomerPage({ params }: { params: Promise<{ lo
   await requirePagePermission(locale, "customer.write");
 
   return (
-    <main className="card card-wide">
-      <h1>{t(locale, "customer.new.title")}</h1>
-      <CustomerForm locale={locale} idempotencyKey={randomUUID()} />
-    </main>
+    <>
+      <PageHeader title={t(locale, "customer.new.title")} />
+      <Card>
+        <CustomerForm locale={locale} idempotencyKey={randomUUID()} />
+      </Card>
+    </>
   );
 }

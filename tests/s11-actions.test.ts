@@ -41,8 +41,8 @@ vi.mock("../src/server/db/client", async (importOriginal) => ({
   getDb: () => state.db!,
 }));
 
-const { createCustomerAction } = await import("../src/app/[locale]/customers/new/actions");
-const { createVehicleAction } = await import("../src/app/[locale]/vehicles/new/actions");
+const { createCustomerAction } = await import("../src/app/[locale]/(staff)/customers/new/actions");
+const { createVehicleAction } = await import("../src/app/[locale]/(staff)/vehicles/new/actions");
 const { requirePagePermission } = await import("../src/app/[locale]/server-support");
 const { EMPTY_FORM_STATE } = await import("../src/app/[locale]/form-state");
 

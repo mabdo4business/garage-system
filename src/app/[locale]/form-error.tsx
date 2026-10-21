@@ -1,3 +1,4 @@
+import { Alert } from "../../components/ui";
 import { t, type Locale } from "../../i18n";
 import { FIELD_LABELS, type FormError } from "./form-state";
 
@@ -6,10 +7,12 @@ export function FormErrorMessage({ locale, error }: { locale: Locale; error: For
   if (!error) return null;
   const label = error.field ? FIELD_LABELS[error.field] : undefined;
   return (
-    <p role="alert" className="error">
-      {error.key === "error.validationFailed" && label
-        ? t(locale, "error.validationField", { field: t(locale, label) })
-        : t(locale, error.key)}
-    </p>
+    <Alert tone="danger">
+      <p>
+        {error.key === "error.validationFailed" && label
+          ? t(locale, "error.validationField", { field: t(locale, label) })
+          : t(locale, error.key)}
+      </p>
+    </Alert>
   );
 }

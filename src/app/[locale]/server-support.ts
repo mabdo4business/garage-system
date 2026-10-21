@@ -14,6 +14,13 @@ async function currentSession(): Promise<SessionUser | null> {
   return validateSession(getDb(), (await cookies()).get(SESSION_COOKIE)?.value);
 }
 
+/** For pages every signed-in user may see (Today): no session → sign-in page. */
+export async function requirePageSession(locale: Locale): Promise<SessionUser> {
+  const session = await currentSession();
+  if (!session) redirect(`/${locale}/login`);
+  return session;
+}
+
 /**
  * Pages check the permission on the server like every handler (rule 8): no session → sign-in page;
  * missing permission → audited denial (authorize) and a not-found page, so the page does not

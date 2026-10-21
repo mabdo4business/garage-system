@@ -6,6 +6,7 @@
 | Baseline | Specification amendment v0.2.2 and everything it amends (`docs/spec/`) |
 | Status | Increment 0 complete on `feature/increment-0` (80 tests passing). This plan covers Increments 1–6 and the move to Claude Code. |
 | Scope rule | Nothing here adds features beyond the PRD's launch scope (P0) and the first-month items (P1). |
+| Progress | Tracked per story in `docs/roadmap.md`, which also holds the proposed customer tracks (website, portal, mobile app) |
 
 Effort is relative (S / M / L) because budget and calendar are not set. Each increment ends with a working, tested
 build; nothing is "half done" between increments.
