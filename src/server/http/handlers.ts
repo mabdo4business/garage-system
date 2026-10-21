@@ -18,6 +18,7 @@ import { getMediaStorage, type MediaStorage } from "../media/storage";
 import {
   addCheckInPhoto,
   checkInFieldsFrom,
+  getCheckInSettings,
   completeCheckIn,
   excludePhoto,
   startCheckIn,
@@ -51,6 +52,7 @@ const STATUS_BY_CODE: Record<string, number> = {
   username_taken: 409,
   plate_already_active: 409,
   check_in_closed: 409,
+  owner_changed: 409,
   photo_not_discardable: 409,
   photo_not_locked: 409,
   photo_already_excluded: 409,
@@ -132,6 +134,36 @@ function sameOrigin(request: Request): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * The request body, or null once it exceeds `limit` bytes: a declared Content-Length over the limit is
+ * refused without reading, and an undeclared or chunked body is counted while it streams.
+ */
+async function readLimited(request: Request, limit: number): Promise<Uint8Array<ArrayBuffer> | null> {
+  const declared = Number(request.headers.get("content-length"));
+  if (Number.isFinite(declared) && declared > limit) return null;
+  if (!request.body) return new Uint8Array(0);
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  const reader = request.body.getReader();
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > limit) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return bytes;
 }
 
 async function readBody(request: Request): Promise<Record<string, unknown>> {
@@ -466,7 +498,15 @@ export function createHandlers(db: Kysely<DB>, storage: MediaStorage = getMediaS
           entityId: checkInId,
         });
         if (!isUuid(checkInId)) return json(404, { error: "not_found" });
-        const form = await request.formData();
+        // Never hold more than the photo limit (plus the multipart envelope) in memory.
+        const { maxPhotoBytes } = await getCheckInSettings(db);
+        const body = await readLimited(request, maxPhotoBytes + 64 * 1024);
+        if (!body) {
+          return json(413, { error: "validation_failed", details: { field: "photo", reason: "too_large" } });
+        }
+        const form = await new Response(body, {
+          headers: { "content-type": request.headers.get("content-type") ?? "" },
+        }).formData();
         const file = form.get("photo");
         if (!(file instanceof Blob))
           return json(422, { error: "validation_failed", details: { field: "photo" } });
@@ -558,6 +598,9 @@ export function createHandlers(db: Kysely<DB>, storage: MediaStorage = getMediaS
             "content-type": file.contentType,
             "cache-control": "private, no-store",
             "x-content-type-options": "nosniff",
+            // Even a file that only looks like an image must never run as a page.
+            "content-security-policy": "default-src 'none'; sandbox",
+            "content-disposition": "inline",
           },
         });
       } catch (error) {

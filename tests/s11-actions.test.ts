@@ -45,6 +45,10 @@ const { createCustomerAction } = await import("../src/app/[locale]/(staff)/custo
 const { createVehicleAction } = await import("../src/app/[locale]/(staff)/vehicles/new/actions");
 const { requirePagePermission } = await import("../src/app/[locale]/server-support");
 const { EMPTY_FORM_STATE } = await import("../src/app/[locale]/form-state");
+const { saveCheckInAction } = await import("../src/app/[locale]/(staff)/check-ins/actions");
+const { startCheckIn } = await import("../src/server/repair-order/check-in");
+const { createCustomer } = await import("../src/server/customer/service");
+const { createVehicle } = await import("../src/server/vehicle/service");
 
 function formData(fields: Record<string, string>): FormData {
   const data = new FormData();
@@ -65,6 +69,7 @@ async function submit<S>(action: (previous: S, data: FormData) => Promise<S>, pr
 describe("S11 — server actions and page authorization", () => {
   let db: TestDatabase;
   let advisorToken: string;
+  let advisorUserId: string;
   let technicianToken: string;
   let technicianUserId: string;
 
@@ -83,6 +88,7 @@ describe("S11 — server actions and page authorization", () => {
       return decodeURIComponent(match?.[1] ?? "");
     };
     const advisor = await makeUser(db.app, ["service_advisor"], "advisor");
+    advisorUserId = advisor.userId;
     const technician = await makeUser(db.app, ["technician"], "tech");
     technicianUserId = technician.userId;
     advisorToken = await signIn(advisor.username);
@@ -227,5 +233,52 @@ describe("S11 — server actions and page authorization", () => {
     await expect(requirePagePermission("en", "customer.read")).resolves.toMatchObject({
       userId: technicianUserId,
     });
+  });
+
+  it("check-in: pressing Complete twice on the same form goes to the same repair order (no 'already completed')", async () => {
+    state.token = advisorToken;
+    const actor = { kind: "user" as const, userId: advisorUserId };
+    const customerId = (
+      await createCustomer(
+        db.app,
+        actor,
+        { nameEn: "Double Tap", mobile: "0573334444", preferredLanguage: "en", marketingConsent: false },
+        randomUUID(),
+      )
+    ).result.customerId;
+    const vehicleId = (
+      await createVehicle(
+        db.app,
+        actor,
+        {
+          make: "Mazda",
+          model: "3",
+          year: 2019,
+          plate: { emirate: "dubai", code: "DT", number: "11223" },
+          ownerCustomerId: customerId,
+        },
+        randomUUID(),
+      )
+    ).result.vehicleId;
+    const { checkInId } = (await startCheckIn(db.app, actor, vehicleId, randomUUID())).result;
+
+    const form = () =>
+      formData({
+        locale: "en",
+        checkInId,
+        intent: "complete",
+        idempotencyKey: sameKey,
+        contactName: "Double Tap",
+        contactMobile: "0573334444",
+        contactRelationship: "owner",
+        odometerKm: "1000",
+        concerns: "Noise",
+        photoShortfallReason: "Test without photos",
+      });
+    const sameKey = randomUUID();
+    const first = await submit(saveCheckInAction, { ...EMPTY_FORM_STATE }, form());
+    expect(first.redirect).toMatch(/^\/en\/repair-orders\/[0-9a-f-]{36}$/);
+    const second = await submit(saveCheckInAction, { ...EMPTY_FORM_STATE }, form());
+    expect(second.redirect).toBe(first.redirect);
   });
 });

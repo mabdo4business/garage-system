@@ -28,8 +28,12 @@ Status: ✅ decided · ⏳ open · 🔍 needs professional verification
 | OD-3 | Repair orders get a reference number `RO-000123` from the numbering module (series `repair_order`) when check-in completes. Not a tax document. | 2026-10-21 | Owners |
 | OD-4 | Fuel level is recorded in eighths: E, 1/8 … 7/8, F. | 2026-10-21 | Owners |
 | OD-5 | Check-in also records dashboard warning lights (US-04.1) and an optional promised completion time (US-04.5); empty means "to be confirmed after inspection". | 2026-10-21 | Owners |
-| T-07 | Photo limits where AC2-33 says `[TBD]` [assumptions — confirm before UAT]: largest upload 15 MB; shortest allowed long edge 1280 px; the tablet downscales to a 2560 px long edge (JPEG) before upload; JPEG, PNG and WebP only. Held as configuration (`app_setting`). Odometer in km. | 2026-10-21 | Technical (I1-02) |
+| T-07 | Photo limits where AC2-33 says `[TBD]`: largest upload **10 MB** (owner, 2026-10-21 — keeps AC2-33's "maximum size within 10 s at 10 Mbps"); **no minimum resolution** (B-12 below); the tablet re-encodes every photo as JPEG at most 2560 px on the long edge before upload, which also strips location metadata; JPEG, PNG and WebP only [assumption — confirm before UAT]. Held as configuration (`app_setting`). Odometer in km. | 2026-10-21 | Owners (size) · Technical |
 | T-08 | Lock ranks added in I1-02: `check_in` 7 (after vehicle, before repair order), `repair_order` 10 as reserved. | 2026-10-21 | Technical (I1-02) |
+| B-12 | Minimum photo resolution (Pre-Implementation Review B-12): dropped, as recommended — any real photo is accepted. | 2026-10-21 | Owners |
+| OD-6 | Fuel level and keys received are recorded at check-in but do not block completion (B1 requires customer, vehicle, authorized contact, odometer, concerns, and photos or a reason). | 2026-10-21 | Owners |
+| OD-7 | Excluding a check-in photo (AC2-33 "by a manager"): managers and partners. | 2026-10-21 | Owners |
+| T-09 | If the vehicle's owner changes while a check-in is open, completing it is refused ("owner changed") so the advisor starts a fresh check-in for the new owner; nothing is silently reassigned [assumption — confirm before UAT]. | 2026-10-21 | Technical (I1-02 review) |
 
 ## Open — needed before the increment shown
 

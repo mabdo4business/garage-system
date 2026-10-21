@@ -369,7 +369,8 @@ a {
   font-weight: 600;
 }
 
-.field .optional {
+.field .optional,
+.segmented .optional {
   color: var(--muted);
   font-weight: 400;
 }

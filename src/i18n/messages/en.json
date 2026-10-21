@@ -169,10 +169,9 @@
   "checkIn.removePhoto": "Remove",
   "checkIn.uploading": "Uploading…",
   "checkIn.photoError.tooLarge": "This photo is too large. Try again with a smaller photo.",
-  "checkIn.photoError.tooSmall": "This photo's resolution is too low to serve as evidence. Take it again.",
   "checkIn.photoError.notImage": "This file is not a JPEG, PNG or WebP photo.",
   "checkIn.photoError.failed": "The photo could not be uploaded. Check the connection and try again.",
-  "repairOrder.title": "Repair order {number}",
+  "repairOrder.title": "Repair order",
   "repairOrder.newCheckIn": "New check-in",
   "repairOrder.checkInsInProgress": "Check-ins in progress",
   "repairOrder.open": "Open repair orders",
@@ -199,5 +198,6 @@
   "error.checkInClosed": "This check-in is already completed or abandoned and can no longer change.",
   "error.photoLocked": "This photo is locked and cannot be removed.",
   "error.photoNotLocked": "Photos of a check-in in progress are removed, not excluded.",
-  "error.photoAlreadyExcluded": "This photo is already excluded."
+  "error.photoAlreadyExcluded": "This photo is already excluded.",
+  "error.ownerChanged": "This vehicle changed owner after the check-in started. Abandon it and start a new check-in."
 }
