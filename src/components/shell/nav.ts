@@ -40,6 +40,20 @@ export const NAV_ITEMS: readonly NavItem[] = [
     permission: "directory.search",
     sections: ["/search", "/customers", "/vehicles"],
   },
+  {
+    key: "catalogue",
+    label: "nav.catalogue",
+    path: "/catalogue",
+    permission: "catalogue.read",
+    sections: ["/catalogue"],
+  },
+  {
+    key: "taxSettings",
+    label: "nav.taxSettings",
+    path: "/settings/tax",
+    permission: "tax.manage",
+    sections: ["/settings/tax"],
+  },
 ];
 
 export function navFor(roles: readonly string[], items: readonly NavItem[] = NAV_ITEMS): NavItem[] {

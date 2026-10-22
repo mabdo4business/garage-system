@@ -36,6 +36,8 @@ import {
   type FindingInput,
 } from "../inspection/commands";
 import { getInspection } from "../inspection/queries";
+import { createItem, getCatalogueItem, KINDS, listCatalogue, setPrice } from "../catalog/items";
+import { addTaxProfile, getTaxSettings } from "../catalog/tax";
 import {
   changePlate,
   createVehicle,
@@ -68,6 +70,9 @@ const STATUS_BY_CODE: Record<string, number> = {
   already_assigned: 409,
   finding_withdrawn: 409,
   item_already_recorded: 409,
+  item_code_taken: 409,
+  tax_code_exists: 409,
+  tax_date_not_after_latest: 409,
   photo_not_discardable: 409,
   photo_not_locked: 409,
   photo_already_excluded: 409,
@@ -773,6 +778,111 @@ export function createHandlers(db: Kysely<DB>, storage: MediaStorage = getMediaS
         const body = await readBody(request);
         const outcome = await setFindingPhotoVisibility(db, session, mediaId, toStr(body.visibility));
         return json(200, outcome.result);
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    // ------------------------------------------------------------------ I1-04 catalog & tax
+
+    /** GET /api/catalogue?kind=labor_rate|package|part&q=&inactive=1 — current VAT-inclusive prices. */
+    async listCatalogue(request: Request): Promise<Response> {
+      try {
+        await authorize(db, await currentSession(request), "catalogue.read");
+        const url = new URL(request.url);
+        const kind = url.searchParams.get("kind") ?? "";
+        if (!(KINDS as readonly string[]).includes(kind)) {
+          return json(422, { error: "validation_failed", details: { field: "kind" } });
+        }
+        const items = await listCatalogue(db, {
+          kind: kind as (typeof KINDS)[number],
+          includeInactive: url.searchParams.get("inactive") === "1",
+          search: url.searchParams.get("q") ?? "",
+        });
+        return json(200, items);
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    /** GET /api/catalogue/:id — details and price history. */
+    async getCatalogueItem(request: Request, itemId: string): Promise<Response> {
+      try {
+        await authorize(db, await currentSession(request), "catalogue.read", {
+          entityType: "catalogue_item",
+          entityId: itemId,
+        });
+        const item = await getCatalogueItem(db, itemId);
+        if (!item) return json(404, { error: "not_found" });
+        return json(200, item);
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    /** POST /api/catalogue — new item with its first price (OD-12: partner or manager). */
+    async createCatalogueItem(request: Request): Promise<Response> {
+      try {
+        if (!sameOrigin(request)) return json(403, { error: "forbidden" });
+        const session = await authorize(db, await currentSession(request), "pricing.manage");
+        const body = await readBody(request);
+        const outcome = await createItem(
+          db,
+          session,
+          { ...body, stockTracked: toBool(body.stockTracked) } as Parameters<typeof createItem>[2],
+          toStr(body.idempotencyKey),
+        );
+        return json(outcome.replayed ? 200 : 201, outcome.result);
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    /** POST /api/catalogue/:id/price — JSON/form { price, taxCode, idempotencyKey }. */
+    async setCataloguePrice(request: Request, itemId: string): Promise<Response> {
+      try {
+        if (!sameOrigin(request)) return json(403, { error: "forbidden" });
+        const session = await authorize(db, await currentSession(request), "pricing.manage", {
+          entityType: "catalogue_item",
+          entityId: itemId,
+        });
+        const body = await readBody(request);
+        const outcome = await setPrice(
+          db,
+          session,
+          itemId,
+          { price: body.price, taxCode: body.taxCode },
+          toStr(body.idempotencyKey),
+        );
+        return json(outcome.replayed ? 200 : 201, outcome.result);
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    /** GET /api/tax — tax profiles and codes with rate history (partners, T-15). */
+    async getTaxSettings(request: Request): Promise<Response> {
+      try {
+        await authorize(db, await currentSession(request), "tax.manage");
+        return json(200, await getTaxSettings(db));
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    /** POST /api/tax/profiles — JSON/form { registrationStatus, trn?, effectiveFrom, note?, idempotencyKey }. */
+    async addTaxProfile(request: Request): Promise<Response> {
+      try {
+        if (!sameOrigin(request)) return json(403, { error: "forbidden" });
+        const session = await authorize(db, await currentSession(request), "tax.manage");
+        const body = await readBody(request);
+        const outcome = await addTaxProfile(
+          db,
+          session,
+          body as Parameters<typeof addTaxProfile>[2],
+          toStr(body.idempotencyKey),
+        );
+        return json(outcome.replayed ? 200 : 201, outcome.result);
       } catch (error) {
         return errorResponse(error);
       }

@@ -305,6 +305,71 @@ export interface FindingTable {
   updated_by: string | null;
 }
 
+// I1-04 — catalog & tax (0009)
+
+export type TaxCategory = "standard" | "zero_rated" | "exempt" | "out_of_scope" | "not_registered";
+export type CatalogueKind = "labor_rate" | "package" | "part";
+export type PartType = "oem" | "aftermarket" | "other";
+export type PartUnit = "piece" | "set" | "litre" | "kg" | "metre" | "job";
+
+export interface TaxProfileTable {
+  id: Generated<string>;
+  registration_status: "not_registered" | "registered";
+  trn: string | null;
+  effective_from: DbDate;
+  note: string | null;
+  created_at: Generated<Date>;
+  created_by: string | null;
+}
+
+export interface TaxCodeTable {
+  code: string;
+  label_en: string;
+  label_ar: string;
+  category: TaxCategory;
+  active: Generated<boolean>;
+  created_at: Generated<Date>;
+  created_by: string | null;
+}
+
+export interface TaxCodeRateTable {
+  id: Generated<string>;
+  code: string;
+  rate: ColumnType<string, string, string>; // numeric(5,2) percent, exact
+  effective_from: DbDate;
+  created_at: Generated<Date>;
+  created_by: string | null;
+}
+
+export interface CatalogueItemTable {
+  id: Generated<string>;
+  kind: CatalogueKind;
+  code: string;
+  name_en: string;
+  name_ar: string;
+  description_en: string | null;
+  description_ar: string | null;
+  part_no: string | null;
+  brand: string | null;
+  part_type: PartType | null;
+  unit: PartUnit | null;
+  stock_tracked: Generated<boolean>;
+  active: Generated<boolean>;
+  created_at: Generated<Date>;
+  created_by: string | null;
+  updated_at: Generated<Date>;
+  updated_by: string | null;
+}
+
+export interface CataloguePriceTable {
+  id: Generated<string>;
+  item_id: string;
+  price: ColumnType<string, string, string>; // numeric(14,2), VAT-inclusive (OD-14)
+  tax_code: string;
+  effective_from: Generated<Date>;
+  set_by: string | null;
+}
+
 export interface DB {
   app_user: AppUserTable;
   user_role: UserRoleTable;
@@ -328,5 +393,10 @@ export interface DB {
   checklist_template: ChecklistTemplateTable;
   checklist_template_item: ChecklistTemplateItemTable;
   finding: FindingTable;
+  tax_profile: TaxProfileTable;
+  tax_code: TaxCodeTable;
+  tax_code_rate: TaxCodeRateTable;
+  catalogue_item: CatalogueItemTable;
+  catalogue_price: CataloguePriceTable;
   schema_migration: SchemaMigrationTable;
 }

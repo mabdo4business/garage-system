@@ -55,6 +55,12 @@ export const PERMISSIONS = {
   "finding.record": ["partner", "manager", "service_advisor", "technician"],
   // The technician's own list of assigned inspections (menu item "My inspections").
   "inspection.my_work": ["technician"],
+
+  // I1-04: price list. Technicians never see prices (AC2-30); changing prices is partner or manager
+  // (OD-12) until the per-user T4 toggle. Tax settings are partner-only until dual control (T-15).
+  "catalogue.read": ["partner", "manager", "service_advisor", "store_keeper", "accountant"],
+  "pricing.manage": ["partner", "manager"],
+  "tax.manage": ["partner"],
 } as const satisfies Record<string, readonly Role[]>;
 
 export type Permission = keyof typeof PERMISSIONS;

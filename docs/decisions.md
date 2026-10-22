@@ -43,6 +43,16 @@ Status: ✅ decided · ⏳ open · 🔍 needs professional verification
 | T-12 | A checklist item is recorded at most once per repair order (an active finding per item); a second attempt is refused with "already recorded — edit the existing finding". Withdrawing the finding frees the item. | 2026-10-22 | Technical (I1-03 review) |
 | T-13 | The customer-facing finding view includes fault codes (diagnostic facts, not internal notes; AC-05.3 covers internal notes only) [assumption — owner to confirm before customer pages ship in I2-03]. | 2026-10-22 | Technical (I1-03 review) |
 | B-08 | Non-stock billable items are allowed (sublet work, outside machining, a one-off part bought for a job). Catalogue items are flagged stock-tracked or non-stock; a non-stock line can be invoiced only after its actual cost is entered on the line (Pre-Implementation Review P0-06 point 3). Stock-tracked parts still must be issued before invoicing. | 2026-10-22 | Owners |
+| OD-12 | Prices (labor rates, packages, parts) are changed by partners and managers until the per-user T4 "Manage pricing" toggle (I5-01) narrows it to named people. Every change is logged with before/after. | 2026-10-22 | Owners |
+| OD-13 | The garage is VAT-registered. A partner enters the TRN, rate and effective date on the tax settings screen before the first estimate; nothing tax-related is seeded (codes, categories and rates are for the tax agent, V-2). | 2026-10-22 | Owners |
+| OD-14 | Catalogue prices are entered and quoted including VAT. How net and VAT are derived from an inclusive price is a tax-computation rule, recorded as an assumption for V-2 when I1-05 computes it. | 2026-10-22 | Owners |
+| OD-15 | Parts have a fixed selling price; a markup on average cost is added with the stock ledger (I4-01). | 2026-10-22 | Owners |
+| T-14 | A UAE TRN is entered as 15 digits [assumption — tax agent to confirm, V-2]. | 2026-10-22 | Technical (I1-04) |
+| T-15 | Tax settings (profiles, codes, rates) are changed by partners only until dual control (I5-02, R2 "tax profile change") applies. | 2026-10-22 | Technical (I1-04) |
+| T-16 | Lock rank for catalogue items: 50 (after stock balances, before number series); only price changes lock an item. | 2026-10-22 | Technical (I1-04) |
+| T-17 | A catalogue item's kind (labor rate, package, part) and its stock-tracked flag never change after creation; a different kind is a new item, so stock history stays consistent. | 2026-10-22 | Technical (I1-04) |
+| OD-16 | Tax history only moves forward: a new tax profile, or a new rate for a tax code, may start in the past but never before the latest one already recorded. Corrections inside history wait for the tax agent and dual control (I5). | 2026-10-22 | Owners |
+| OD-17 | A part's unit can be edited after creation (audited before/after); earlier prices in the history keep their amounts. | 2026-10-22 | Owners |
 
 ## Open — needed before the increment shown
 
