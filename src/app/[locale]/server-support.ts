@@ -88,6 +88,14 @@ const ERROR_KEYS: Record<string, MessageKey> = {
   finding_already_included: "error.findingAlreadyIncluded",
   finding_already_excluded: "error.findingAlreadyExcluded",
   finding_in_estimate: "error.findingInEstimate",
+  estimate_empty: "error.estimateEmpty",
+  job_without_lines: "error.jobWithoutLines",
+  urgent_finding_open: "error.urgentFindingOpen",
+  tax_rate_changed: "error.taxRateChanged",
+  estimate_not_sent: "error.estimateNotSent",
+  estimate_expired: "error.estimateExpired",
+  estimate_changed: "error.estimateChanged",
+  revision_not_pending: "error.revisionNotPending",
 };
 
 /**

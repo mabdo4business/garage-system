@@ -1,4 +1,4 @@
-import type { Kysely } from "kysely";
+import { sql, type Kysely } from "kysely";
 import { runCommand, type CommandOutcome } from "../command/runner";
 import { ConflictError, NotFoundError, ValidationError } from "../core/errors";
 import { isUuid } from "../core/ids";
@@ -299,6 +299,29 @@ export async function priceAt(
     .select(["id", "price", "tax_code", "effective_from"])
     .where("item_id", "=", itemId)
     .where("effective_from", "<=", instant)
+    .orderBy("effective_from", "desc")
+    .orderBy("id", "desc")
+    .executeTakeFirst();
+  return row
+    ? { priceId: row.id, price: row.price, taxCode: row.tax_code, effectiveFrom: row.effective_from }
+    : null;
+}
+
+/**
+ * The price in force at the current transaction's own time (`now()`, microsecond precision). Use this inside
+ * a command rather than `priceAt(ctx.txTime)`: a JavaScript Date keeps only milliseconds, so a price set
+ * less than a millisecond before the transaction would otherwise be missed.
+ */
+export async function priceInForce(
+  db: Kysely<DB>,
+  itemId: string,
+): Promise<{ priceId: string; price: string; taxCode: string; effectiveFrom: Date } | null> {
+  if (!isUuid(itemId)) return null;
+  const row = await db
+    .selectFrom("catalogue_price")
+    .select(["id", "price", "tax_code", "effective_from"])
+    .where("item_id", "=", itemId)
+    .where("effective_from", "<=", sql<Date>`now()`)
     .orderBy("effective_from", "desc")
     .orderBy("id", "desc")
     .executeTakeFirst();

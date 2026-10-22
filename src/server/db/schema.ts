@@ -400,6 +400,14 @@ export interface EstimateVersionTable {
   status: Generated<EstimateVersionStatus>;
   created_at: Generated<Date>;
   created_by: string | null;
+  // I1-05b (migration 0012): set once, when sent.
+  sent_at: ColumnType<Date | null, never, Date | null>;
+  sent_by: ColumnType<string | null, never, string | null>;
+  expires_at: ColumnType<Date | null, never, Date | null>;
+  snapshot: ColumnType<unknown, never, string>;
+  content_hash: ColumnType<string | null, never, string>;
+  terms_ar_id: ColumnType<string | null, never, string | null>;
+  terms_en_id: ColumnType<string | null, never, string | null>;
 }
 
 export interface RepairJobTable {
@@ -468,6 +476,49 @@ export interface UrgentFindingExclusionTable {
   cleared_by: string | null;
 }
 
+// I1-05b — in-person approval (migration 0012).
+export type ApprovalMethod = "in_person_signature" | "link" | "phone" | "garage_reduction";
+export type VerificationLevel = "possession" | "step_up" | "in_person";
+
+export interface TermsTextTable {
+  id: Generated<string>;
+  kind: "estimate";
+  language: "ar" | "en";
+  version_no: number;
+  body: string;
+  created_at: Generated<Date>;
+  created_by: string | null;
+}
+
+export interface ApprovalEventTable {
+  id: Generated<string>;
+  estimate_version_id: string;
+  method: ApprovalMethod;
+  verification_level: VerificationLevel;
+  approver_name: string;
+  signature_sha256: string | null;
+  signature_storage_key: string | null;
+  signature_content_type: string | null;
+  contact_name: string;
+  contact_mobile: string;
+  displayed_language: "ar" | "en";
+  terms_ar_id: string | null;
+  terms_en_id: string | null;
+  content_hash: string;
+  idempotency_key: string;
+  recorded_by: string | null;
+  recorded_at: Generated<Date>;
+  business_date: ColumnType<string, string | undefined, never>;
+}
+
+export interface RevisionDecisionTable {
+  id: Generated<string>;
+  approval_event_id: string;
+  revision_id: string;
+  decision: "approved" | "declined";
+  urgent_ack_pending: Generated<boolean>;
+}
+
 export interface DB {
   app_user: AppUserTable;
   user_role: UserRoleTable;
@@ -502,5 +553,8 @@ export interface DB {
   job_revision: JobRevisionTable;
   revision_line: RevisionLineTable;
   urgent_finding_exclusion: UrgentFindingExclusionTable;
+  terms_text: TermsTextTable;
+  approval_event: ApprovalEventTable;
+  revision_decision: RevisionDecisionTable;
   schema_migration: SchemaMigrationTable;
 }

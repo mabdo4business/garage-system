@@ -569,11 +569,7 @@ describe("S14 — inspection findings", () => {
     const ro = await newRepairOrder();
     const { findingId } = (await recordFinding(db.app, people.advisor!, ro, finding(), randomUUID())).result;
     // Simulate a later stage (later stories move the status through their own commands).
-    await db.owner
-      .updateTable("repair_order")
-      .set({ status: "awaiting_approval" })
-      .where("id", "=", ro)
-      .execute();
+    await db.owner.updateTable("repair_order").set({ status: "cancelled" }).where("id", "=", ro).execute();
     await expect(updateFinding(db.app, people.advisor!, findingId, finding())).rejects.toMatchObject({
       code: "inspection_closed",
     });
@@ -696,11 +692,7 @@ describe("S14 — inspection findings", () => {
       (await handlers.getInspection(get(`/api/repair-orders/${ro}/inspection`, people.tech!.token), ro))
         .status,
     ).toBe(200);
-    await db.owner
-      .updateTable("repair_order")
-      .set({ status: "awaiting_approval" })
-      .where("id", "=", ro)
-      .execute();
+    await db.owner.updateTable("repair_order").set({ status: "cancelled" }).where("id", "=", ro).execute();
     expect(
       (await handlers.getInspection(get(`/api/repair-orders/${ro}/inspection`, people.tech!.token), ro))
         .status,
@@ -720,11 +712,7 @@ describe("S14 — inspection findings", () => {
         randomUUID(),
       )
     ).result;
-    await db.owner
-      .updateTable("repair_order")
-      .set({ status: "awaiting_approval" })
-      .where("id", "=", ro)
-      .execute();
+    await db.owner.updateTable("repair_order").set({ status: "cancelled" }).where("id", "=", ro).execute();
     const sql = (statement: string) => sqlErrorAs(db.appUrl, statement).then((error) => error?.code);
 
     expect(await sql(`UPDATE finding SET title = 'x' WHERE id = '${findingId}'`)).toBe("42501");

@@ -901,3 +901,47 @@ textarea.internal {
   min-inline-size: 220px;
   margin-block-end: var(--space-3);
 }
+
+/* ---------------------------------------------------------------- Customer decision (I1-05b) */
+
+.estimate-document {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.approval-form .approval-choice {
+  margin: 0;
+}
+
+.segmented label.choice-approved:has(input:checked) {
+  background: var(--success-fg);
+  border-color: var(--success-fg);
+  color: var(--surface);
+}
+
+.segmented label.choice-declined:has(input:checked) {
+  background: var(--danger-fg);
+  border-color: var(--danger-fg);
+  color: var(--surface);
+}
+
+/* The signature stays dark on white in every theme; touch-action keeps the page from scrolling while signing. */
+.signature-pad {
+  inline-size: 100%;
+  block-size: 200px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: #fff;
+  touch-action: none;
+}
+
+/* The counter screen the customer holds: no shell, comfortable margins. */
+.counter {
+  max-inline-size: 960px;
+  margin-inline: auto;
+  padding: var(--space-5) var(--space-4);
+}
+
+.terms-text {
+  white-space: pre-wrap;
+}

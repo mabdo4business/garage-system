@@ -40,6 +40,7 @@ import { createItem, getCatalogueItem, KINDS, listCatalogue, setPrice } from "..
 import { addTaxProfile, getTaxSettings } from "../catalog/tax";
 import { addJob, addLine, openEstimate, setLineDiscount } from "../estimate/commands";
 import { estimateView } from "../estimate/queries";
+import { recordInPersonApproval, sendVersion } from "../estimate/approval";
 import {
   changePlate,
   createVehicle,
@@ -86,6 +87,14 @@ const STATUS_BY_CODE: Record<string, number> = {
   finding_already_included: 409,
   finding_already_excluded: 409,
   finding_in_estimate: 409,
+  estimate_empty: 409,
+  job_without_lines: 409,
+  urgent_finding_open: 409,
+  tax_rate_changed: 409,
+  estimate_not_sent: 409,
+  estimate_expired: 409,
+  estimate_changed: 409,
+  revision_not_pending: 409,
   try_again: 503,
 };
 
@@ -885,6 +894,69 @@ export function createHandlers(db: Kysely<DB>, storage: MediaStorage = getMediaS
           lineId,
           { discount: body.discount },
           toStr(body.idempotencyKey),
+        );
+        return json(outcome.replayed ? 200 : 201, outcome.result);
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    /** POST /api/repair-orders/:id/estimate/send — { idempotencyKey }; freezes the snapshot (P0-11). */
+    async sendEstimate(request: Request, repairOrderId: string): Promise<Response> {
+      try {
+        if (!sameOrigin(request)) return json(403, { error: "forbidden" });
+        const session = await authorize(db, await currentSession(request), "estimate.send", {
+          entityType: "repair_order",
+          entityId: repairOrderId,
+        });
+        const body = await readBody(request);
+        const outcome = await sendVersion(db, session, repairOrderId, toStr(body.idempotencyKey));
+        return json(outcome.replayed ? 200 : 201, outcome.result);
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    /**
+     * POST /api/estimate-versions/:id/approvals — multipart: contentHash, language, approverName,
+     * decision.<revisionId> = approved | declined, signature (image), idempotencyKey. In person (L3, OD-20).
+     */
+    async recordEstimateApproval(request: Request, versionId: string): Promise<Response> {
+      try {
+        if (!sameOrigin(request)) return json(403, { error: "forbidden" });
+        const session = await authorize(db, await currentSession(request), "estimate.record_approval", {
+          entityType: "estimate_version",
+          entityId: versionId,
+        });
+        if (!isUuid(versionId)) return json(404, { error: "not_found" });
+        const body = await readLimited(request, 2 * 1024 * 1024 + 64 * 1024);
+        if (!body) {
+          return json(413, {
+            error: "validation_failed",
+            details: { field: "signature", reason: "too_large" },
+          });
+        }
+        const form = await new Response(body, {
+          headers: { "content-type": request.headers.get("content-type") ?? "" },
+        }).formData();
+        const signature = form.get("signature");
+        const decisions = [...form.entries()]
+          .filter(([key, value]) => key.startsWith("decision.") && value !== "")
+          .map(([key, value]) => ({ revisionId: key.slice("decision.".length), decision: value }));
+        const outcome = await recordInPersonApproval(
+          db,
+          storage,
+          session,
+          {
+            versionId,
+            contentHash: form.get("contentHash"),
+            language: form.get("language"),
+            approverName: form.get("approverName"),
+            decisions,
+            signature:
+              signature instanceof Blob ? new Uint8Array(await signature.arrayBuffer()) : new Uint8Array(0),
+          },
+          toStr(form.get("idempotencyKey")),
         );
         return json(outcome.replayed ? 200 : 201, outcome.result);
       } catch (error) {

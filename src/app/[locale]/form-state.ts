@@ -92,4 +92,7 @@ export const FIELD_LABELS: Record<string, MessageKey> = {
   discount: "estimate.discountAmount",
   reason: "estimate.excludeReason",
   findingId: "estimate.urgentFindings",
+  approverName: "approval.name",
+  signature: "approval.signature",
+  decisions: "approval.title",
 };

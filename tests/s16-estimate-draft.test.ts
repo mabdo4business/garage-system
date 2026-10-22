@@ -706,12 +706,8 @@ describe("S16 — estimate draft", () => {
   it("nothing changes once the repair order has left Checked-in/Diagnosing", async () => {
     const { ro, jobId } = await draftWithJob();
     const id = await line(jobId, items.part!, "1");
-    // I1-05b moves the repair order on when the estimate is sent; simulate that here.
-    await db.owner
-      .updateTable("repair_order")
-      .set({ status: "awaiting_approval" })
-      .where("id", "=", ro)
-      .execute();
+    // Set-up: the repair order has left Checked-in/Diagnosing (cancelled; sending is tested in s17).
+    await db.owner.updateTable("repair_order").set({ status: "cancelled" }).where("id", "=", ro).execute();
 
     await expect(line(jobId, items.part!, "1")).rejects.toMatchObject({ code: "estimate_closed" });
     await expect(
@@ -842,11 +838,7 @@ describe("S16 — estimate draft", () => {
         ?.code,
     ).toBe("42501");
     // An estimate for a repair order that has moved on.
-    await db.owner
-      .updateTable("repair_order")
-      .set({ status: "awaiting_approval" })
-      .where("id", "=", bare)
-      .execute();
+    await db.owner.updateTable("repair_order").set({ status: "cancelled" }).where("id", "=", bare).execute();
     expect(
       (await sqlErrorAs(db.appUrl, `INSERT INTO estimate (repair_order_id) VALUES ('${bare}')`))?.code,
     ).toBe("42501");

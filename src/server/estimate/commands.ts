@@ -5,7 +5,7 @@ import { runCommand, type CommandContext, type CommandOutcome } from "../command
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "../core/errors";
 import { isUuid } from "../core/ids";
 import { Money, Qty } from "../core/money";
-import { priceAt } from "../catalog/items";
+import { priceInForce } from "../catalog/items";
 import { taxCodeRateOn, taxProfileOn } from "../catalog/tax";
 import type { DB, RevisionLineType } from "../db/schema";
 import { computeLine, parseDiscount, parseQty } from "./pricing";
@@ -21,7 +21,7 @@ export type Staff = Pick<SessionUser, "userId" | "roles">;
 const OPEN_FOR_ESTIMATE = ["checked_in", "diagnosing"] as const;
 const actorOf = (staff: Staff) => ({ kind: "user" as const, userId: staff.userId });
 
-function requirePermission(staff: Staff, permission: Permission): void {
+export function requirePermission(staff: Staff, permission: Permission): void {
   if (!hasPermission(staff.roles, permission)) throw new ForbiddenError(permission);
 }
 
@@ -59,7 +59,7 @@ async function draftOf(ctx: CommandContext, repairOrderId: string) {
 }
 
 /** Locks the repair order and returns its open draft version. */
-async function lockDraft(ctx: CommandContext, repairOrderId: string) {
+export async function lockDraft(ctx: CommandContext, repairOrderId: string) {
   await lockRepairOrder(ctx, repairOrderId);
   const draft = await draftOf(ctx, repairOrderId);
   if (!draft) throw new ConflictError("no_draft", "The estimate has no open draft");
@@ -498,7 +498,7 @@ export async function addLine(
         throw new ValidationError("Choose an active item from the price list", { field: "itemId" });
       const unit = item.kind === "labor_rate" ? "hour" : item.kind === "part" ? item.unit : null;
       requireAllowedQty(qty, unit);
-      const price = await priceAt(ctx.tx, itemId, ctx.txTime);
+      const price = await priceInForce(ctx.tx, itemId);
       if (!price) throw new ValidationError("This item has no price yet", { field: "itemId" });
 
       const profile = await taxProfileOn(ctx.tx, ctx.businessDate);

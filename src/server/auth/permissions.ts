@@ -67,6 +67,9 @@ export const PERMISSIONS = {
   "estimate.read": ["partner", "manager", "service_advisor"],
   "estimate.edit": ["partner", "manager", "service_advisor"],
   "estimate.discount": ["partner", "manager"],
+  // I1-05b: presenting the estimate and recording the customer's in-person decision (L3, OD-20).
+  "estimate.send": ["partner", "manager", "service_advisor"],
+  "estimate.record_approval": ["partner", "manager", "service_advisor"],
 } as const satisfies Record<string, readonly Role[]>;
 
 export type Permission = keyof typeof PERMISSIONS;

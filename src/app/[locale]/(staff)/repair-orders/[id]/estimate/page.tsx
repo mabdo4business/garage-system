@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { notFound } from "next/navigation";
 import { Alert, Card, EmptyState, PageHeader, PlateBadge, StatusChip } from "../../../../../../components/ui";
 import { isLocale, t, type Locale, type MessageKey } from "../../../../../../i18n";
-import { formatAed } from "../../../../../../i18n/format";
+import { formatAed, formatDubaiDateTime } from "../../../../../../i18n/format";
 import { hasPermission } from "../../../../../../server/auth/permissions";
 import { KINDS, listCatalogue } from "../../../../../../server/catalog/items";
 import { Money } from "../../../../../../server/core/money";
@@ -17,6 +17,11 @@ export const dynamic = "force-dynamic";
 
 const SEVERITY_TONE = { ok: "success", soon: "warning", urgent: "danger" } as const;
 const STATE_TONE = { included: "success", excluded: "neutral", open: "danger" } as const;
+const REVISION_TONE: Record<string, "success" | "danger" | "warning" | "neutral"> = {
+  approved: "success",
+  declined: "danger",
+  pending: "warning",
+};
 
 const aed = (amount: string, locale: Locale) => <bdi>{formatAed(Money.parse(amount), locale)}</bdi>;
 
@@ -123,10 +128,34 @@ export default async function EstimatePage({ params }: { params: Promise<{ local
   return (
     <>
       {header}
-      {!canEdit ? (
+      {view.status === "draft" && !canEdit ? (
         <Alert tone="warning">
           <p>{t(locale, "estimate.readOnly")}</p>
         </Alert>
+      ) : null}
+      {view.sentAt && view.expiresAt ? (
+        <Card
+          title={t(locale, `estimate.status.${view.status}` as MessageKey)}
+          actions={
+            view.status === "sent" &&
+            view.expiresAt.getTime() > Date.now() &&
+            hasPermission(session.roles, "estimate.record_approval") ? (
+              <a className="btn btn-primary" href={`/${locale}/repair-orders/${id}/estimate/approve`}>
+                {t(locale, "estimate.recordDecision")}
+              </a>
+            ) : undefined
+          }
+        >
+          <p>
+            {t(locale, "estimate.sentInfo", {
+              sent: formatDubaiDateTime(view.sentAt, locale),
+              expires: formatDubaiDateTime(view.expiresAt, locale),
+            })}
+          </p>
+          <p className="muted">
+            {t(locale, "estimate.contentHash")}: <bdi dir="ltr">{view.contentHash?.slice(0, 12)}</bdi>
+          </p>
+        </Card>
       ) : null}
       <p className="muted">{t(locale, "estimate.pricesIncludeVat")}</p>
 
@@ -210,13 +239,20 @@ export default async function EstimatePage({ params }: { params: Promise<{ local
           key={job.id}
           title={job.title}
           actions={
-            job.findingSeverity ? (
-              <StatusChip tone={SEVERITY_TONE[job.findingSeverity]}>
-                {t(locale, "estimate.fromFinding")}
-                {t(locale, "common.listSeparator")}
-                {t(locale, `finding.severity.${job.findingSeverity}` as MessageKey)}
-              </StatusChip>
-            ) : undefined
+            <>
+              {job.findingSeverity ? (
+                <StatusChip tone={SEVERITY_TONE[job.findingSeverity]}>
+                  {t(locale, "estimate.fromFinding")}
+                  {t(locale, "common.listSeparator")}
+                  {t(locale, `finding.severity.${job.findingSeverity}` as MessageKey)}
+                </StatusChip>
+              ) : null}{" "}
+              {job.revisionStatus !== "draft" ? (
+                <StatusChip tone={REVISION_TONE[job.revisionStatus] ?? "neutral"}>
+                  {t(locale, `estimate.revision.${job.revisionStatus}` as MessageKey)}
+                </StatusChip>
+              ) : null}
+            </>
           }
         >
           {job.lines.length === 0 ? (
@@ -374,6 +410,19 @@ export default async function EstimatePage({ params }: { params: Promise<{ local
           <dd className="num">{aed(view.totals.net, locale)}</dd>
         </dl>
       </Card>
+
+      {canEdit && hasPermission(session.roles, "estimate.send") && view.jobs.length > 0 ? (
+        <Card title={t(locale, "estimate.send")}>
+          <p className="muted">{t(locale, "estimate.sendHint")}</p>
+          <StepForm
+            locale={locale}
+            action="send"
+            hidden={{ repairOrderId: id, idempotencyKey: randomUUID() }}
+            submit="estimate.send"
+            variant="primary"
+          />
+        </Card>
+      ) : null}
     </>
   );
 }

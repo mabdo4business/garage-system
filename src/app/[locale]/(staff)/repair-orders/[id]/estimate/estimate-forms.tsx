@@ -13,6 +13,7 @@ import {
   openEstimateAction,
   removeJobAction,
   removeLineAction,
+  sendEstimateAction,
   updateQtyAction,
 } from "./actions";
 
@@ -30,6 +31,7 @@ const ACTIONS = {
   qty: updateQtyAction,
   discount: discountAction,
   removeLine: removeLineAction,
+  send: sendEstimateAction,
 } as const;
 
 export interface StepField {

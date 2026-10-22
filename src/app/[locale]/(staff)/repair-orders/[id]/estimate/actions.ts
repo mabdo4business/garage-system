@@ -12,6 +12,7 @@ import {
   setLineDiscount,
   updateLineQty,
 } from "../../../../../../server/estimate/commands";
+import { sendVersion } from "../../../../../../server/estimate/approval";
 import type { FormState } from "../../../../form-state";
 import { errorFrom, field, localeOf, requireActionPermission, valuesOf } from "../../../../server-support";
 
@@ -136,4 +137,17 @@ export async function removeLineAction(previous: FormState, formData: FormData):
     const session = await requireActionPermission("estimate.edit");
     await removeLine(getDb(), session, field(formData, "lineId"), field(formData, "idempotencyKey"));
   });
+}
+
+/** Presents the estimate (I1-05b): freezes the snapshot, then opens the customer's decision screen. */
+export async function sendEstimateAction(previous: FormState, formData: FormData): Promise<FormState> {
+  const locale = localeOf(formData);
+  const repairOrderId = field(formData, "repairOrderId");
+  try {
+    const session = await requireActionPermission("estimate.send");
+    await sendVersion(getDb(), session, repairOrderId, field(formData, "idempotencyKey"));
+  } catch (error) {
+    return { seq: previous.seq + 1, values: {}, error: errorFrom(error) };
+  }
+  redirect(`/${locale}/repair-orders/${repairOrderId}/estimate/approve`);
 }
