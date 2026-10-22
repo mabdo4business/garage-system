@@ -86,4 +86,10 @@ export const FIELD_LABELS: Record<string, MessageKey> = {
   labelEn: "catalogue.nameEn",
   labelAr: "catalogue.nameAr",
   note: "tax.note",
+  // I1-05 estimate
+  itemId: "estimate.item",
+  qty: "estimate.qty",
+  discount: "estimate.discountAmount",
+  reason: "estimate.excludeReason",
+  findingId: "estimate.urgentFindings",
 };

@@ -877,3 +877,27 @@ textarea.internal {
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-sm);
 }
+
+/* ---------------------------------------------------------------- Estimate (I1-05) */
+
+/* Amounts line up at the end edge in both directions (logical, rule 10). */
+.num {
+  text-align: end;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Lets a dt/dd pair sit in a wrapper element without breaking the list's grid. */
+.contents {
+  display: contents;
+}
+
+.estimate-job-total {
+  margin-block: var(--space-3) 0;
+  text-align: end;
+}
+
+.estimate-lines td .disclosure .form {
+  min-inline-size: 220px;
+  margin-block-end: var(--space-3);
+}

@@ -26,8 +26,8 @@ Status values: `not started` · `in progress` · `done (unmerged)` · `done` · 
 
 ## Current position
 
-- **Wave:** 1 · **Increment:** 1 · **Active story:** none; I1-03 and I1-04 committed (unmerged). Push both and merge into `qa`: I1-03 first, then I1-04
-- **Next story:** I1-05 (estimate), split into smaller stories before starting
+- **Wave:** 1 · **Increment:** 1 · **Active story:** none; I1-03, I1-04 and I1-05a committed (unmerged). Push and merge into `qa` in order: I1-03, I1-04, I1-05a
+- **Next story:** I1-05b (send, snapshot, in-person approval), branched from I1-05a
 - **Next decision needed:** OQ-1 (before I1-06)
 
 ### Housekeeping before more feature work
@@ -39,7 +39,7 @@ Status values: `not started` · `in progress` · `done (unmerged)` · `done` · 
 - [x] PR `feature/increment-0` → `qa` and merge (PR #1)
 - [x] Merge I1-01 and I1-11 into `qa` (PRs #1 and #2, merged straight to `qa` rather than through `increment/1`)
 - [x] I1-02 merged into `qa` (PR #3); `qa` builds again
-- [ ] Push `story/I1-03-inspection-findings` (again: GitHub has only the partial c8e5f8a) and `story/I1-04-catalog-tax`; merge I1-03, then I1-04
+- [ ] Push `story/I1-03-inspection-findings` (again: GitHub has only the partial c8e5f8a), `story/I1-04-catalog-tax` and `story/I1-05a-estimate-draft`; merge in that order
 - [ ] Before committing yourself: `git add -A` first. `git commit -a` and most IDE defaults skip new files (this broke `qa` twice)
 - [ ] Rule from now on: every story branch is pushed the same day it is committed
 
@@ -94,7 +94,9 @@ tests pass.
 | I1-02 | Repair order & check-in | M | I1-01 | done | `story/I1-02-repair-order-check-in` | 2026-10-21 | Migrations 0005–0006; decisions OD-2–OD-7, B-12, T-07–T-09; 160 tests + 12 e2e; open question OQ-1. Follow-up: cleanup job for unreferenced photo files ; in `qa` (PR #3) |
 | I1-03 | Inspection findings | S | I1-02 | done (unmerged) | `story/I1-03-inspection-findings` | 2026-10-22 | Migrations 0007–0008; inspection assignment (OD-8) and AC2-30 scoping; decisions OD-8–OD-11, T-10–T-13; 181 tests + 14 e2e; AC-05.2 test moves to I1-05; checklist content needs owner review (OD-9) |
 | I1-04 | Catalog & tax | M | B-08 | done (unmerged) | `story/I1-04-catalog-tax` | 2026-10-22 | Migrations 0009–0010; price list (labor rates, packages, parts, non-stock items), dated tax profiles and codes; decisions OD-12–OD-17, T-14–T-17; 197 tests + 16 e2e; AC2-12 → I1-05, AC2-19 → I1-09 |
-| I1-05 | Estimate (single version) | L | I1-03, I1-04 | not started | | | Split before starting (L). Carries AC-05.2 (urgent finding pre-selected) and AC2-12 (price change leaves sent estimates alone); lines store the catalogue price row id and values (`priceAt` returns `priceId`), never just an instant; refuse estimating while no tax profile is in force; record the VAT-inclusive net/VAT method as an assumption for V-2 (OD-14) |
+| I1-05 | Estimate (single version) | L | I1-03, I1-04 | in progress | | | Split before starting (L). Carries AC-05.2 (urgent finding pre-selected) and AC2-12 (price change leaves sent estimates alone); lines store the catalogue price row id and values (`priceAt` returns `priceId`), never just an instant; refuse estimating while no tax profile is in force; record the VAT-inclusive net/VAT method as an assumption for V-2 (OD-14) |
+| I1-05a | Estimate draft: jobs, lines, totals | M | I1-03, I1-04 | done (unmerged) | `story/I1-05a-estimate-draft` | 2026-10-22 | Migration 0011; jobs, revisions, lines, totals (AC-06.1, OD-18), urgent findings pre-selected and exclusions (AC-05.2, OD-23), withdrawal guard (OD-24), whole quantities (OD-22), manager/partner discounts (OD-19), AC2-12 line keeps its price; decisions OD-18–OD-24, T-18–T-20; 218 tests + 18 e2e. For I1-05b: send must lock the repair order and refuse an "open" urgent finding |
+| I1-05b | Estimate send & in-person approval | M | I1-05a | not started | | | Canonical snapshot + hash (AT-20 basic), signature (OD-20), ApprovalEvent + RevisionDecision, AC2-01 guard, AC2-12 after send |
 | I1-06 | Workshop execution | M | I1-05 | not started | | | Can run beside I1-07 |
 | I1-07 | Parts for a job (simple) | M | I1-05, I1-04 | not started | | | Can run beside I1-06 |
 | I1-08 | Quality check | S | I1-06 | not started | | | |
@@ -264,3 +266,4 @@ versioned customer API built on P-01's sign-in.
 | 2026-10-21 | I1-02 committed (done, unmerged); I0, I1-01 and I1-11 marked done (in `qa`); housekeeping updated |
 | 2026-10-22 | B-08 decided (I1-04 unblocked); I1-03 committed (done, unmerged) |
 | 2026-10-22 | I1-04 committed (done, unmerged); OD-16, OD-17 recorded |
+| 2026-10-22 | I1-05 split into I1-05a and I1-05b; I1-05a committed (done, unmerged); OD-18–OD-24, T-18–T-20 recorded |

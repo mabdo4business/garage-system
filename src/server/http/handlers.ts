@@ -38,6 +38,8 @@ import {
 import { getInspection } from "../inspection/queries";
 import { createItem, getCatalogueItem, KINDS, listCatalogue, setPrice } from "../catalog/items";
 import { addTaxProfile, getTaxSettings } from "../catalog/tax";
+import { addJob, addLine, openEstimate, setLineDiscount } from "../estimate/commands";
+import { estimateView } from "../estimate/queries";
 import {
   changePlate,
   createVehicle,
@@ -76,6 +78,14 @@ const STATUS_BY_CODE: Record<string, number> = {
   photo_not_discardable: 409,
   photo_not_locked: 409,
   photo_already_excluded: 409,
+  estimate_closed: 409,
+  estimate_exists: 409,
+  no_draft: 409,
+  no_tax_profile: 409,
+  no_tax_rate: 409,
+  finding_already_included: 409,
+  finding_already_excluded: 409,
+  finding_in_estimate: 409,
   try_again: 503,
 };
 
@@ -778,6 +788,105 @@ export function createHandlers(db: Kysely<DB>, storage: MediaStorage = getMediaS
         const body = await readBody(request);
         const outcome = await setFindingPhotoVisibility(db, session, mediaId, toStr(body.visibility));
         return json(200, outcome.result);
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    // ------------------------------------------------------------------ I1-05 estimate
+
+    /** GET /api/repair-orders/:id/estimate — the staff estimate builder (no technicians: no prices, AC2-30). */
+    async getEstimate(request: Request, repairOrderId: string): Promise<Response> {
+      try {
+        await authorize(db, await currentSession(request), "estimate.read", {
+          entityType: "repair_order",
+          entityId: repairOrderId,
+        });
+        const view = await estimateView(db, repairOrderId);
+        if (!view) return json(404, { error: "not_found" });
+        return json(200, view);
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    /** POST /api/repair-orders/:id/estimate — { idempotencyKey }; starts the draft (urgent findings pre-selected, AC-05.2). */
+    async openEstimate(request: Request, repairOrderId: string): Promise<Response> {
+      try {
+        if (!sameOrigin(request)) return json(403, { error: "forbidden" });
+        const session = await authorize(db, await currentSession(request), "estimate.edit", {
+          entityType: "repair_order",
+          entityId: repairOrderId,
+        });
+        const body = await readBody(request);
+        const outcome = await openEstimate(db, session, repairOrderId, toStr(body.idempotencyKey));
+        return json(outcome.replayed ? 200 : 201, outcome.result);
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    /** POST /api/repair-orders/:id/estimate/jobs — JSON/form { title?, findingId?, idempotencyKey }. */
+    async addEstimateJob(request: Request, repairOrderId: string): Promise<Response> {
+      try {
+        if (!sameOrigin(request)) return json(403, { error: "forbidden" });
+        const session = await authorize(db, await currentSession(request), "estimate.edit", {
+          entityType: "repair_order",
+          entityId: repairOrderId,
+        });
+        const body = await readBody(request);
+        const outcome = await addJob(
+          db,
+          session,
+          repairOrderId,
+          { title: body.title, findingId: body.findingId },
+          toStr(body.idempotencyKey),
+        );
+        return json(outcome.replayed ? 200 : 201, outcome.result);
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    /** POST /api/repair-jobs/:id/lines — JSON/form { itemId, qty, idempotencyKey }. */
+    async addEstimateLine(request: Request, jobId: string): Promise<Response> {
+      try {
+        if (!sameOrigin(request)) return json(403, { error: "forbidden" });
+        const session = await authorize(db, await currentSession(request), "estimate.edit", {
+          entityType: "repair_job",
+          entityId: jobId,
+        });
+        const body = await readBody(request);
+        const outcome = await addLine(
+          db,
+          session,
+          jobId,
+          { itemId: body.itemId, qty: body.qty },
+          toStr(body.idempotencyKey),
+        );
+        return json(outcome.replayed ? 200 : 201, outcome.result);
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    /** POST /api/revision-lines/:id/discount — JSON/form { discount, idempotencyKey }. Manager or partner (OD-19). */
+    async setEstimateLineDiscount(request: Request, lineId: string): Promise<Response> {
+      try {
+        if (!sameOrigin(request)) return json(403, { error: "forbidden" });
+        const session = await authorize(db, await currentSession(request), "estimate.discount", {
+          entityType: "revision_line",
+          entityId: lineId,
+        });
+        const body = await readBody(request);
+        const outcome = await setLineDiscount(
+          db,
+          session,
+          lineId,
+          { discount: body.discount },
+          toStr(body.idempotencyKey),
+        );
+        return json(outcome.replayed ? 200 : 201, outcome.result);
       } catch (error) {
         return errorResponse(error);
       }

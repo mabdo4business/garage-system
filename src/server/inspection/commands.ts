@@ -7,6 +7,7 @@ import type { DB, FindingSeverity } from "../db/schema";
 import { inspectImage } from "../media/image";
 import { photoKey, type MediaStorage } from "../media/storage";
 import { getCheckInSettings } from "../repair-order/check-in";
+import { preselectUrgentFinding } from "../estimate/commands";
 import { canAccessRepairOrder } from "./access";
 
 /**
@@ -240,6 +241,9 @@ export async function recordFinding(
         entityId: row.id,
         after: { repairOrderId, templateItemId, ...findingJson(finding) },
       });
+      if (finding.severity === "urgent") {
+        await preselectUrgentFinding(ctx, staff, repairOrderId, { id: row.id, title: finding.title });
+      }
       return { findingId: row.id };
     },
   );
@@ -294,6 +298,9 @@ export async function updateFinding(
       before: findingJson(before),
       after: findingJson(finding),
     });
+    if (finding.severity === "urgent" && before.severity !== "urgent") {
+      await preselectUrgentFinding(ctx, staff, repairOrderId, { id: findingId, title: finding.title });
+    }
     return { findingId };
   });
 }
@@ -310,6 +317,15 @@ export async function withdrawFinding(
   const repairOrderId = await findingParent(db, findingId);
   return runCommand(db, { name: "finding.withdraw", actor: actorOf(staff) }, async (ctx) => {
     await lockActiveFinding(ctx, staff, repairOrderId, findingId);
+    // OD-24: a finding the draft estimate has a job for stays until that job is removed.
+    const job = await ctx.tx
+      .selectFrom("repair_job")
+      .select("id")
+      .where("finding_id", "=", findingId)
+      .where("removed_at", "is", null)
+      .executeTakeFirst();
+    if (job)
+      throw new ConflictError("finding_in_estimate", "Remove this finding's job from the estimate first");
     await ctx.tx
       .updateTable("finding")
       .set({ status: "withdrawn", withdrawn_reason: why, updated_at: ctx.txTime, updated_by: staff.userId })

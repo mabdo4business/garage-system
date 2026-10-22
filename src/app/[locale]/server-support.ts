@@ -80,6 +80,14 @@ const ERROR_KEYS: Record<string, MessageKey> = {
   photo_not_discardable: "error.photoLocked",
   photo_not_locked: "error.photoNotLocked",
   photo_already_excluded: "error.photoAlreadyExcluded",
+  estimate_closed: "error.estimateClosed",
+  estimate_exists: "error.estimateExists",
+  no_draft: "error.noDraft",
+  no_tax_profile: "error.noTaxProfile",
+  no_tax_rate: "error.noTaxRate",
+  finding_already_included: "error.findingAlreadyIncluded",
+  finding_already_excluded: "error.findingAlreadyExcluded",
+  finding_in_estimate: "error.findingInEstimate",
 };
 
 /**

@@ -61,6 +61,12 @@ export const PERMISSIONS = {
   "catalogue.read": ["partner", "manager", "service_advisor", "store_keeper", "accountant"],
   "pricing.manage": ["partner", "manager"],
   "tax.manage": ["partner"],
+
+  // I1-05: estimates. Technicians never see prices (AC2-30). Line discounts are managers and partners
+  // only until discount limits and approvals arrive in I3-06 (OD-19).
+  "estimate.read": ["partner", "manager", "service_advisor"],
+  "estimate.edit": ["partner", "manager", "service_advisor"],
+  "estimate.discount": ["partner", "manager"],
 } as const satisfies Record<string, readonly Role[]>;
 
 export type Permission = keyof typeof PERMISSIONS;

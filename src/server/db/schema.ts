@@ -370,6 +370,104 @@ export interface CataloguePriceTable {
   set_by: string | null;
 }
 
+// I1-05a — estimate draft (migration 0011).
+export type EstimateVersionStatus = "draft" | "sent" | "closed" | "withdrawn" | "expired" | "discarded";
+export type JobExecutionStatus =
+  | "not_authorized"
+  | "authorized"
+  | "waiting_parts"
+  | "in_progress"
+  | "paused"
+  | "done"
+  | "stopped_by_customer"
+  | "cancelled";
+export type RevisionKind =
+  "original" | "add_scope" | "price_change" | "reduction" | "substitution" | "partial_work_agreement";
+export type RevisionStatus = "draft" | "pending" | "approved" | "declined" | "lapsed";
+export type RevisionLineType = "labor" | "part" | "package" | "fee" | "customer_supplied_part";
+
+export interface EstimateTable {
+  id: Generated<string>;
+  repair_order_id: string;
+  created_at: Generated<Date>;
+  created_by: string | null;
+}
+
+export interface EstimateVersionTable {
+  id: Generated<string>;
+  estimate_id: string;
+  version_no: number;
+  status: Generated<EstimateVersionStatus>;
+  created_at: Generated<Date>;
+  created_by: string | null;
+}
+
+export interface RepairJobTable {
+  id: Generated<string>;
+  repair_order_id: string;
+  title: string;
+  job_type: Generated<"repair" | "diagnostic">;
+  charge_type: Generated<"chargeable" | "warranty" | "goodwill">;
+  execution_status: Generated<JobExecutionStatus>;
+  finding_id: string | null;
+  removed_at: Date | null;
+  removed_by: string | null;
+  created_at: Generated<Date>;
+  created_by: string | null;
+  updated_at: Generated<Date>;
+  updated_by: string | null;
+}
+
+export interface JobRevisionTable {
+  id: Generated<string>;
+  job_id: string;
+  revision_no: number;
+  kind: RevisionKind;
+  proposed_in_version_id: string;
+  status: Generated<RevisionStatus>;
+  lapse_reason: "withdrawn" | "expired" | null;
+  created_at: Generated<Date>;
+  created_by: string | null;
+}
+
+export interface RevisionLineTable {
+  id: Generated<string>;
+  revision_id: string;
+  line_type: RevisionLineType;
+  catalogue_item_id: string | null;
+  catalogue_price_id: string | null;
+  description_en: string;
+  description_ar: string;
+  unit: string | null;
+  qty: ColumnType<string, string, string>; // numeric(18,3)
+  unit_price: ColumnType<string, string, string>; // numeric(14,2), VAT-inclusive
+  gross: ColumnType<string, string, string>;
+  discount: ColumnType<string, string | undefined, string>;
+  line_total: ColumnType<string, string, string>;
+  net: ColumnType<string, string, string>;
+  vat: ColumnType<string, string, string>;
+  tax_code: string;
+  tax_rate: ColumnType<string, string, string>; // numeric(5,2) percent
+  supersedes_line_id: string | null;
+  removed_at: Date | null;
+  removed_by: string | null;
+  created_at: Generated<Date>;
+  created_by: string | null;
+  updated_at: Generated<Date>;
+  updated_by: string | null;
+}
+
+export interface UrgentFindingExclusionTable {
+  id: Generated<string>;
+  estimate_version_id: string;
+  finding_id: string;
+  reason: string;
+  created_at: Generated<Date>;
+  created_by: string | null;
+  cleared_at: Date | null;
+  cleared_by: string | null;
+}
+
 export interface DB {
   app_user: AppUserTable;
   user_role: UserRoleTable;
@@ -398,5 +496,11 @@ export interface DB {
   tax_code_rate: TaxCodeRateTable;
   catalogue_item: CatalogueItemTable;
   catalogue_price: CataloguePriceTable;
+  estimate: EstimateTable;
+  estimate_version: EstimateVersionTable;
+  repair_job: RepairJobTable;
+  job_revision: JobRevisionTable;
+  revision_line: RevisionLineTable;
+  urgent_finding_exclusion: UrgentFindingExclusionTable;
   schema_migration: SchemaMigrationTable;
 }

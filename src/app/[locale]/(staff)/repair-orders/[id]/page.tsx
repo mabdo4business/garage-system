@@ -9,6 +9,9 @@ import { requirePagePermission } from "../../../server-support";
 import { ExcludePhotoForm } from "./exclude-photo-form";
 import { getInspection, listTechnicians } from "../../../../../server/inspection/queries";
 import { AssignInspectionForm } from "./inspection/inspection-forms";
+import { estimateView } from "../../../../../server/estimate/queries";
+import { Money } from "../../../../../server/core/money";
+import { formatAed } from "../../../../../i18n/format";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +33,7 @@ export default async function RepairOrderPage({
   const canAssign = hasPermission(session.roles, "inspection.assign");
   const inspection = await getInspection(getDb(), id);
   const technicians = canAssign ? await listTechnicians(getDb()) : [];
+  const estimate = hasPermission(session.roles, "estimate.read") ? await estimateView(getDb(), id) : null;
   const activeFindings = inspection?.findings.filter((finding) => finding.status === "active") ?? [];
   const countOf = (severity: string) =>
     activeFindings.filter((finding) => finding.severity === severity).length;
@@ -164,6 +168,34 @@ export default async function RepairOrderPage({
           />
         ) : null}
       </Card>
+
+      {hasPermission(session.roles, "estimate.read") ? (
+        <Card
+          title={t(locale, "estimate.title")}
+          actions={
+            <a className="btn btn-secondary" href={`/${locale}/repair-orders/${ro.id}/estimate`}>
+              {t(locale, "estimate.open")}
+            </a>
+          }
+        >
+          {estimate ? (
+            <dl className="detail-list">
+              <dt>{t(locale, "estimate.version", { no: String(estimate.versionNo) })}</dt>
+              <dd>{t(locale, `estimate.status.${estimate.status}` as MessageKey)}</dd>
+              <dt>{t(locale, "estimate.jobs")}</dt>
+              <dd>
+                <bdi dir="ltr">{estimate.jobs.length}</bdi>
+              </dd>
+              <dt>{t(locale, "estimate.total")}</dt>
+              <dd>
+                <bdi>{formatAed(Money.parse(estimate.totals.total), locale)}</bdi>
+              </dd>
+            </dl>
+          ) : (
+            <p className="muted">{t(locale, "estimate.none")}</p>
+          )}
+        </Card>
+      ) : null}
 
       <Card title={t(locale, "checkIn.section.photos")}>
         <p className="muted">{t(locale, "repairOrder.photosLocked")}</p>
