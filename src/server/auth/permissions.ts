@@ -70,6 +70,12 @@ export const PERMISSIONS = {
   // I1-05b: presenting the estimate and recording the customer's in-person decision (L3, OD-20).
   "estimate.send": ["partner", "manager", "service_advisor"],
   "estimate.record_approval": ["partner", "manager", "service_advisor"],
+
+  // I1-06: the workshop board (no prices), assigning jobs (US-07.2, OD-26) and the assignee's own jobs. Managers
+  // and partners can be assignees (OD-27), so they have "My jobs" too.
+  "workshop.board": ["partner", "manager", "service_advisor"],
+  "workshop.assign": ["partner", "manager"],
+  "workshop.my_jobs": ["partner", "manager", "technician"],
 } as const satisfies Record<string, readonly Role[]>;
 
 export type Permission = keyof typeof PERMISSIONS;

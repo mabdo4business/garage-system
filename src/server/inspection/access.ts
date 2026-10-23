@@ -47,7 +47,7 @@ export async function canAccessRepairOrder(
 }
 
 /** Audits a denied attempt and answers "not found" (AC2-30), without saying whether the record exists. */
-async function denyAsNotFound(
+export async function denyAsNotFound(
   db: Kysely<DB>,
   session: Pick<SessionUser, "userId" | "roles">,
   entityType: string,

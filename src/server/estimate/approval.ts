@@ -389,7 +389,7 @@ export async function recordInPersonApproval(
         // v0.2.1 §3.3: Not authorized → Authorized when the job's first revision is approved.
         await ctx.tx
           .updateTable("repair_job")
-          .set({ execution_status: "authorized" })
+          .set({ execution_status: "authorized", updated_by: staff.userId })
           .where("id", "=", revision.job_id)
           .where("execution_status", "=", "not_authorized")
           .execute();

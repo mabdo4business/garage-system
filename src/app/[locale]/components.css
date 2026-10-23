@@ -945,3 +945,37 @@ textarea.internal {
 .terms-text {
   white-space: pre-wrap;
 }
+
+/* ---------------------------------------------------------------- Workshop board and jobs (I1-06) */
+
+.board {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.board-column {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.board-column h2 {
+  margin: 0;
+  font-size: var(--text-md, 1rem);
+}
+
+.board-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin: 0;
+}
+
+.segmented-2 {
+  grid-template-columns: repeat(2, minmax(56px, 1fr));
+}
+
+.job-actions .form {
+  display: inline-grid;
+}

@@ -384,6 +384,21 @@ export async function abandonCheckIn(
 
 // --------------------------------------------------------------------------- complete
 
+/** OQ-1: the vehicle's latest open repair order (not delivered, closed or cancelled), if any. */
+export async function openRepairOrderOf(
+  db: Kysely<DB>,
+  vehicleId: string,
+): Promise<{ id: string; number: string; status: string } | null> {
+  const row = await db
+    .selectFrom("repair_order")
+    .select(["id", "number", "status"])
+    .where("vehicle_id", "=", vehicleId)
+    .where("status", "not in", ["delivered", "closed", "cancelled"])
+    .orderBy("checked_in_at", "desc")
+    .executeTakeFirst();
+  return row ?? null;
+}
+
 export async function completeCheckIn(
   db: Kysely<DB>,
   actor: Actor,
@@ -391,12 +406,20 @@ export async function completeCheckIn(
   idempotencyKey: string,
   // Test-only fault injection (allocation rollback), as in test-document/service.ts.
   hooks?: RunCommandOptions["hooks"],
+  // OQ-1: the open repair order number the advisor was warned about and confirmed.
+  options: { confirmOpenRepairOrder?: string | null } = {},
 ): Promise<CommandOutcome<{ repairOrderId: string; number: string }>> {
   if (!isUuid(checkInId)) throw new NotFoundError("check_in", checkInId);
   const settings = await getCheckInSettings(db);
+  const confirmed = options.confirmOpenRepairOrder?.trim() || null;
   return runCommand(
     db,
-    { name: "check_in.complete", actor, idempotency: { key: idempotencyKey, payload: { checkInId } }, hooks },
+    {
+      name: "check_in.complete",
+      actor,
+      idempotency: { key: idempotencyKey, payload: { checkInId, confirmed } },
+      hooks,
+    },
     async (ctx) => {
       // The vehicle first (rank 5 before check-in 7), so its owner cannot change underneath us (T-09).
       const vehicle = await ctx.tx
@@ -449,6 +472,19 @@ export async function completeCheckIn(
       }
       const shortfallReason = missingSlots.length > 0 ? draft.photo_shortfall_reason : null;
 
+      // OQ-1: another open repair order for this vehicle is allowed once the advisor confirms it (the vehicle
+      // lock above keeps two check-ins of one vehicle from passing this check together).
+      const open = await openRepairOrderOf(ctx.tx, draft.vehicle_id);
+      if (open && confirmed !== open.number) {
+        throw new ConflictError("open_repair_order_exists", `Vehicle has open repair order ${open.number}`, {
+          reason: "confirm_open_repair_order",
+          openRepairOrder: open.number,
+        });
+      }
+      if (!open && confirmed) {
+        throw new ConflictError("open_repair_order_gone", "The open repair order was closed meanwhile");
+      }
+
       const repairOrderId = randomUUID();
       const number = await allocateNumber(ctx, "repair_order", { type: "repair_order", id: repairOrderId });
       await ctx.tx
@@ -471,6 +507,7 @@ export async function completeCheckIn(
           key_tag: draft.key_tag,
           promised_at: draft.promised_at,
           photo_shortfall_reason: shortfallReason,
+          duplicate_open_ack: open ? open.number : null,
           checked_in_at: ctx.txTime,
           checked_in_by: userId(actor),
           business_date: ctx.businessDate,
@@ -509,6 +546,7 @@ export async function completeCheckIn(
           photoSlots: [...present].sort(),
           missingSlots,
           photoShortfallReason: shortfallReason,
+          confirmedOpenRepairOrder: open ? open.number : null,
         },
       });
       return { repairOrderId, number: number.text };

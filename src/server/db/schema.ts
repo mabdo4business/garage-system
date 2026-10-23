@@ -232,6 +232,8 @@ export interface RepairOrderTable {
   key_tag: string | null;
   promised_at: Timestamp | null;
   photo_shortfall_reason: string | null;
+  /** OQ-1: the open repair order number the advisor confirmed at check-in (migration 0013). */
+  duplicate_open_ack: ColumnType<string | null, string | null | undefined, never>;
   checked_in_at: Timestamp;
   checked_in_by: string | null;
   business_date: DbDate;
@@ -417,6 +419,8 @@ export interface RepairJobTable {
   job_type: Generated<"repair" | "diagnostic">;
   charge_type: Generated<"chargeable" | "warranty" | "goodwill">;
   execution_status: Generated<JobExecutionStatus>;
+  /** Reason or note of the last execution change (pause reason, completion note); migration 0013. */
+  execution_reason: ColumnType<string | null, never, string | null>;
   finding_id: string | null;
   removed_at: Date | null;
   removed_by: string | null;
@@ -519,6 +523,38 @@ export interface RevisionDecisionTable {
   urgent_ack_pending: Generated<boolean>;
 }
 
+// I1-06 — workshop (migration 0013).
+export interface JobAssignmentTable {
+  id: Generated<string>;
+  job_id: string;
+  assignee_id: string;
+  bay: string | null;
+  assigned_by: string | null;
+  assigned_at: Generated<Date>;
+  ended_by: string | null;
+  ended_at: Date | null;
+}
+
+export interface JobLineOutcomeTable {
+  id: Generated<string>;
+  job_id: string;
+  revision_line_id: string;
+  outcome: "done" | "not_performed";
+  reason: string | null;
+  recorded_by: string;
+  recorded_at: Generated<Date>;
+}
+
+export interface JobStatusEventTable {
+  id: Generated<string>;
+  job_id: string;
+  from_status: string;
+  to_status: string;
+  reason: string | null;
+  actor_id: string | null;
+  occurred_at: Generated<Date>;
+}
+
 export interface DB {
   app_user: AppUserTable;
   user_role: UserRoleTable;
@@ -556,5 +592,8 @@ export interface DB {
   terms_text: TermsTextTable;
   approval_event: ApprovalEventTable;
   revision_decision: RevisionDecisionTable;
+  job_assignment: JobAssignmentTable;
+  job_line_outcome: JobLineOutcomeTable;
+  job_status_event: JobStatusEventTable;
   schema_migration: SchemaMigrationTable;
 }

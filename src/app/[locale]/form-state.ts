@@ -95,4 +95,10 @@ export const FIELD_LABELS: Record<string, MessageKey> = {
   approverName: "approval.name",
   signature: "approval.signature",
   decisions: "approval.title",
+  // I1-06 workshop
+  assigneeId: "workshop.assignee",
+  bay: "workshop.bay",
+  pauseReason: "job.pauseReason",
+  lines: "job.lines",
+  notPerformedReason: "job.line.reason",
 };

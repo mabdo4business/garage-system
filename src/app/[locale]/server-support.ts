@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { DEFAULT_LOCALE, isLocale, type Locale, type MessageKey } from "../../i18n";
-import type { Permission } from "../../server/auth/permissions";
+import { hasPermission, type Permission } from "../../server/auth/permissions";
 import { authorize } from "../../server/auth/service";
 import { SESSION_COOKIE, validateSession, type SessionUser } from "../../server/auth/session";
 import { DomainError, ForbiddenError } from "../../server/core/errors";
@@ -30,11 +30,14 @@ export async function requirePagePermission(
   locale: Locale,
   permission: Permission,
   target?: { entityType: string; entityId: string },
+  /** A second permission that also opens the page (checked instead when the viewer holds it). */
+  alternative?: Permission,
 ): Promise<SessionUser> {
   const session = await currentSession();
   if (!session) redirect(`/${locale}/login`);
+  const required = alternative && hasPermission(session.roles, alternative) ? alternative : permission;
   try {
-    return await authorize(getDb(), session, permission, target);
+    return await authorize(getDb(), session, required, target);
   } catch (error) {
     if (error instanceof ForbiddenError) notFound();
     throw error;
@@ -96,6 +99,13 @@ const ERROR_KEYS: Record<string, MessageKey> = {
   estimate_expired: "error.estimateExpired",
   estimate_changed: "error.estimateChanged",
   revision_not_pending: "error.revisionNotPending",
+  open_repair_order_exists: "error.openRepairOrderExists",
+  open_repair_order_gone: "error.openRepairOrderGone",
+  job_not_assignable: "error.jobNotAssignable",
+  job_not_authorized: "error.jobNotAuthorized",
+  repair_order_not_in_progress: "error.repairOrderNotInProgress",
+  not_assignee: "error.notAssignee",
+  job_status_changed: "error.jobStatusChanged",
 };
 
 /**

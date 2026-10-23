@@ -34,6 +34,20 @@ export const NAV_ITEMS: readonly NavItem[] = [
     sections: ["/inspections", "/repair-orders"],
   },
   {
+    key: "workshop",
+    label: "nav.workshop",
+    path: "/workshop",
+    permission: "workshop.board",
+    sections: ["/workshop"],
+  },
+  {
+    key: "myJobs",
+    label: "nav.myJobs",
+    path: "/jobs",
+    permission: "workshop.my_jobs",
+    sections: ["/jobs"],
+  },
+  {
     key: "directory",
     label: "nav.directory",
     path: "/search",

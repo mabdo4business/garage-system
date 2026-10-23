@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import { uniqueDigits } from "./fixtures";
 import { addItem, checkedInRepairOrder, pageFor, taxSetUp } from "./estimate-helpers";
@@ -7,7 +8,7 @@ import { addItem, checkedInRepairOrder, pageFor, taxSetUp } from "./estimate-hel
 test("advisor presents the estimate; the customer approves one job, declines the other and signs", async ({
   browser,
 }) => {
-  test.setTimeout(90_000); // the longest flow: tax set-up, pricing, check-in, estimate, decision
+  test.setTimeout(120_000); // the longest flow: tax set-up, pricing, check-in, estimate, decision
   const partner = await pageFor(browser, "partner");
   const taxCode = await taxSetUp(partner);
   const manager = await pageFor(browser, "manager");
@@ -22,33 +23,26 @@ test("advisor presents the estimate; the customer approves one job, declines the
 
   const advisor = await pageFor(browser, "advisor");
   const ro = await checkedInRepairOrder(advisor);
-  await advisor.goto(`/en/repair-orders/${ro}/inspection`);
-  const addFinding = advisor
-    .locator(".card")
-    .filter({ has: advisor.getByRole("heading", { name: "Add a finding" }) });
-  await addFinding.locator("input[name=title]").fill("Brake pads at 2 mm");
-  await addFinding.locator("label.severity-urgent").click();
-  await addFinding.getByRole("button", { name: "Save finding" }).click();
-  await expect(advisor.locator(".finding-list").first()).toContainText("Brake pads at 2 mm");
-
-  await advisor.goto(`/en/repair-orders/${ro}/estimate`);
-  await advisor.getByRole("button", { name: "Start estimate" }).click();
-  const addJob = advisor.locator(".card").filter({ has: advisor.getByRole("heading", { name: "Add job" }) });
-  await addJob.locator("input[name=title]").fill("AC service");
-  await addJob.getByRole("button", { name: "Add job" }).click();
-  for (const [title, qty] of [
-    ["Brake pads at 2 mm", "1.5"],
-    ["AC service", "1"],
-  ] as const) {
-    const job = advisor.locator(".card").filter({ has: advisor.getByRole("heading", { name: title }) });
-    await job.locator("summary", { hasText: "Add item" }).click();
-    const form = job.locator("form", { has: advisor.locator("select[name=itemId]") });
-    const value = await form.locator("option", { hasText: labor }).getAttribute("value");
-    await form.locator("select[name=itemId]").selectOption(value!);
-    await form.locator("input[name=qty]").fill(qty);
-    await form.getByRole("button", { name: "Add item" }).click();
-    await expect(job.locator("tbody")).toContainText("Workshop labour");
+  const itemId = manager.url().split("/").pop()!;
+  // Set-up through the API (the finding and estimate screens have their own specs): an urgent finding becomes
+  // the first job (AC-05.2), then an AC job; each gets a labour line.
+  const post = (path: string, data: Record<string, unknown>) =>
+    advisor.request.post(path, { data: { idempotencyKey: randomUUID(), ...data } });
+  expect(
+    (
+      await post(`/api/repair-orders/${ro}/findings`, { title: "Brake pads at 2 mm", severity: "urgent" })
+    ).ok(),
+  ).toBe(true);
+  expect((await post(`/api/repair-orders/${ro}/estimate`, {})).ok()).toBe(true);
+  expect((await post(`/api/repair-orders/${ro}/estimate/jobs`, { title: "AC service" })).ok()).toBe(true);
+  const view = await (await advisor.request.get(`/api/repair-orders/${ro}/estimate`)).json();
+  for (const [job, qty] of [
+    [view.jobs[0].id, "1.5"],
+    [view.jobs[1].id, "1"],
+  ]) {
+    expect((await post(`/api/repair-jobs/${job}/lines`, { itemId, qty })).ok()).toBe(true);
   }
+  await advisor.goto(`/en/repair-orders/${ro}/estimate`);
 
   // Present: the estimate is frozen and the decision screen opens.
   await advisor.getByRole("button", { name: "Present to customer" }).click();

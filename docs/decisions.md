@@ -66,12 +66,14 @@ Status: ✅ decided · ⏳ open · 🔍 needs professional verification
 | OD-25 | A customer may decline an urgent job in person; the decision is flagged "urgent declined — acknowledgment pending" so I2-07 can require the declined-urgent acknowledgment (wording: V-4) before the vehicle is released. | 2026-10-22 | Owners (I1-05b) |
 | T-21 | Sending refuses an estimate whose lines carry a VAT rate other than the one in force today (the advisor re-adds the line); prices themselves stay as added (T-18). | 2026-10-22 | Technical (I1-05b) |
 | T-22 | In person, one submission may decide some or all pending jobs (v0.2.1 §3.1 partial decisions). With nothing pending the version is Closed. The repair order moves Awaiting approval → In progress on the first approved job; if every job is declined it stays Awaiting approval until the declined path (I2-07). | 2026-10-22 | Technical (I1-05b) |
+| OQ-1 | A vehicle may have two open repair orders at once (open = not delivered, closed or cancelled). Check-in warns: it shows the open repair order's number and status and asks the advisor to confirm; the confirmation is recorded on the new repair order and audited. Never blocked. To be built at the start of I1-06 (check-in change plus the workshop board showing both). | 2026-10-23 | Owners |
+| OD-26 | One technician (assignee) per job at a time; managers and partners assign and reassign, and the assignment history is kept. A bay is an optional free-text label on the assignment (PRD v0.2 #39). | 2026-10-23 | Owners (I1-06) |
+| OD-27 | A job's execution status (start, pause, resume, done) is changed only by the person assigned. A manager or partner who must act reassigns the job to themselves first, so assignees are technicians, managers or partners. | 2026-10-23 | Owners (I1-06) |
 
 ## Open — needed before the increment shown
 
 | ID | Question | Needed before | Recommended default |
 |---|---|---|---|
-| OQ-1 | May one vehicle have two open repair orders at the same time (e.g. a second check-in before the first is delivered)? The spec is silent; I1-02 does not prevent it. | Before I1-06 (workshop board) | Warn at check-in, do not block |
 | D-6 | Accept customer-supplied parts at launch? | Increment 2 | Not at launch; enable later |
 | D-7 | Allow phone approval at all? | Increment 2 | Yes; outbound call to number on file = verified |
 | D-11 | Diagnostic fee: amount, when charged, when waived | Increment 2 | Pre-authorised at check-in; waive if repairs approved |

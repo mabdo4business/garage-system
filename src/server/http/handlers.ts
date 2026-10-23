@@ -4,6 +4,7 @@ import { isUuid } from "../core/ids";
 import { idempotencyKeyUsed } from "../command/runner";
 import { logger } from "../core/logger";
 import { authorize, deactivateUser, login, logout } from "../auth/service";
+import { hasPermission } from "../auth/permissions";
 import { SESSION_COOKIE, sessionPolicy, validateSession, type SessionUser } from "../auth/session";
 import type { DB } from "../db/schema";
 import { createTestDocument, issueTestDocument } from "../test-document/service";
@@ -41,6 +42,15 @@ import { addTaxProfile, getTaxSettings } from "../catalog/tax";
 import { addJob, addLine, openEstimate, setLineDiscount } from "../estimate/commands";
 import { estimateView } from "../estimate/queries";
 import { recordInPersonApproval, sendVersion } from "../estimate/approval";
+import {
+  assignJob,
+  completeJob,
+  pauseJob,
+  requireJobAccess,
+  resumeJob,
+  startJob,
+} from "../workshop/commands";
+import { jobCard, workshopBoard } from "../workshop/queries";
 import {
   changePlate,
   createVehicle,
@@ -95,6 +105,13 @@ const STATUS_BY_CODE: Record<string, number> = {
   estimate_expired: 409,
   estimate_changed: 409,
   revision_not_pending: 409,
+  open_repair_order_exists: 409,
+  open_repair_order_gone: 409,
+  job_not_assignable: 409,
+  job_not_authorized: 409,
+  repair_order_not_in_progress: 409,
+  not_assignee: 409,
+  job_status_changed: 409,
   try_again: 503,
 };
 
@@ -215,6 +232,16 @@ async function readLimited(request: Request, limit: number): Promise<Uint8Array<
     offset += chunk.byteLength;
   }
   return bytes;
+}
+
+/** Like readBody, but keeps JSON arrays and objects (job completion sends a list of line outcomes). */
+async function readJsonOrForm(request: Request): Promise<Record<string, unknown>> {
+  const type = request.headers.get("content-type") ?? "";
+  if (type.includes("application/json")) {
+    const body = (await request.json()) as unknown;
+    return body && typeof body === "object" ? (body as Record<string, unknown>) : {};
+  }
+  return readBody(request);
 }
 
 async function readBody(request: Request): Promise<Record<string, unknown>> {
@@ -589,6 +616,8 @@ export function createHandlers(db: Kysely<DB>, storage: MediaStorage = getMediaS
           { kind: "user", userId: session.userId },
           checkInId,
           toStr(body.idempotencyKey),
+          undefined,
+          { confirmOpenRepairOrder: toStr(body.confirmOpenRepairOrder) || null },
         );
         return json(outcome.replayed ? 200 : 201, outcome.result);
       } catch (error) {
@@ -958,6 +987,71 @@ export function createHandlers(db: Kysely<DB>, storage: MediaStorage = getMediaS
           },
           toStr(form.get("idempotencyKey")),
         );
+        return json(outcome.replayed ? 200 : 201, outcome.result);
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    // ------------------------------------------------------------------ I1-06 workshop
+
+    /** GET /api/workshop/board — open repair orders with jobs (no prices). */
+    async getWorkshopBoard(request: Request): Promise<Response> {
+      try {
+        await authorize(db, await currentSession(request), "workshop.board");
+        return json(200, await workshopBoard(db));
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    /** GET /api/jobs/:id — the job card (AC2-30: assignee or board staff only; never prices). */
+    async getJob(request: Request, jobId: string): Promise<Response> {
+      try {
+        const current = await currentSession(request);
+        // Board staff (advisors included) and assignees read job cards; anyone else is refused and logged.
+        const permission =
+          current && hasPermission(current.roles, "workshop.board") ? "workshop.board" : "workshop.my_jobs";
+        const session = await authorize(db, current, permission, {
+          entityType: "repair_job",
+          entityId: jobId,
+        });
+        await requireJobAccess(db, session, jobId);
+        const card = await jobCard(db, jobId);
+        if (!card) return json(404, { error: "not_found" });
+        return json(200, card);
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    /**
+     * POST /api/jobs/:id/:action — action = assign { assigneeId, bay? } | start | pause { reason } | resume |
+     * complete { lines: [{ lineId, outcome, reason? }], note? }; every body carries an idempotencyKey.
+     */
+    async jobAction(request: Request, jobId: string, action: string): Promise<Response> {
+      try {
+        if (!sameOrigin(request)) return json(403, { error: "forbidden" });
+        const permission = action === "assign" ? "workshop.assign" : "workshop.my_jobs";
+        const session = await authorize(db, await currentSession(request), permission, {
+          entityType: "repair_job",
+          entityId: jobId,
+        });
+        const body = await readJsonOrForm(request);
+        const key = toStr(body.idempotencyKey);
+        const outcome =
+          action === "assign"
+            ? await assignJob(db, session, jobId, { assigneeId: body.assigneeId, bay: body.bay }, key)
+            : action === "start"
+              ? await startJob(db, session, jobId, key)
+              : action === "pause"
+                ? await pauseJob(db, session, jobId, { reason: body.reason }, key)
+                : action === "resume"
+                  ? await resumeJob(db, session, jobId, key)
+                  : action === "complete"
+                    ? await completeJob(db, session, jobId, { lines: body.lines, note: body.note }, key)
+                    : null;
+        if (!outcome) return json(404, { error: "not_found" });
         return json(outcome.replayed ? 200 : 201, outcome.result);
       } catch (error) {
         return errorResponse(error);

@@ -5,7 +5,7 @@ import { signIn, submitForm, uniqueDigits } from "./fixtures";
 
 export async function pageFor(
   browser: Browser,
-  user: "advisor" | "technician" | "manager" | "partner",
+  user: "advisor" | "technician" | "technician2" | "manager" | "partner",
   locale: "en" | "ar" = "en",
 ) {
   const page = await (await browser.newContext()).newPage();
@@ -58,6 +58,11 @@ export async function addItem(
 }
 
 export async function checkedInRepairOrder(page: Page): Promise<string> {
+  return (await checkedInVehicle(page)).ro;
+}
+
+/** Like checkedInRepairOrder, and also returns the vehicle id (for a second check-in, OQ-1). */
+export async function checkedInVehicle(page: Page): Promise<{ ro: string; vehicleId: string }> {
   await page.goto("/en/customers/new");
   await page.locator("#nameEn").fill(`Estimate Owner ${uniqueDigits(5)}`);
   await page.locator("#mobile").fill(`055${uniqueDigits(7)}`);
@@ -74,6 +79,7 @@ export async function checkedInRepairOrder(page: Page): Promise<string> {
   await page.locator("#year").fill("2020");
   await submitForm(page);
   await expect(page).toHaveURL(/\/en\/vehicles\/[0-9a-f-]{36}$/);
+  const vehicleId = page.url().split("/").pop()!;
   await page.getByRole("button", { name: "Check in this vehicle" }).click();
   await expect(page).toHaveURL(/\/en\/check-ins\//);
   await page.locator("#odometerKm").fill("61000");
@@ -81,5 +87,5 @@ export async function checkedInRepairOrder(page: Page): Promise<string> {
   await page.locator("#photoShortfallReason").fill("Photos taken on the workshop camera");
   await page.getByRole("button", { name: "Complete check-in" }).click();
   await expect(page).toHaveURL(/\/en\/repair-orders\/[0-9a-f-]{36}$/);
-  return page.url().split("/").pop()!;
+  return { ro: page.url().split("/").pop()!, vehicleId };
 }

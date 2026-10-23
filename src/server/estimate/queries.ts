@@ -30,6 +30,7 @@ export interface EstimateLineView {
 
 export interface EstimateJobView {
   id: string;
+  revisionId: string;
   title: string;
   findingId: string | null;
   findingSeverity: FindingSeverity | null;
@@ -147,6 +148,7 @@ export async function estimateView(db: Kysely<DB>, repairOrderId: string): Promi
     allAmounts.push(...amounts);
     jobViews.push({
       id: job.id,
+      revisionId: job.revision_id,
       title: job.title,
       findingId: job.finding_id,
       findingSeverity: job.severity,
