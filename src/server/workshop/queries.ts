@@ -163,7 +163,7 @@ export async function myJobs(db: Kysely<DB>, userId: string): Promise<MyJob[]> {
     ])
     .where("job_assignment.assignee_id", "=", userId)
     .where("job_assignment.ended_at", "is", null)
-    .where("repair_job.execution_status", "in", ["authorized", "in_progress", "paused"])
+    .where("repair_job.execution_status", "in", ["authorized", "waiting_parts", "in_progress", "paused"])
     .orderBy("job_assignment.assigned_at")
     .execute();
   return rows.map((row) => ({
@@ -208,6 +208,9 @@ export interface JobCard {
     descriptionAr: string;
     qty: string;
     unit: string | null;
+    lineType: string;
+    /** Part lines: quantity issued or received for the line so far (never its cost, AC2-30). */
+    partsQty: string | null;
     outcome: "done" | "not_performed" | null;
     reason: string | null;
   }[];
@@ -265,12 +268,15 @@ export async function jobCard(db: Kysely<DB>, jobId: string): Promise<JobCard | 
       : await db
           .selectFrom("revision_line")
           .leftJoin("job_line_outcome", "job_line_outcome.revision_line_id", "revision_line.id")
+          .leftJoin("line_wip", "line_wip.revision_line_id", "revision_line.id")
           .select([
             "revision_line.id",
             "revision_line.description_en",
             "revision_line.description_ar",
             "revision_line.qty",
             "revision_line.unit",
+            "revision_line.line_type",
+            "line_wip.qty as parts_qty",
             "job_line_outcome.outcome",
             "job_line_outcome.reason",
           ])
@@ -329,6 +335,8 @@ export async function jobCard(db: Kysely<DB>, jobId: string): Promise<JobCard | 
       descriptionAr: line.description_ar,
       qty: line.qty,
       unit: line.unit,
+      lineType: line.line_type,
+      partsQty: line.line_type === "part" ? (line.parts_qty ?? "0.000") : null,
       outcome: line.outcome,
       reason: line.reason,
     })),

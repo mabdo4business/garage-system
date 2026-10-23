@@ -11,6 +11,7 @@ import { jobCard } from "../../../../../server/workshop/queries";
 import { ActionForm } from "../../../action-form";
 import { requirePagePermission } from "../../../server-support";
 import { completeJobAction, pauseJobAction, resumeJobAction, startJobAction } from "../actions";
+import { waitingPartsAction } from "../../stock/actions";
 import { JOB_TONE } from "../shared";
 
 export const dynamic = "force-dynamic";
@@ -82,13 +83,22 @@ export default async function JobPage({ params }: { params: Promise<{ locale: st
       {mine && running ? (
         <div className="form-actions job-actions">
           {job.status === "authorized" ? (
-            <ActionForm
-              locale={locale}
-              action={startJobAction}
-              hidden={hidden()}
-              submit="job.start"
-              variant="primary"
-            />
+            <>
+              <ActionForm
+                locale={locale}
+                action={startJobAction}
+                hidden={hidden()}
+                submit="job.start"
+                variant="primary"
+              />
+              <ActionForm
+                locale={locale}
+                action={waitingPartsAction}
+                hidden={{ ...hidden(), back: "job" }}
+                submit="parts.markWaiting"
+                variant="quiet"
+              />
+            </>
           ) : null}
           {job.status === "paused" ? (
             <ActionForm
@@ -129,6 +139,11 @@ export default async function JobPage({ params }: { params: Promise<{ locale: st
                     <bdi>{name(line)}</bdi> · <bdi dir="ltr">{line.qty.replace(/\.?0+$/, "")}</bdi>{" "}
                     {unit(line.unit)}
                   </strong>
+                  {line.partsQty !== null ? (
+                    <span className="muted">
+                      {t(locale, "job.partsIssued", { qty: line.partsQty.replace(/\.?0+$/, "") || "0" })}
+                    </span>
+                  ) : null}
                   <fieldset className="segmented segmented-2">
                     <legend className="visually-hidden">{name(line)}</legend>
                     <label className="choice-approved">
@@ -163,6 +178,11 @@ export default async function JobPage({ params }: { params: Promise<{ locale: st
                   <bdi>{name(line)}</bdi> · <bdi dir="ltr">{line.qty.replace(/\.?0+$/, "")}</bdi>{" "}
                   {unit(line.unit)}
                 </strong>
+                {line.partsQty !== null ? (
+                  <span className="muted">
+                    {t(locale, "job.partsIssued", { qty: line.partsQty.replace(/\.?0+$/, "") || "0" })}
+                  </span>
+                ) : null}
                 {line.outcome ? (
                   <p>
                     <StatusChip tone={line.outcome === "done" ? "success" : "danger"}>

@@ -45,8 +45,15 @@ export async function requirePagePermission(
 }
 
 /** For server actions: throws UnauthenticatedError / ForbiddenError, which errorFrom translates. */
-export async function requireActionPermission(permission: Permission): Promise<SessionUser> {
-  return authorize(getDb(), await currentSession(), permission);
+export async function requireActionPermission(
+  permission: Permission,
+  alternative?: Permission,
+): Promise<SessionUser> {
+  const session = await currentSession();
+  // As requirePagePermission: the alternative is checked instead when the user holds it.
+  const required =
+    alternative && session && hasPermission(session.roles, alternative) ? alternative : permission;
+  return authorize(getDb(), session, required);
 }
 
 export function field(formData: FormData, key: string): string {
@@ -106,6 +113,9 @@ const ERROR_KEYS: Record<string, MessageKey> = {
   repair_order_not_in_progress: "error.repairOrderNotInProgress",
   not_assignee: "error.notAssignee",
   job_status_changed: "error.jobStatusChanged",
+  not_stock_tracked: "error.notStockTracked",
+  line_not_issuable: "error.lineNotIssuable",
+  insufficient_stock: "error.insufficientStock",
 };
 
 /**

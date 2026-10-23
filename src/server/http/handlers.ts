@@ -52,6 +52,14 @@ import {
 } from "../workshop/commands";
 import { jobCard, workshopBoard } from "../workshop/queries";
 import {
+  clearWaitingParts,
+  issueFromStock,
+  markWaitingParts,
+  receiveAndIssue,
+  receiveStock,
+} from "../inventory/commands";
+import { partsForOpenJobs, stockList } from "../inventory/queries";
+import {
   changePlate,
   createVehicle,
   duplicateConfirmKey,
@@ -112,6 +120,9 @@ const STATUS_BY_CODE: Record<string, number> = {
   repair_order_not_in_progress: 409,
   not_assignee: 409,
   job_status_changed: 409,
+  not_stock_tracked: 409,
+  line_not_issuable: 409,
+  insufficient_stock: 409,
   try_again: 503,
 };
 
@@ -1025,8 +1036,16 @@ export function createHandlers(db: Kysely<DB>, storage: MediaStorage = getMediaS
     async jobAction(request: Request, jobId: string, action: string): Promise<Response> {
       try {
         if (!sameOrigin(request)) return json(403, { error: "forbidden" });
-        const permission = action === "assign" ? "workshop.assign" : "workshop.my_jobs";
-        const session = await authorize(db, await currentSession(request), permission, {
+        const current = await currentSession(request);
+        // Waiting parts is set by staff handling parts (OD-29) or by the assignee; the command checks which.
+        const parts = action === "waiting-parts" || action === "parts-arrived";
+        const permission =
+          action === "assign"
+            ? "workshop.assign"
+            : parts && current && hasPermission(current.roles, "stock.issue")
+              ? "stock.issue"
+              : "workshop.my_jobs";
+        const session = await authorize(db, current, permission, {
           entityType: "repair_job",
           entityId: jobId,
         });
@@ -1043,7 +1062,98 @@ export function createHandlers(db: Kysely<DB>, storage: MediaStorage = getMediaS
                   ? await resumeJob(db, session, jobId, key)
                   : action === "complete"
                     ? await completeJob(db, session, jobId, { lines: body.lines, note: body.note }, key)
-                    : null;
+                    : action === "waiting-parts"
+                      ? await markWaitingParts(db, session, jobId, key)
+                      : action === "parts-arrived"
+                        ? await clearWaitingParts(db, session, jobId, key)
+                        : null;
+        if (!outcome) return json(404, { error: "not_found" });
+        return json(outcome.replayed ? 200 : 201, outcome.result);
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    // ------------------------------------------------------------------ I1-07 parts
+
+    /** GET /api/stock — stock-tracked parts with on hand, value and unit cost (stock roles only, T-24). */
+    async getStock(request: Request): Promise<Response> {
+      try {
+        await authorize(db, await currentSession(request), "stock.read");
+        return json(200, await stockList(db));
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    /** GET /api/stock/parts-for-jobs — approved part lines of running work, with what is costed so far. */
+    async getPartsForJobs(request: Request): Promise<Response> {
+      try {
+        await authorize(db, await currentSession(request), "stock.read");
+        return json(200, await partsForOpenJobs(db));
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    /** POST /api/stock/:itemId/receipts — { qty, amount (excl. VAT, total), supplierName, supplierRef, idempotencyKey }. */
+    async receiveStock(request: Request, itemId: string): Promise<Response> {
+      try {
+        if (!sameOrigin(request)) return json(403, { error: "forbidden" });
+        const session = await authorize(db, await currentSession(request), "stock.receive", {
+          entityType: "catalogue_item",
+          entityId: itemId,
+        });
+        const body = await readBody(request);
+        const outcome = await receiveStock(
+          db,
+          session,
+          itemId,
+          {
+            qty: body.qty,
+            amount: body.amount,
+            supplierName: body.supplierName,
+            supplierRef: body.supplierRef,
+          },
+          toStr(body.idempotencyKey),
+        );
+        return json(outcome.replayed ? 200 : 201, outcome.result);
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    /**
+     * POST /api/revision-lines/:id/:action — action = issue { qty, overReason? } | receive-and-issue { qty, amount,
+     * supplierName, supplierRef, overReason? }; every body carries an idempotencyKey.
+     */
+    async lineParts(request: Request, lineId: string, action: string): Promise<Response> {
+      try {
+        if (!sameOrigin(request)) return json(403, { error: "forbidden" });
+        const session = await authorize(db, await currentSession(request), "stock.issue", {
+          entityType: "revision_line",
+          entityId: lineId,
+        });
+        const body = await readBody(request);
+        const key = toStr(body.idempotencyKey);
+        const outcome =
+          action === "issue"
+            ? await issueFromStock(db, session, lineId, { qty: body.qty, overReason: body.overReason }, key)
+            : action === "receive-and-issue"
+              ? await receiveAndIssue(
+                  db,
+                  session,
+                  lineId,
+                  {
+                    qty: body.qty,
+                    amount: body.amount,
+                    supplierName: body.supplierName,
+                    supplierRef: body.supplierRef,
+                    overReason: body.overReason,
+                  },
+                  key,
+                )
+              : null;
         if (!outcome) return json(404, { error: "not_found" });
         return json(outcome.replayed ? 200 : 201, outcome.result);
       } catch (error) {

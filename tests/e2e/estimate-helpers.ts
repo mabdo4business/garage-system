@@ -5,7 +5,7 @@ import { signIn, submitForm, uniqueDigits } from "./fixtures";
 
 export async function pageFor(
   browser: Browser,
-  user: "advisor" | "technician" | "technician2" | "manager" | "partner",
+  user: "advisor" | "technician" | "technician2" | "manager" | "partner" | "storekeeper",
   locale: "en" | "ar" = "en",
 ) {
   const page = await (await browser.newContext()).newPage();

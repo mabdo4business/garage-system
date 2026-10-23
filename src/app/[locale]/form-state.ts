@@ -102,4 +102,9 @@ export const FIELD_LABELS: Record<string, MessageKey> = {
   lines: "job.lines",
   notPerformedReason: "job.line.reason",
   completionNote: "job.note",
+  // I1-07 parts
+  amount: "stock.amount",
+  supplierName: "stock.supplierName",
+  supplierRef: "stock.supplierRef",
+  overReason: "parts.overReason",
 };

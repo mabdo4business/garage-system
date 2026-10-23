@@ -70,7 +70,7 @@ test("manager assigns on the board; the technician runs the job in Arabic, witho
   // Technician, in Arabic.
   const tech = await pageFor(browser, "technician", "ar");
   await tech.getByRole("link", { name: "أعمالي" }).click();
-  await tech.locator(".result-list a").filter({ hasText: "Brake service" }).click();
+  await tech.locator(`.result-list a[href$="/jobs/${jobId}"]`).click();
   await expect(tech).toHaveURL(new RegExp(`/ar/jobs/${jobId}$`));
   await expect(tech.locator("html")).toHaveAttribute("dir", "rtl");
   await expect(tech.locator("main")).toContainText("عمالة الفرامل");

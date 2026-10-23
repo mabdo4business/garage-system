@@ -91,7 +91,7 @@ export async function assignJob(
       .select(["execution_status"])
       .where("id", "=", jobId)
       .executeTakeFirstOrThrow();
-    if (!["authorized", "in_progress", "paused"].includes(current.execution_status)) {
+    if (!["authorized", "waiting_parts", "in_progress", "paused"].includes(current.execution_status)) {
       throw new ConflictError("job_not_assignable", `Job is ${current.execution_status}`, {
         status: current.execution_status,
       });

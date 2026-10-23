@@ -555,6 +555,56 @@ export interface JobStatusEventTable {
   occurred_at: Generated<Date>;
 }
 
+// I1-07 — parts for a job (migration 0014). Amounts numeric(14,2), quantities numeric(18,3), as strings.
+type Num = ColumnType<string, string, string>;
+
+export interface StockBalanceTable {
+  item_id: string;
+  qty: Num;
+  value: Num;
+  basis_qty: Num;
+  basis_value: Num;
+  updated_at: Generated<Date>;
+}
+
+export interface StockMovementTable {
+  id: Generated<string>;
+  item_id: string;
+  kind: "receipt" | "issue";
+  qty: Num;
+  value: Num;
+  supplier_name: string | null;
+  supplier_ref: string | null;
+  revision_line_id: string | null;
+  created_by: string | null;
+  created_at: Generated<Date>;
+  business_date: ColumnType<string, string | undefined, never>;
+}
+
+export interface LineWipTable {
+  revision_line_id: string;
+  qty: Num;
+  value: Num;
+  basis_qty: Num;
+  basis_value: Num;
+  updated_at: Generated<Date>;
+}
+
+export interface LineCostMovementTable {
+  id: Generated<string>;
+  revision_line_id: string;
+  kind: "stock_issue" | "purchase";
+  qty: Num;
+  value: Num;
+  stock_movement_id: string | null;
+  supplier_name: string | null;
+  supplier_ref: string | null;
+  over_reason: string | null;
+  created_by: string | null;
+  created_at: Generated<Date>;
+  business_date: ColumnType<string, string | undefined, never>;
+}
+
 export interface DB {
   app_user: AppUserTable;
   user_role: UserRoleTable;
@@ -595,5 +645,9 @@ export interface DB {
   job_assignment: JobAssignmentTable;
   job_line_outcome: JobLineOutcomeTable;
   job_status_event: JobStatusEventTable;
+  stock_balance: StockBalanceTable;
+  stock_movement: StockMovementTable;
+  line_wip: LineWipTable;
+  line_cost_movement: LineCostMovementTable;
   schema_migration: SchemaMigrationTable;
 }

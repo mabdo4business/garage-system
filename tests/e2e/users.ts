@@ -7,4 +7,5 @@ export const E2E_USERS = {
   technician2: { username: "e2e.tech2", displayName: "Omar Technician", role: "technician" },
   manager: { username: "e2e.manager", displayName: "Mona Manager", role: "manager" },
   partner: { username: "e2e.partner", displayName: "Pat Partner", role: "partner" },
+  storekeeper: { username: "e2e.store", displayName: "Sami Store", role: "store_keeper" },
 } as const;

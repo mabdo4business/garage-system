@@ -76,6 +76,11 @@ export const PERMISSIONS = {
   "workshop.board": ["partner", "manager", "service_advisor"],
   "workshop.assign": ["partner", "manager"],
   "workshop.my_jobs": ["partner", "manager", "technician"],
+
+  // I1-07: stock and parts for jobs (OD-29). Stock values and line costs are shown to these roles only (T-24).
+  "stock.read": ["partner", "manager", "service_advisor", "store_keeper"],
+  "stock.receive": ["partner", "manager", "service_advisor", "store_keeper"],
+  "stock.issue": ["partner", "manager", "service_advisor", "store_keeper"],
 } as const satisfies Record<string, readonly Role[]>;
 
 export type Permission = keyof typeof PERMISSIONS;

@@ -32,6 +32,9 @@ const LOCK_TARGETS: Partial<Record<LockKind, { table: keyof DB; column: string }
   check_in: { table: "check_in", column: "id" },
   repair_order: { table: "repair_order", column: "id" },
   catalogue_item: { table: "catalogue_item", column: "id" },
+  // I1-07: a job line's WIP pool, then the part's stock pool (repair order → revision line → stock).
+  revision_line: { table: "revision_line", column: "id" },
+  stock_balance: { table: "stock_balance", column: "item_id" },
   test_document: { table: "test_document", column: "id" },
   number_series: { table: "number_series", column: "series" },
 };

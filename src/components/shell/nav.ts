@@ -48,6 +48,20 @@ export const NAV_ITEMS: readonly NavItem[] = [
     sections: ["/jobs"],
   },
   {
+    key: "parts",
+    label: "nav.parts",
+    path: "/parts",
+    permission: "stock.read",
+    sections: ["/parts"],
+  },
+  {
+    key: "stock",
+    label: "nav.stock",
+    path: "/stock",
+    permission: "stock.read",
+    sections: ["/stock"],
+  },
+  {
     key: "directory",
     label: "nav.directory",
     path: "/search",
