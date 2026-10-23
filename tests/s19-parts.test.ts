@@ -757,7 +757,7 @@ describe("S19 — parts for a job", () => {
       "waiting-parts",
     );
     expect(response.status).toBe(201);
-    await db.owner.updateTable("repair_order").set({ status: "qc" }).where("id", "=", ro).execute();
+    await db.owner.updateTable("repair_order").set({ status: "cancelled" }).where("id", "=", ro).execute();
     await expect(clearWaitingParts(db.app, people.store!, job, randomUUID())).rejects.toMatchObject({
       code: "repair_order_not_in_progress",
     });

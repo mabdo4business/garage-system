@@ -81,6 +81,10 @@ export const PERMISSIONS = {
   "stock.read": ["partner", "manager", "service_advisor", "store_keeper"],
   "stock.receive": ["partner", "manager", "service_advisor", "store_keeper"],
   "stock.issue": ["partner", "manager", "service_advisor", "store_keeper"],
+
+  // I1-08: QC (OD-36). Technicians may request QC only on repair orders they have a job on (checked in the command).
+  "qc.request": ["partner", "manager", "technician"],
+  "qc.decide": ["partner", "manager"],
 } as const satisfies Record<string, readonly Role[]>;
 
 export type Permission = keyof typeof PERMISSIONS;

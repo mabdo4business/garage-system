@@ -12,6 +12,10 @@ import { AssignInspectionForm } from "./inspection/inspection-forms";
 import { estimateView } from "../../../../../server/estimate/queries";
 import { Money } from "../../../../../server/core/money";
 import { formatAed } from "../../../../../i18n/format";
+import { qcView } from "../../../../../server/quality/queries";
+import { ActionForm } from "../../../action-form";
+import { requestQcAction } from "./qc/actions";
+import { randomUUID } from "node:crypto";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +38,8 @@ export default async function RepairOrderPage({
   const inspection = await getInspection(getDb(), id);
   const technicians = canAssign ? await listTechnicians(getDb()) : [];
   const estimate = hasPermission(session.roles, "estimate.read") ? await estimateView(getDb(), id) : null;
+  const qc = await qcView(getDb(), id);
+  const latestQc = qc?.records[0] ?? null;
   const activeFindings = inspection?.findings.filter((finding) => finding.status === "active") ?? [];
   const countOf = (severity: string) =>
     activeFindings.filter((finding) => finding.severity === severity).length;
@@ -168,6 +174,34 @@ export default async function RepairOrderPage({
           />
         ) : null}
       </Card>
+
+      {qc && (qc.status === "in_progress" || qc.status === "qc" || latestQc) ? (
+        <Card
+          title={t(locale, "qc.title")}
+          actions={
+            hasPermission(session.roles, "qc.decide") ? (
+              <a className="btn btn-secondary" href={`/${locale}/repair-orders/${ro.id}/qc`}>
+                {t(locale, "qc.open")}
+              </a>
+            ) : undefined
+          }
+        >
+          <p>
+            {latestQc
+              ? t(locale, `qc.status.${latestQc.status}` as MessageKey)
+              : t(locale, `qc.blocker.${qc.blocker ?? "ready"}` as MessageKey)}
+          </p>
+          {qc.blocker === null && hasPermission(session.roles, "qc.request") ? (
+            <ActionForm
+              locale={locale}
+              action={requestQcAction}
+              hidden={{ repairOrderId: ro.id, idempotencyKey: randomUUID() }}
+              submit="qc.request"
+              variant="primary"
+            />
+          ) : null}
+        </Card>
+      ) : null}
 
       {hasPermission(session.roles, "estimate.read") ? (
         <Card

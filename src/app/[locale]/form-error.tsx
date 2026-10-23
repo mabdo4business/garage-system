@@ -11,7 +11,7 @@ export function FormErrorMessage({ locale, error }: { locale: Locale; error: For
       <p>
         {error.key === "error.validationFailed" && label
           ? t(locale, "error.validationField", { field: t(locale, label) })
-          : t(locale, error.key)}
+          : t(locale, error.key, error.params)}
       </p>
     </Alert>
   );

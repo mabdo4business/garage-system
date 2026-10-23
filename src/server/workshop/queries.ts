@@ -267,7 +267,11 @@ export async function jobCard(db: Kysely<DB>, jobId: string): Promise<JobCard | 
       ? []
       : await db
           .selectFrom("revision_line")
-          .leftJoin("job_line_outcome", "job_line_outcome.revision_line_id", "revision_line.id")
+          .leftJoin("job_line_outcome", (join) =>
+            join
+              .onRef("job_line_outcome.revision_line_id", "=", "revision_line.id")
+              .on("job_line_outcome.superseded_at", "is", null),
+          )
           .leftJoin("line_wip", "line_wip.revision_line_id", "revision_line.id")
           .select([
             "revision_line.id",

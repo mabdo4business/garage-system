@@ -26,8 +26,8 @@ Status values: `not started` · `in progress` · `done (unmerged)` · `done` · 
 
 ## Current position
 
-- **Wave:** 1 · **Increment:** 1 · **Active story:** none; I1-03, I1-04, I1-05a, I1-05b, I1-06 and I1-07 committed (unmerged). Push and merge into `qa` in order: I1-03, I1-04, I1-05a, I1-05b, I1-06, I1-07
-- **Next story:** I1-08 (quality check)
+- **Wave:** 1 · **Increment:** 1 · **Active story:** none; I1-03 to I1-08 committed (unmerged). Push and merge into `qa` in order: I1-03, I1-04, I1-05a, I1-05b, I1-06, I1-07, I1-08
+- **Next story:** I1-09 (invoice), split before starting (L)
 - **Next decision needed:** none for I1-06/I1-07 (OQ-1 decided 2026-10-23: warn, don't block)
 
 ### Housekeeping before more feature work
@@ -39,7 +39,7 @@ Status values: `not started` · `in progress` · `done (unmerged)` · `done` · 
 - [x] PR `feature/increment-0` → `qa` and merge (PR #1)
 - [x] Merge I1-01 and I1-11 into `qa` (PRs #1 and #2, merged straight to `qa` rather than through `increment/1`)
 - [x] I1-02 merged into `qa` (PR #3); `qa` builds again
-- [ ] Push `story/I1-03-inspection-findings` (again: GitHub has only the partial c8e5f8a), `story/I1-04-catalog-tax`, `story/I1-05a-estimate-draft`, `story/I1-05b-estimate-approval`, `story/I1-06-workshop` and `story/I1-07-parts`; merge in that order
+- [ ] Push `story/I1-03-inspection-findings` (again: GitHub has only the partial c8e5f8a), `story/I1-04-catalog-tax`, `story/I1-05a-estimate-draft`, `story/I1-05b-estimate-approval`, `story/I1-06-workshop`, `story/I1-07-parts` and `story/I1-08-quality-check`; merge in that order
 - [ ] Before committing yourself: `git add -A` first. `git commit -a` and most IDE defaults skip new files (this broke `qa` twice)
 - [ ] Rule from now on: every story branch is pushed the same day it is committed
 
@@ -99,7 +99,7 @@ tests pass.
 | I1-05b | Estimate send & in-person approval | M | I1-05a | done (unmerged) | `story/I1-05b-estimate-approval` | 2026-10-22 | Migration 0012; present (canonical snapshot + SHA-256, AT-20 basic, T-21), in-person decision screen without the staff shell (signature, name, displayed language, contact snapshot, terms ids), whole-job decisions (T-22), urgent decline flagged (OD-25), AC2-01 enforced in the database, AC2-12 after sending; decisions OD-25, T-21, T-22; 236 tests + 20 e2e. Terms text has no editing screen yet (rows come from the owners, V-4); withdrawal/expiry transitions are I2-01 |
 | I1-06 | Workshop execution | M | I1-05 | done (unmerged) | `story/I1-06-workshop` | 2026-10-23 | Migration 0013; workshop board, assignment with bay (OD-26), My jobs and job card without prices, start/pause (reason)/resume/done with line outcomes by the assignee only (OD-27), AC2-01 refusal logged, AC2-30 scoping, DB-written job history; OQ-1 check-in warning with recorded confirmation; integrity review fixes and OD-31 (completion note) in a follow-up commit; 247 tests + 22 e2e |
 | I1-07 | Parts for a job (simple) | M | I1-05, I1-04 | done (unmerged) | `story/I1-07-parts` | 2026-10-23 | Migration 0014; goods receipt into per-part stock pools (OD-28), issue from stock under the pool rule (T-02/AT-17), receive-and-issue for special orders and non-stock costs (T-23, OD-30), no negative stock (AC2-13/14), v0.2.1 §3.3 issue guard with over-issue reason, Waiting parts (B2), costs excl. VAT (OD-32); Stock and Parts for jobs screens; decisions OD-28–OD-32, T-23–T-25; integrity review fixes (migration 0015; OD-33–OD-35) in a follow-up commit |
-| I1-08 | Quality check | S | I1-06 | not started | | | |
+| I1-08 | Quality check | S | I1-06 | done (unmerged) | `story/I1-08-quality-check` | 2026-10-23 | Migration 0016; QC request (B1, AC2-25), pass with the §G checklist incl. road test, odometer out (GAP-48) and old-parts disposition (GAP-47, OD-38), self-check rule (AC2-26, OD-37 = D-8), fail with optional rework (T-26, OD-39); Ready refused without a QC pass; decisions OD-36–OD-39, T-26, T-27; 279 tests + 26 e2e |
 | I1-09 | Invoice | L | I1-07, I1-08 | not started | | | Split before starting (L). Carries AC2-19; snapshot tax code, category (treatment), rate, registration status and TRN per line (needs a code+category+rate lookup); refuse invoicing without a tax profile; registration evidence attachment (spec §4.4) still deferred |
 | I1-10 | Payments & delivery | M | I1-09 | not started | | | |
 
@@ -109,7 +109,7 @@ Decisions first: D-5, D-6, D-7, D-11, B-09, D-30.
 
 | ID | Story | Size | Needs | Status | Branch | Updated | Notes |
 |---|---|---|---|---|---|---|---|
-| I2-01 | Estimate versions | M | I1-05 | not started | | | |
+| I2-01 | Estimate versions | M | I1-05 | not started | | | Until withdrawal/expiry exist, a version with an undecided job blocks QC (AC2-25) for good; build early |
 | I2-02 | Amendments | L | I2-01 | not started | | | Split before starting (L) |
 | I2-03 | Customer links | M | I2-01 | not started | | | Track C1 |
 | I2-04 | Step-up verification | M | I2-03, B-09, D-30 | not started | | | |
@@ -271,3 +271,4 @@ versioned customer API built on P-01's sign-in.
 | 2026-10-23 | OQ-1 decided; I1-06 committed (done, unmerged); OD-26, OD-27 recorded |
 | 2026-10-23 | I1-06 review fixes (OD-31); I1-07 committed (done, unmerged); OD-28–OD-32, T-23–T-25 recorded |
 | 2026-10-23 | I1-07 review fixes; OD-33, OD-34, OD-35 recorded |
+| 2026-10-23 | I1-08 committed (done, unmerged); D-8 decided (OD-37); OD-36–OD-39, T-26, T-27 recorded |

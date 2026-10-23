@@ -117,6 +117,10 @@ const ERROR_KEYS: Record<string, MessageKey> = {
   line_not_issuable: "error.lineNotIssuable",
   insufficient_stock: "error.insufficientStock",
   item_inactive: "error.itemInactive",
+  decision_pending: "error.decisionPending",
+  work_not_finished: "error.workNotFinished",
+  qc_not_pending: "error.qcNotPending",
+  qc_self_check: "error.qcSelfCheck",
 };
 
 /**
@@ -128,5 +132,11 @@ export function errorFrom(error: unknown): FormError {
   const key = ERROR_KEYS[error.code];
   if (!key) throw error;
   const fieldName = error.details?.field;
-  return typeof fieldName === "string" ? { key, field: fieldName } : { key };
+  const version = error.details?.version;
+  const params = typeof version === "string" ? { version } : undefined;
+  return {
+    key,
+    ...(typeof fieldName === "string" ? { field: fieldName } : {}),
+    ...(params ? { params } : {}),
+  };
 }

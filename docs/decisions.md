@@ -80,6 +80,12 @@ Status: ✅ decided · ⏳ open · 🔍 needs professional verification
 | OD-33 | A job waiting for parts returns to Approved automatically only when every approved part line of the job has received its full quantity; staff can still clear Waiting parts by hand earlier. | 2026-10-23 | Owners (I1-07 review) |
 | OD-34 | Stock is not received into a part deactivated in the price list; reactivate it first. Existing stock of it can still be issued to approved lines. | 2026-10-23 | Owners (I1-07 review) |
 | OD-35 | Parts may be issued to a job that is Paused (as well as Approved, Waiting parts and In progress), so work can resume at once. | 2026-10-23 | Owners (I1-07 review) |
+| OD-36 | QC is passed or failed by managers and partners. QC is requested by a technician assigned on the repair order, a manager or a partner (PRD v0.2 B1 "TEC, MGR"). | 2026-10-23 | Owners (I1-08) |
+| OD-37 (D-8) | QC by a different person: a setting, `qc.different_person`, on by default — anyone who is or was assigned to a job of the repair order cannot pass its QC (AC2-26). A partner can switch it off when staffing is thin (editing settings arrives in I5). | 2026-10-23 | Owners (I1-08) |
+| OD-38 | Old parts disposition recorded at QC: returned to the customer, disposed of by the garage, kept for a supplier warranty claim, or no parts replaced (disposal rules: V-7). | 2026-10-23 | Owners (I1-08) |
+| T-26 | Jobs returned by a failed QC go Done → Approved for their assignee to redo; their line outcomes are superseded (kept, not deleted); the next request creates a new QC record. | 2026-10-23 | Technical (I1-08) |
+| OD-39 | A failed QC need not reopen any job (car left dirty, belongings missing, an unrelated warning light): the repair order goes back to In progress with the notes, the problem is fixed and QC is requested again. When the failure is in a job's work, the manager chooses the job(s) to rework (T-26). | 2026-10-23 | Owners (I1-08 review) |
+| T-27 | QC road test is "done" or "not applicable" with a reason; every checklist confirmation must be ticked to pass. | 2026-10-23 | Technical (I1-08) |
 
 ## Open — needed before the increment shown
 
@@ -99,7 +105,6 @@ Status: ✅ decided · ⏳ open · 🔍 needs professional verification
 | B-06, B-07 | Parts returns after delivery; who records returns from jobs | Increment 4 | Sealed parts only; advisor or manager |
 | B-04 | Who holds production database/server credentials; how the other partner oversees them | Increment 5 | Named accounts; audit export to storage the other partner controls |
 | D-4 | Second-partner fallback for R2 admin changes | Increment 5 | No fallback at launch |
-| D-8 | QC by a different person than the technician? | Increment 5 (configuration) | Yes when staffing allows |
 | D-32 | Shared tablet idle lock and approval PIN | Increment 5 | 5 minutes; per-user PIN |
 | B-10 | Backup recovery objectives | Increment 5 | Point-in-time recovery, ≤15 min data loss, restore same day |
 | D-23 | Expenses and P&L in the platform or in accounting software | Increment 6 | Accounting software; platform exports |

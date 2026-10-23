@@ -543,6 +543,8 @@ export interface JobLineOutcomeTable {
   reason: string | null;
   recorded_by: string;
   recorded_at: Generated<Date>;
+  /** Set when a failed QC returns the job for rework (T-26, migration 0016). */
+  superseded_at: ColumnType<Date | null, never, Date>;
 }
 
 export interface JobStatusEventTable {
@@ -605,6 +607,30 @@ export interface LineCostMovementTable {
   business_date: ColumnType<string, string | undefined, never>;
 }
 
+// I1-08 — quality check (migration 0016).
+export type QcStatus = "pending" | "passed" | "failed";
+export type OldPartsDisposition = "returned_to_customer" | "disposed" | "kept_for_claim" | "none_replaced";
+
+export interface QcRecordTable {
+  id: Generated<string>;
+  repair_order_id: string;
+  status: Generated<QcStatus>;
+  requested_by: string | null;
+  requested_at: Generated<Date>;
+  no_new_warning_lights: boolean | null;
+  road_test: "done" | "not_applicable" | null;
+  road_test_reason: string | null;
+  odometer_out_km: number | null;
+  odometer_reason: string | null;
+  fluids_ok: boolean | null;
+  cleanliness_ok: boolean | null;
+  belongings_ok: boolean | null;
+  old_parts: OldPartsDisposition | null;
+  notes: string | null;
+  decided_by: string | null;
+  decided_at: Date | null;
+}
+
 export interface DB {
   app_user: AppUserTable;
   user_role: UserRoleTable;
@@ -649,5 +675,6 @@ export interface DB {
   stock_movement: StockMovementTable;
   line_wip: LineWipTable;
   line_cost_movement: LineCostMovementTable;
+  qc_record: QcRecordTable;
   schema_migration: SchemaMigrationTable;
 }

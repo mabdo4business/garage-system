@@ -59,6 +59,8 @@ import {
   receiveStock,
 } from "../inventory/commands";
 import { partsForOpenJobs, stockList } from "../inventory/queries";
+import { failQc, passQc, requestQc } from "../quality/commands";
+import { qcView } from "../quality/queries";
 import {
   changePlate,
   createVehicle,
@@ -124,6 +126,10 @@ const STATUS_BY_CODE: Record<string, number> = {
   line_not_issuable: 409,
   insufficient_stock: 409,
   item_inactive: 409,
+  decision_pending: 409,
+  work_not_finished: 409,
+  qc_not_pending: 409,
+  qc_self_check: 409,
   try_again: 503,
 };
 
@@ -1155,6 +1161,56 @@ export function createHandlers(db: Kysely<DB>, storage: MediaStorage = getMediaS
                   key,
                 )
               : null;
+        if (!outcome) return json(404, { error: "not_found" });
+        return json(outcome.replayed ? 200 : 201, outcome.result);
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    // ------------------------------------------------------------------ I1-08 quality check
+
+    /** GET /api/repair-orders/:id/qc — QC records and what still blocks a request (managers, partners, advisors). */
+    async getQc(request: Request, repairOrderId: string): Promise<Response> {
+      try {
+        await authorize(db, await currentSession(request), "repair_order.read", {
+          entityType: "repair_order",
+          entityId: repairOrderId,
+        });
+        const view = await qcView(db, repairOrderId);
+        if (!view) return json(404, { error: "not_found" });
+        return json(200, view);
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    /**
+     * POST /api/repair-orders/:id/qc/:action — action = request | pass { checklist… } | fail { notes, jobIds };
+     * every body carries an idempotencyKey.
+     */
+    async qcAction(request: Request, repairOrderId: string, action: string): Promise<Response> {
+      try {
+        if (!sameOrigin(request)) return json(403, { error: "forbidden" });
+        const session = await authorize(
+          db,
+          await currentSession(request),
+          action === "request" ? "qc.request" : "qc.decide",
+          {
+            entityType: "repair_order",
+            entityId: repairOrderId,
+          },
+        );
+        const body = await readBody(request);
+        const key = toStr(body.idempotencyKey);
+        const outcome =
+          action === "request"
+            ? await requestQc(db, session, repairOrderId, key)
+            : action === "pass"
+              ? await passQc(db, session, repairOrderId, body, key)
+              : action === "fail"
+                ? await failQc(db, session, repairOrderId, { notes: body.notes, jobIds: body.jobIds }, key)
+                : null;
         if (!outcome) return json(404, { error: "not_found" });
         return json(outcome.replayed ? 200 : 201, outcome.result);
       } catch (error) {

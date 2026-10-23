@@ -12,6 +12,8 @@ import { ActionForm } from "../../../action-form";
 import { requirePagePermission } from "../../../server-support";
 import { completeJobAction, pauseJobAction, resumeJobAction, startJobAction } from "../actions";
 import { waitingPartsAction } from "../../stock/actions";
+import { qcView } from "../../../../../server/quality/queries";
+import { requestQcAction } from "../../repair-orders/[id]/qc/actions";
 import { JOB_TONE } from "../shared";
 
 export const dynamic = "force-dynamic";
@@ -49,6 +51,7 @@ export default async function JobPage({ params }: { params: Promise<{ locale: st
         ? t(locale, `catalogue.unit.${value}` as MessageKey)
         : "";
   const hidden = () => ({ jobId: job.id, idempotencyKey: randomUUID() });
+  const qc = mine ? await qcView(db, job.repairOrderId) : null;
 
   return (
     <div className="workshop">
@@ -80,6 +83,15 @@ export default async function JobPage({ params }: { params: Promise<{ locale: st
       ) : null}
 
       {mine && !running ? <p className="muted">{t(locale, "error.repairOrderNotInProgress")}</p> : null}
+      {qc && qc.blocker === null && hasPermission(session.roles, "qc.request") ? (
+        <ActionForm
+          locale={locale}
+          action={requestQcAction}
+          hidden={{ repairOrderId: job.repairOrderId, idempotencyKey: randomUUID(), back: `/jobs/${job.id}` }}
+          submit="qc.request"
+          variant="primary"
+        />
+      ) : null}
       {mine && running ? (
         <div className="form-actions job-actions">
           {job.status === "authorized" ? (

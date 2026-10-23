@@ -9,6 +9,8 @@ export interface FormError {
   key: MessageKey;
   /** Form field the error is about, when the server could tell (ValidationError details.field). */
   field?: string;
+  /** Values for the message, e.g. the estimate version in AC2-25's "pending on v{version}". */
+  params?: Record<string, string>;
 }
 
 export interface FormState<Duplicate = never> {
@@ -107,4 +109,16 @@ export const FIELD_LABELS: Record<string, MessageKey> = {
   supplierName: "stock.supplierName",
   supplierRef: "stock.supplierRef",
   overReason: "parts.overReason",
+  // I1-08 QC
+  noNewWarningLights: "qc.check.noNewWarningLights",
+  fluidsOk: "qc.check.fluidsOk",
+  cleanlinessOk: "qc.check.cleanlinessOk",
+  belongingsOk: "qc.check.belongingsOk",
+  roadTest: "qc.roadTest",
+  roadTestReason: "qc.roadTestReason",
+  odometerOutKm: "qc.odometerOut",
+  odometerReason: "qc.odometerReason",
+  oldParts: "qc.oldParts",
+  notes: "qc.notes",
+  jobIds: "qc.returnJobs",
 };

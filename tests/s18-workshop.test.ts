@@ -710,8 +710,8 @@ describe("S18 — workshop execution", () => {
   it("work runs only while the repair order is in progress", async () => {
     const { ro, brakes } = await approvedRepairOrder();
     await assignJob(db.app, people.manager!, brakes, { assigneeId: people.tech!.userId }, randomUUID());
-    // Set-up: the repair order has moved on to QC.
-    await db.owner.updateTable("repair_order").set({ status: "qc" }).where("id", "=", ro).execute();
+    // Set-up: the repair order is no longer in progress (cancelled).
+    await db.owner.updateTable("repair_order").set({ status: "cancelled" }).where("id", "=", ro).execute();
     await expect(startJob(db.app, people.tech!, brakes, randomUUID())).rejects.toMatchObject({
       code: "repair_order_not_in_progress",
     });
