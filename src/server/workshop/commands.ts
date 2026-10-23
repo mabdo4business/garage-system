@@ -292,7 +292,7 @@ export interface LineOutcomeInput {
   reason?: unknown;
 }
 
-/** In progress → Done: an outcome for every authorized line (done, or not performed with a reason), and a note. */
+/** In progress → Done: an outcome for every authorized line (done, or not performed with a reason) and a completion note (OD-31). */
 export async function completeJob(
   db: Kysely<DB>,
   staff: Staff,
@@ -300,7 +300,6 @@ export async function completeJob(
   input: { lines?: unknown; note?: unknown },
   idempotencyKey: string,
 ): Promise<CommandOutcome<{ jobId: string; status: JobExecutionStatus }>> {
-  const note = optionalText(input.note, "note", 500);
   if (!Array.isArray(input.lines))
     throw new ValidationError("Mark every item done or not performed", { field: "lines" });
   const lines = (input.lines as LineOutcomeInput[]).map((entry) => {
@@ -316,6 +315,8 @@ export async function completeJob(
       reason: string | null;
     };
   });
+  // PRD v0.2 B2: Done carries a completion note (OD-31).
+  const note = requiredText(input.note, "completionNote", 500);
   const job = await precheck(db, staff, jobId, "complete");
   const options = {
     name: "workshop.complete_job",

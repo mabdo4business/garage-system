@@ -101,4 +101,5 @@ export const FIELD_LABELS: Record<string, MessageKey> = {
   pauseReason: "job.pauseReason",
   lines: "job.lines",
   notPerformedReason: "job.line.reason",
+  completionNote: "job.note",
 };

@@ -355,10 +355,26 @@ describe("S18 — workshop execution", () => {
         db.app,
         people.tech!,
         brakes,
-        { lines: [{ lineId: labor, outcome: "done" }] },
+        { lines: [{ lineId: labor, outcome: "done" }], note: "x" },
         randomUUID(),
       ),
     ).rejects.toMatchObject({ details: { field: "lines" } });
+    // OD-31: a completion note is required.
+    await expect(
+      completeJob(
+        db.app,
+        people.tech!,
+        brakes,
+        {
+          lines: [
+            { lineId: labor, outcome: "done" },
+            { lineId: pads, outcome: "done" },
+          ],
+          note: "  ",
+        },
+        randomUUID(),
+      ),
+    ).rejects.toMatchObject({ details: { field: "completionNote" } });
     await expect(
       completeJob(
         db.app,
@@ -369,6 +385,7 @@ describe("S18 — workshop execution", () => {
             { lineId: labor, outcome: "done" },
             { lineId: pads, outcome: "not_performed" },
           ],
+          note: "x",
         },
         randomUUID(),
       ),
@@ -595,5 +612,132 @@ describe("S18 — workshop execution", () => {
     await expect(checkIn(await newVehicle(), "RO-000001")).rejects.toMatchObject({
       code: "open_repair_order_gone",
     });
+  });
+
+  it("concurrent assignments and retries stay consistent (OD-26, rule 11)", async () => {
+    const { ro, brakes, labor, pads } = await approvedRepairOrder();
+    const holder = new pg.Client({ connectionString: db.appUrl });
+    await holder.connect();
+    try {
+      await holder.query("BEGIN");
+      await holder.query("SELECT id FROM repair_order WHERE id = $1 FOR UPDATE", [ro]);
+      const both = Promise.allSettled([
+        assignJob(db.app, people.manager!, brakes, { assigneeId: people.tech!.userId }, randomUUID()),
+        assignJob(db.app, people.partner!, brakes, { assigneeId: people.tech2!.userId }, randomUUID()),
+      ]);
+      await waitForLockWaiters(db, 2);
+      await holder.query("COMMIT");
+      // Serialised by the repair-order lock: the second simply reassigns (last writer wins, history kept).
+      expect((await both).every((r) => r.status === "fulfilled")).toBe(true);
+    } finally {
+      await holder.end();
+    }
+    const rows = await db.app
+      .selectFrom("job_assignment")
+      .select(["ended_at"])
+      .where("job_id", "=", brakes)
+      .execute();
+    expect(rows).toHaveLength(2);
+    expect(rows.filter((row) => row.ended_at === null)).toHaveLength(1);
+
+    // Replays: an assignment and a completion retried with the same key change nothing more.
+    const live = await db.app
+      .selectFrom("job_assignment")
+      .select("assignee_id")
+      .where("job_id", "=", brakes)
+      .where("ended_at", "is", null)
+      .executeTakeFirstOrThrow();
+    const assignee = live.assignee_id === people.tech!.userId ? people.tech! : people.tech2!;
+    const assignKey = randomUUID();
+    await assignJob(
+      db.app,
+      people.manager!,
+      brakes,
+      { assigneeId: assignee.userId, bay: "Bay 9" },
+      assignKey,
+    );
+    expect(
+      (
+        await assignJob(
+          db.app,
+          people.manager!,
+          brakes,
+          { assigneeId: assignee.userId, bay: "Bay 9" },
+          assignKey,
+        )
+      ).replayed,
+    ).toBe(true);
+    await startJob(db.app, assignee, brakes, randomUUID());
+    const input = {
+      lines: [
+        { lineId: labor, outcome: "done" },
+        { lineId: pads, outcome: "done" },
+      ],
+      note: "Done",
+    };
+    const key = randomUUID();
+    await completeJob(db.app, assignee, brakes, input, key);
+    expect((await completeJob(db.app, assignee, brakes, input, key)).replayed).toBe(true);
+    expect(
+      await db.app.selectFrom("job_line_outcome").select("id").where("job_id", "=", brakes).execute(),
+    ).toHaveLength(2);
+  });
+
+  it("work runs only while the repair order is in progress", async () => {
+    const { ro, brakes } = await approvedRepairOrder();
+    await assignJob(db.app, people.manager!, brakes, { assigneeId: people.tech!.userId }, randomUUID());
+    // Set-up: the repair order has moved on to QC.
+    await db.owner.updateTable("repair_order").set({ status: "qc" }).where("id", "=", ro).execute();
+    await expect(startJob(db.app, people.tech!, brakes, randomUUID())).rejects.toMatchObject({
+      code: "repair_order_not_in_progress",
+    });
+    expect(
+      (
+        await sqlErrorAs(
+          db.appUrl,
+          `UPDATE repair_job SET execution_status = 'in_progress', updated_by = '${people.tech!.userId}' WHERE id = '${brakes}'`,
+        )
+      )?.code,
+    ).toBe("42501");
+  });
+
+  it("two check-ins of one vehicle at once: the second must confirm the first (OQ-1)", async () => {
+    const vehicle = await newVehicle();
+    const holder = new pg.Client({ connectionString: db.appUrl });
+    await holder.connect();
+    try {
+      await holder.query("BEGIN");
+      await holder.query("SELECT id FROM vehicle WHERE id = $1 FOR UPDATE", [vehicle]);
+      const both = Promise.allSettled([checkIn(vehicle), checkIn(vehicle)]);
+      await waitForLockWaiters(db, 2);
+      await holder.query("COMMIT");
+      const results = await both;
+      expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+      expect((results.find((r) => r.status === "rejected") as PromiseRejectedResult).reason).toMatchObject({
+        code: "open_repair_order_exists",
+      });
+    } finally {
+      await holder.end();
+    }
+    // Over HTTP the number to confirm is in the response.
+    const advisor = { kind: "user" as const, userId: people.advisor!.userId };
+    const { checkInId } = (await startCheckIn(db.app, advisor, vehicle, randomUUID())).result;
+    await updateCheckIn(db.app, advisor, checkInId, {
+      odometerKm: 70001,
+      concerns: "Noise",
+      photoShortfallReason: "Test",
+    });
+    const response = await handlers.completeCheckIn(
+      new Request(`${BASE}/api/check-ins/${checkInId}/complete`, {
+        method: "POST",
+        body: JSON.stringify({ idempotencyKey: randomUUID() }),
+        headers: { "content-type": "application/json", ...cookie(people.advisor!.token) },
+      }),
+      checkInId,
+    );
+    expect(response.status).toBe(409);
+    expect(
+      ((await response.json()) as { details: { openRepairOrder?: string } }).details.openRepairOrder,
+    ).toMatch(/^RO-/);
   });
 });

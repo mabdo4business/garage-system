@@ -69,6 +69,7 @@ Status: ✅ decided · ⏳ open · 🔍 needs professional verification
 | OQ-1 | A vehicle may have two open repair orders at once (open = not delivered, closed or cancelled). Check-in warns: it shows the open repair order's number and status and asks the advisor to confirm; the confirmation is recorded on the new repair order and audited. Never blocked. To be built at the start of I1-06 (check-in change plus the workshop board showing both). | 2026-10-23 | Owners |
 | OD-26 | One technician (assignee) per job at a time; managers and partners assign and reassign, and the assignment history is kept. A bay is an optional free-text label on the assignment (PRD v0.2 #39). | 2026-10-23 | Owners (I1-06) |
 | OD-27 | A job's execution status (start, pause, resume, done) is changed only by the person assigned. A manager or partner who must act reassigns the job to themselves first, so assignees are technicians, managers or partners. | 2026-10-23 | Owners (I1-06) |
+| OD-31 | Marking a job Done needs a completion note (PRD v0.2 B2), as well as an outcome for every authorized line. | 2026-10-23 | Owners (I1-06 review) |
 
 ## Open — needed before the increment shown
 

@@ -78,6 +78,7 @@ export default async function JobPage({ params }: { params: Promise<{ locale: st
         </p>
       ) : null}
 
+      {mine && !running ? <p className="muted">{t(locale, "error.repairOrderNotInProgress")}</p> : null}
       {mine && running ? (
         <div className="form-actions job-actions">
           {job.status === "authorized" ? (
@@ -150,10 +151,8 @@ export default async function JobPage({ params }: { params: Promise<{ locale: st
               ))}
             </ul>
             <div className="field">
-              <label htmlFor="note">
-                {t(locale, "job.note")} <span className="optional">{t(locale, "common.optional")}</span>
-              </label>
-              <textarea id="note" name="note" maxLength={500} />
+              <label htmlFor="note">{t(locale, "job.note")}</label>
+              <textarea id="note" name="note" maxLength={500} required />
             </div>
           </ActionForm>
         ) : (

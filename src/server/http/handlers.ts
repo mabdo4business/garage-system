@@ -177,9 +177,12 @@ function errorResponse(error: unknown): Response {
     // internal context.
     const field = error.details?.field;
     const reason = error.details?.reason;
+    // OQ-1: the open repair order's number is what the client must confirm, so it travels too.
+    const open = error.code === "open_repair_order_exists" ? error.details?.openRepairOrder : undefined;
     const details = {
       ...(typeof field === "string" ? { field } : {}),
       ...(typeof reason === "string" ? { reason } : {}),
+      ...(typeof open === "string" ? { openRepairOrder: open } : {}),
     };
     return json(status, {
       error: error.code,
@@ -232,16 +235,6 @@ async function readLimited(request: Request, limit: number): Promise<Uint8Array<
     offset += chunk.byteLength;
   }
   return bytes;
-}
-
-/** Like readBody, but keeps JSON arrays and objects (job completion sends a list of line outcomes). */
-async function readJsonOrForm(request: Request): Promise<Record<string, unknown>> {
-  const type = request.headers.get("content-type") ?? "";
-  if (type.includes("application/json")) {
-    const body = (await request.json()) as unknown;
-    return body && typeof body === "object" ? (body as Record<string, unknown>) : {};
-  }
-  return readBody(request);
 }
 
 async function readBody(request: Request): Promise<Record<string, unknown>> {
@@ -1037,7 +1030,7 @@ export function createHandlers(db: Kysely<DB>, storage: MediaStorage = getMediaS
           entityType: "repair_job",
           entityId: jobId,
         });
-        const body = await readJsonOrForm(request);
+        const body = await readBody(request);
         const key = toStr(body.idempotencyKey);
         const outcome =
           action === "assign"
