@@ -520,5 +520,6 @@
   "job.partsIssued": "Parts received: {qty}",
   "error.notStockTracked": "This item is not kept in stock. Use Receive and issue.",
   "error.lineNotIssuable": "Parts go only to approved part lines of work in progress.",
-  "error.insufficientStock": "Not enough in stock. Mark the job waiting for parts, or receive and issue."
+  "error.insufficientStock": "Not enough in stock. Mark the job waiting for parts, or receive and issue.",
+  "error.itemInactive": "This part is deactivated in the price list. Reactivate it before receiving stock."
 }

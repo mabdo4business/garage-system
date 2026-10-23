@@ -504,6 +504,30 @@ describe("S18 — workshop execution", () => {
     expect((await sqlErrorAs(db.appUrl, `UPDATE job_line_outcome SET outcome = 'done'`))?.code).toBe("42501");
   });
 
+  it("the database requires the completion note and keeps removal out of status changes (OD-31)", async () => {
+    const { brakes, labor, pads } = await approvedRepairOrder();
+    await assignJob(db.app, people.manager!, brakes, { assigneeId: people.tech!.userId }, randomUUID());
+    await startJob(db.app, people.tech!, brakes, randomUUID());
+    // Line outcomes recorded (as the assignee), then Done without a note.
+    const noted = await sqlErrorAs(
+      db.appUrl,
+      `BEGIN;
+       INSERT INTO job_line_outcome (job_id, revision_line_id, outcome, recorded_by) VALUES
+         ('${brakes}', '${labor}', 'done', '${people.tech!.userId}'), ('${brakes}', '${pads}', 'done', '${people.tech!.userId}');
+       UPDATE repair_job SET execution_status = 'done', execution_reason = NULL, updated_by = '${people.tech!.userId}' WHERE id = '${brakes}';
+       COMMIT;`,
+    );
+    expect(noted?.code).toBe("42501");
+    expect(
+      (
+        await sqlErrorAs(
+          db.appUrl,
+          `UPDATE repair_job SET execution_status = 'paused', execution_reason = 'x', removed_by = '${people.tech!.userId}', updated_by = '${people.tech!.userId}' WHERE id = '${brakes}'`,
+        )
+      )?.code,
+    ).toBe("42501");
+  });
+
   // --- AC2-30 ------------------------------------------------------------------------------
 
   it("technicians see only their own jobs, never prices or customer contact (AC2-30, AC-07.3)", async () => {

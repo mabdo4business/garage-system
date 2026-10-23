@@ -123,6 +123,7 @@ const STATUS_BY_CODE: Record<string, number> = {
   not_stock_tracked: 409,
   line_not_issuable: 409,
   insufficient_stock: 409,
+  item_inactive: 409,
   try_again: 503,
 };
 

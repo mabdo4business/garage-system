@@ -69,7 +69,7 @@ export async function lockDraft(ctx: CommandContext, repairOrderId: string) {
 /** OD-22: only labour hours and parts sold by litre, kg or metre may be fractional. */
 const FRACTIONAL_UNITS: readonly (string | null)[] = ["hour", "litre", "kg", "metre"];
 
-function requireAllowedQty(qty: Qty, unit: string | null): void {
+export function requireAllowedQty(qty: Qty, unit: string | null): void {
   if (qty.milli % 1000n !== 0n && !FRACTIONAL_UNITS.includes(unit)) {
     throw new ValidationError("This item is counted in whole numbers", {
       field: "qty",

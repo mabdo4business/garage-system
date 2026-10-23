@@ -6,8 +6,9 @@ import { isUuid } from "../core/ids";
 import { Money, Qty } from "../core/money";
 import { EMPTY_POOL, poolIn, poolOut, type PoolState } from "../core/pool";
 import type { DB } from "../db/schema";
-import { requirePermission, type Staff } from "../estimate/commands";
-import { liveAssignee } from "../workshop/commands";
+import { authorizedScope } from "../estimate/approval";
+import { requireAllowedQty, requirePermission, type Staff } from "../estimate/commands";
+import { liveAssignee, requireJobAccess } from "../workshop/commands";
 
 /**
  * Parts for a job (I1-07). Stock pool per stock-tracked part and WIP pool per job line, both under the pool
@@ -94,7 +95,7 @@ export async function receiveStock(
   return runCommand(db, options, async (ctx) => {
     const item = await ctx.tx
       .selectFrom("catalogue_item")
-      .select(["stock_tracked", "active"])
+      .select(["stock_tracked", "active", "unit"])
       .where("id", "=", itemId)
       .executeTakeFirst();
     if (!item) throw new NotFoundError("catalogue_item", itemId);
@@ -103,6 +104,12 @@ export async function receiveStock(
         reason: "not_stock_tracked",
       });
     }
+    if (!item.active) {
+      throw new ConflictError("item_inactive", "Reactivate the part before receiving stock (OD-34)", {
+        reason: "item_inactive",
+      });
+    }
+    requireAllowedQty(qty, item.unit);
     await ctx.locks.acquire("stock_balance", [itemId]);
     const balance = await ctx.tx
       .selectFrom("stock_balance")
@@ -181,7 +188,7 @@ async function lockLine(ctx: CommandContext, head: Awaited<ReturnType<typeof lin
   }
   const line = await ctx.tx
     .selectFrom("revision_line")
-    .select(["qty", "catalogue_item_id"])
+    .select(["qty", "unit", "catalogue_item_id"])
     .where("id", "=", head.id)
     .executeTakeFirstOrThrow();
   const costed = await ctx.tx
@@ -195,6 +202,7 @@ async function lockLine(ctx: CommandContext, head: Awaited<ReturnType<typeof lin
     .where("revision_line_id", "=", head.id)
     .executeTakeFirst();
   return {
+    unit: line.unit,
     authorized: Qty.parse(line.qty),
     costed: Qty.parse(costed.qty),
     wip: wip ? poolOfRow(wip) : EMPTY_POOL,
@@ -233,7 +241,10 @@ async function addToLine(
   return after;
 }
 
-/** B2: Waiting parts → Approved when parts are received for the job. */
+/**
+ * B2: Waiting parts → Approved when the parts have been received — all of them (OD-33): every approved part line
+ * of the job has received at least its approved quantity. Staff can clear Waiting parts by hand earlier.
+ */
 async function partsArrived(ctx: CommandContext, staff: Staff, jobId: string) {
   const job = await ctx.tx
     .selectFrom("repair_job")
@@ -241,6 +252,15 @@ async function partsArrived(ctx: CommandContext, staff: Staff, jobId: string) {
     .where("id", "=", jobId)
     .executeTakeFirstOrThrow();
   if (job.execution_status !== "waiting_parts") return;
+  const scope = await authorizedScope(ctx.tx, jobId);
+  const lines = await ctx.tx
+    .selectFrom("revision_line")
+    .leftJoin("line_wip", "line_wip.revision_line_id", "revision_line.id")
+    .select(["revision_line.qty", "line_wip.qty as received"])
+    .where("revision_line.id", "in", scope)
+    .where("revision_line.line_type", "=", "part")
+    .execute();
+  if (lines.some((line) => Qty.parse(line.received ?? "0").compare(Qty.parse(line.qty)) < 0)) return;
   await ctx.tx
     .updateTable("repair_job")
     .set({ execution_status: "authorized", execution_reason: null, updated_by: staff.userId })
@@ -273,6 +293,7 @@ export async function issueFromStock(
   };
   return runCommand(db, options, async (ctx) => {
     const state = await lockLine(ctx, head);
+    requireAllowedQty(qty, state.unit);
     const itemId = head.catalogue_item_id;
     const item = itemId
       ? await ctx.tx
@@ -385,6 +406,7 @@ export async function receiveAndIssue(
   };
   return runCommand(db, options, async (ctx) => {
     const state = await lockLine(ctx, head);
+    requireAllowedQty(qty, state.unit);
     const why = overReason(state, qty, reason);
     const movement = await ctx.tx
       .insertInto("line_cost_movement")
@@ -438,8 +460,10 @@ async function waitingParts(
     .where("id", "=", jobId)
     .executeTakeFirst();
   if (!job) throw new NotFoundError("repair_job", jobId);
-  if (!hasPermission(staff.roles, "stock.issue") && (await liveAssignee(db, jobId)) !== staff.userId) {
-    throw new ForbiddenError("stock.issue");
+  if (!hasPermission(staff.roles, "stock.issue")) {
+    // AC2-30: anyone else sees only jobs assigned to them ("not found", audited); then only the assignee acts.
+    await requireJobAccess(db, staff, jobId);
+    if ((await liveAssignee(db, jobId)) !== staff.userId) throw new ForbiddenError("stock.issue");
   }
   const from = to === "waiting_parts" ? "authorized" : "waiting_parts";
   const options = {
@@ -449,11 +473,22 @@ async function waitingParts(
   };
   return runCommand(db, options, async (ctx) => {
     await ctx.locks.acquire("repair_order", [job.repair_order_id]);
+    const ro = await ctx.tx
+      .selectFrom("repair_order")
+      .select("status")
+      .where("id", "=", job.repair_order_id)
+      .executeTakeFirstOrThrow();
+    if (ro.status !== "in_progress") {
+      throw new ConflictError("repair_order_not_in_progress", `Repair order is ${ro.status}`, {
+        status: ro.status,
+      });
+    }
     const current = await ctx.tx
       .selectFrom("repair_job")
-      .select("execution_status")
+      .select(["execution_status", "removed_at"])
       .where("id", "=", jobId)
       .executeTakeFirstOrThrow();
+    if (current.removed_at) throw new NotFoundError("repair_job", jobId);
     if (current.execution_status !== from) {
       throw new ConflictError("job_status_changed", `Job is ${current.execution_status}`, {
         reason: current.execution_status,

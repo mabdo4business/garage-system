@@ -116,6 +116,7 @@ const ERROR_KEYS: Record<string, MessageKey> = {
   not_stock_tracked: "error.notStockTracked",
   line_not_issuable: "error.lineNotIssuable",
   insufficient_stock: "error.insufficientStock",
+  item_inactive: "error.itemInactive",
 };
 
 /**

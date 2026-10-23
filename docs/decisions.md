@@ -70,13 +70,16 @@ Status: ✅ decided · ⏳ open · 🔍 needs professional verification
 | OD-26 | One technician (assignee) per job at a time; managers and partners assign and reassign, and the assignment history is kept. A bay is an optional free-text label on the assignment (PRD v0.2 #39). | 2026-10-23 | Owners (I1-06) |
 | OD-27 | A job's execution status (start, pause, resume, done) is changed only by the person assigned. A manager or partner who must act reassigns the job to themselves first, so assignees are technicians, managers or partners. | 2026-10-23 | Owners (I1-06) |
 | OD-31 | Marking a job Done needs a completion note (PRD v0.2 B2), as well as an outcome for every authorized line. | 2026-10-23 | Owners (I1-06 review) |
-| OD-28 | I1-07 includes a simple goods receipt (part, quantity, unit cost, supplier name and reference) into the per-part stock pool, so parts can be issued from the shelf; I4-01 adds history screens, counts and reports. | 2026-10-23 | Owners (I1-07) |
+| OD-28 | I1-07 includes a simple goods receipt (part, quantity, total cost for the quantity per OD-32, supplier name and reference) into the per-part stock pool, so parts can be issued from the shelf; I4-01 adds history screens, counts and reports. | 2026-10-23 | Owners (I1-07) |
 | OD-29 | Stock receipts, issues to jobs and receive-and-issue are recorded by store keepers, service advisors, managers and partners. Technicians do not issue parts; they ask. | 2026-10-23 | Owners (I1-07) |
 | OD-30 | A non-stock item's actual cost (sublet, outside machining, a one-off part) is recorded in I1-07 against the approved job line — supplier, reference, quantity, amount — using the same receive-and-issue step as a special-order part. Invoicing (I1-09) checks it exists (B-08). | 2026-10-23 | Owners (I1-07) |
 | T-23 | Receive-and-issue (special order or non-stock item) puts its cost straight into the job line's WIP pool and never passes through the stock pool: on hand is unchanged and the line carries the actual cost. | 2026-10-23 | Technical (I1-07) |
 | T-24 | Until the per-user cost toggle T2 (I5-01), stock values and job-line costs are visible only to the roles in OD-29 (never to technicians, never customer-facing). | 2026-10-23 | Technical (I1-07) |
 | T-25 | Returns from job to stock are built in I4-02 (with B-06/B-07); I1-07 records only inbound cost to job lines. | 2026-10-23 | Technical (I1-07) |
 | OD-32 | Supplier costs (goods receipt, receive-and-issue, non-stock cost) are entered excluding VAT [assumption for the tax agent and accountant, V-2/V-3: input VAT recoverable for a registered business], as the total for the quantity received (e.g. 3 for 10.00); the pool rule spreads it per unit. | 2026-10-23 | Owners (I1-07) |
+| OD-33 | A job waiting for parts returns to Approved automatically only when every approved part line of the job has received its full quantity; staff can still clear Waiting parts by hand earlier. | 2026-10-23 | Owners (I1-07 review) |
+| OD-34 | Stock is not received into a part deactivated in the price list; reactivate it first. Existing stock of it can still be issued to approved lines. | 2026-10-23 | Owners (I1-07 review) |
+| OD-35 | Parts may be issued to a job that is Paused (as well as Approved, Waiting parts and In progress), so work can resume at once. | 2026-10-23 | Owners (I1-07 review) |
 
 ## Open — needed before the increment shown
 

@@ -118,6 +118,7 @@ test("store keeper receives stock, issues it to a job and records a non-stock co
   await expect(tech.locator("main")).not.toContainText("420");
   await expect(tech.locator("main")).not.toContainText("3.33");
   expect((await tech.goto("/en/stock"))?.status()).toBe(404);
+  expect((await tech.goto("/en/parts"))?.status()).toBe(404);
 });
 
 /** The e2e technician's user id, read from the board's assign form. */

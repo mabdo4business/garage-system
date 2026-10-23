@@ -13,11 +13,13 @@ import { recordInPersonApproval, sendVersion } from "../src/server/estimate/appr
 import { addJob, addLine, openEstimate, type Staff } from "../src/server/estimate/commands";
 import { createHandlers } from "../src/server/http/handlers";
 import {
+  clearWaitingParts,
   issueFromStock,
   markWaitingParts,
   receiveAndIssue,
   receiveStock,
 } from "../src/server/inventory/commands";
+import { setItemActive } from "../src/server/catalog/items";
 import { partsForOpenJobs, stockList } from "../src/server/inventory/queries";
 import { LocalDiskStorage } from "../src/server/media/storage";
 import { completeCheckIn, startCheckIn, updateCheckIn } from "../src/server/repair-order/check-in";
@@ -477,7 +479,14 @@ describe("S19 — parts for a job", () => {
     const other = await makeUser(db.app, ["technician"], "tech-other");
     await expect(
       markWaitingParts(db.app, { userId: other.userId, roles: ["technician"] }, job, randomUUID()),
-    ).rejects.toMatchObject({ code: "forbidden" });
+    ).rejects.toMatchObject({ code: "not_found" }); // AC2-30: not theirs, so "not found" (and logged)
+    const denied = await db.app
+      .selectFrom("audit_event")
+      .select("action")
+      .where("entity_id", "=", job)
+      .where("action", "=", "authz.denied")
+      .execute();
+    expect(denied).toHaveLength(1);
   });
 
   // --- Permissions, lists, database guards -------------------------------------------------
@@ -561,5 +570,196 @@ describe("S19 — parts for a job", () => {
     expect(again.replayed).toBe(true);
     expect(again.result).toEqual(first.result);
     expect(await balance(pad)).toEqual({ qty: "2.000", value: "20.00" });
+  });
+
+  // --- Integrity review additions -----------------------------------------------------------
+
+  it("waiting parts clears only when every approved part line has all its parts (OD-33)", async () => {
+    const pads = await part(true);
+    const disc = await part(true);
+    const { job, partLines } = await jobWith([
+      { itemId: pads, qty: "4" },
+      { itemId: disc, qty: "2" },
+    ]);
+    await receive(pads, "4", "80.00");
+    await receive(disc, "2", "100.00");
+    await markWaitingParts(db.app, people.store!, job, randomUUID());
+    await issue(partLines[0]!, "1");
+    expect((await jobCard(db.app, job))!.status).toBe("waiting_parts");
+    await issue(partLines[0]!, "3");
+    await issue(partLines[1]!, "1");
+    expect((await jobCard(db.app, job))!.status).toBe("waiting_parts");
+    await issue(partLines[1]!, "1");
+    expect((await jobCard(db.app, job))!.status).toBe("authorized");
+    // Staff can clear it by hand earlier, and set it again.
+    await markWaitingParts(db.app, people.store!, job, randomUUID());
+    await clearWaitingParts(db.app, people.advisor!, job, randomUUID());
+    expect((await jobCard(db.app, job))!.status).toBe("authorized");
+  });
+
+  it("whole units for parts counted in pieces, sets and jobs (OD-22)", async () => {
+    const pad = await part(true);
+    await expect(receive(pad, "2.5", "10.00")).rejects.toMatchObject({
+      details: { field: "qty", reason: "whole_number" },
+    });
+    await receive(pad, "3", "30.00");
+    const { partLines } = await jobWith([{ itemId: pad, qty: "1" }]);
+    await expect(issue(partLines[0]!, "0.5")).rejects.toMatchObject({ details: { reason: "whole_number" } });
+    await expect(
+      receiveAndIssue(
+        db.app,
+        people.store!,
+        partLines[0]!,
+        { qty: "0.5", amount: "5", supplierName: "S", supplierRef: "R" },
+        randomUUID(),
+      ),
+    ).rejects.toMatchObject({ details: { reason: "whole_number" } });
+    // Oil by the litre takes fractions.
+    counter++;
+    const oil = (
+      await createItem(
+        db.app,
+        people.manager!,
+        {
+          kind: "part",
+          code: `OIL-${counter}`,
+          nameEn: "Oil",
+          nameAr: "زيت",
+          price: "30.00",
+          taxCode: "STD",
+          unit: "litre",
+          stockTracked: true,
+        },
+        randomUUID(),
+      )
+    ).result.itemId;
+    await receive(oil, "4.5", "45.00");
+    // The database refuses a fractional piece count whatever the code does.
+    expect(
+      (
+        await sqlErrorAs(
+          db.appUrl,
+          `INSERT INTO stock_movement (item_id, kind, qty, value, supplier_name, supplier_ref) VALUES ('${pad}', 'receipt', 0.5, 1, 'x', 'y')`,
+        )
+      )?.code,
+    ).toBe("23514");
+  });
+
+  it("no receipts into a deactivated part; its stock still issues (OD-34)", async () => {
+    const pad = await part(true);
+    await receive(pad, "2", "20.00");
+    const { partLines } = await jobWith([{ itemId: pad, qty: "1" }]);
+    await setItemActive(db.app, people.manager!, pad, false);
+    await expect(receive(pad, "1", "10.00")).rejects.toMatchObject({ code: "item_inactive" });
+    await issue(partLines[0]!, "1");
+    expect(await balance(pad)).toEqual({ qty: "1.000", value: "10.00" });
+  });
+
+  it("two over-issues to one line at once: the second needs a reason (v0.2.1 §3.3)", async () => {
+    const pad = await part(true);
+    await receive(pad, "5", "50.00");
+    const { ro, partLines } = await jobWith([{ itemId: pad, qty: "2" }]);
+    const holder = new pg.Client({ connectionString: db.appUrl });
+    await holder.connect();
+    try {
+      await holder.query("BEGIN");
+      await holder.query("SELECT id FROM repair_order WHERE id = $1 FOR UPDATE", [ro]);
+      const both = Promise.allSettled([
+        issue(partLines[0]!, "2"),
+        issue(partLines[0]!, "1", undefined, people.advisor!),
+      ]);
+      await waitForLockWaiters(db, 2);
+      await holder.query("COMMIT");
+      const results = await both;
+      expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+      expect((results.find((r) => r.status === "rejected") as PromiseRejectedResult).reason).toMatchObject({
+        details: { field: "overReason" },
+      });
+    } finally {
+      await holder.end();
+    }
+  });
+
+  it("retried receipts and receive-and-issue replay instead of recording twice (rule 11)", async () => {
+    const pad = await part(true);
+    const input = { qty: "2", amount: "20.00", supplierName: "Supplier", supplierRef: "R-1" };
+    const key = randomUUID();
+    const first = await receiveStock(db.app, people.store!, pad, input, key);
+    const again = await receiveStock(db.app, people.store!, pad, input, key);
+    expect(again.replayed).toBe(true);
+    expect(again.result).toEqual(first.result);
+    expect(await balance(pad)).toEqual({ qty: "2.000", value: "20.00" });
+
+    const { partLines } = await jobWith([{ itemId: pad, qty: "1" }]);
+    const raiKey = randomUUID();
+    const rai = { qty: "1", amount: "12.00", supplierName: "Dealer", supplierRef: "D-1" };
+    await receiveAndIssue(db.app, people.store!, partLines[0]!, rai, raiKey);
+    expect((await receiveAndIssue(db.app, people.store!, partLines[0]!, rai, raiKey)).replayed).toBe(true);
+    expect(await wip(partLines[0]!)).toMatchObject({ qty: "1.000", value: "12.00" });
+  });
+
+  it("the database refuses issues without a job line, a moved basis, and waiting parts by the wrong people", async () => {
+    const pad = await part(true);
+    await receive(pad, "2", "20.00");
+    const { job, partLines } = await jobWith([{ itemId: pad, qty: "1" }]);
+    // A stock issue (and its pool change) without the line's side fails at commit.
+    const orphan = await sqlErrorAs(
+      db.appUrl,
+      `BEGIN;
+       INSERT INTO stock_movement (item_id, kind, qty, value, revision_line_id) VALUES ('${pad}', 'issue', 1, 10, '${partLines[0]}');
+       UPDATE stock_balance SET qty = 1, value = 10 WHERE item_id = '${pad}';
+       COMMIT;`,
+    );
+    expect(orphan?.code).toBe("42501");
+    // The basis moves only when units enter (the trigger refuses before the basis CHECK is reached).
+    expect(
+      (await sqlErrorAs(db.appUrl, `UPDATE stock_balance SET basis_value = 1 WHERE item_id = '${pad}'`))
+        ?.code,
+    ).toBe("42501");
+    expect(
+      (await sqlErrorAs(db.appUrl, `UPDATE stock_balance SET basis_qty = 0 WHERE item_id = '${pad}'`))?.code,
+    ).toBe("42501");
+    // Waiting parts: not by an accountant, not by a deactivated store keeper.
+    expect(
+      (
+        await sqlErrorAs(
+          db.appUrl,
+          `UPDATE repair_job SET execution_status = 'waiting_parts', updated_by = '${people.accountant!.userId}' WHERE id = '${job}'`,
+        )
+      )?.code,
+    ).toBe("42501");
+    const gone = await makeUser(db.app, ["store_keeper"], "store-gone");
+    await db.owner
+      .updateTable("app_user")
+      .set({ status: "deactivated", deactivated_at: new Date() })
+      .where("id", "=", gone.userId)
+      .execute();
+    expect(
+      (
+        await sqlErrorAs(
+          db.appUrl,
+          `UPDATE repair_job SET execution_status = 'waiting_parts', updated_by = '${gone.userId}' WHERE id = '${job}'`,
+        )
+      )?.code,
+    ).toBe("42501");
+  });
+
+  it("waiting parts needs running work; the HTTP action works for store keepers", async () => {
+    const pad = await part(true);
+    const { ro, job } = await jobWith([{ itemId: pad, qty: "1" }]);
+    const response = await handlers.jobAction(
+      new Request(`${BASE}/api/jobs/${job}/waiting-parts`, {
+        method: "POST",
+        body: JSON.stringify({ idempotencyKey: randomUUID() }),
+        headers: { "content-type": "application/json", ...cookie(people.store!.token) },
+      }),
+      job,
+      "waiting-parts",
+    );
+    expect(response.status).toBe(201);
+    await db.owner.updateTable("repair_order").set({ status: "qc" }).where("id", "=", ro).execute();
+    await expect(clearWaitingParts(db.app, people.store!, job, randomUUID())).rejects.toMatchObject({
+      code: "repair_order_not_in_progress",
+    });
   });
 });
