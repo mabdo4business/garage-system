@@ -9,6 +9,8 @@ export interface FormError {
   key: MessageKey;
   /** Form field the error is about, when the server could tell (ValidationError details.field). */
   field?: string;
+  /** Values for the message, e.g. the estimate version in AC2-25's "pending on v{version}". */
+  params?: Record<string, string>;
 }
 
 export interface FormState<Duplicate = never> {
@@ -55,4 +57,68 @@ export const FIELD_LABELS: Record<string, MessageKey> = {
   excludedReason: "repairOrder.excludeReason",
   photo: "checkIn.section.photos",
   slot: "checkIn.section.photos",
+  // I1-03 inspection
+  technicianUserId: "inspection.technician",
+  title: "finding.title",
+  severity: "finding.severity",
+  faultCodes: "finding.faultCodes",
+  customerNote: "finding.customerNote",
+  internalNote: "finding.internalNote",
+  templateItemId: "inspection.checklist",
+  withdrawnReason: "finding.withdrawReason",
+  visibility: "finding.photo",
+  // I1-04 catalog & tax
+  kind: "catalogue.kind",
+  code: "catalogue.code",
+  price: "catalogue.price",
+  taxCode: "catalogue.taxCode",
+  nameEn: "catalogue.nameEn",
+  nameAr: "catalogue.nameAr",
+  descriptionEn: "catalogue.descriptionEn",
+  descriptionAr: "catalogue.descriptionAr",
+  partNo: "catalogue.partNo",
+  brand: "catalogue.brand",
+  partType: "catalogue.partType",
+  unit: "catalogue.unit",
+  registrationStatus: "tax.status",
+  trn: "tax.trn",
+  effectiveFrom: "tax.effectiveFrom",
+  rate: "tax.rate",
+  category: "tax.category",
+  labelEn: "catalogue.nameEn",
+  labelAr: "catalogue.nameAr",
+  note: "tax.note",
+  // I1-05 estimate
+  itemId: "estimate.item",
+  qty: "estimate.qty",
+  discount: "estimate.discountAmount",
+  reason: "estimate.excludeReason",
+  findingId: "estimate.urgentFindings",
+  approverName: "approval.name",
+  signature: "approval.signature",
+  decisions: "approval.title",
+  // I1-06 workshop
+  assigneeId: "workshop.assignee",
+  bay: "workshop.bay",
+  pauseReason: "job.pauseReason",
+  lines: "job.lines",
+  notPerformedReason: "job.line.reason",
+  completionNote: "job.note",
+  // I1-07 parts
+  amount: "stock.amount",
+  supplierName: "stock.supplierName",
+  supplierRef: "stock.supplierRef",
+  overReason: "parts.overReason",
+  // I1-08 QC
+  noNewWarningLights: "qc.check.noNewWarningLights",
+  fluidsOk: "qc.check.fluidsOk",
+  cleanlinessOk: "qc.check.cleanlinessOk",
+  belongingsOk: "qc.check.belongingsOk",
+  roadTest: "qc.roadTest",
+  roadTestReason: "qc.roadTestReason",
+  odometerOutKm: "qc.odometerOut",
+  odometerReason: "qc.odometerReason",
+  oldParts: "qc.oldParts",
+  notes: "qc.notes",
+  jobIds: "qc.returnJobs",
 };

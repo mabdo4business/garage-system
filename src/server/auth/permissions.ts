@@ -48,6 +48,43 @@ export const PERMISSIONS = {
   "repair_order.read": ["partner", "manager", "service_advisor"],
   // AC2-33: after check-in a photo can only be marked excluded, by a manager, with a reason.
   "media.exclude": ["partner", "manager"],
+
+  // I1-03: assigning the inspection (T-11) and recording findings. A technician records findings only
+  // on repair orders whose inspection they are assigned to (checked in the inspection module, AC2-30).
+  "inspection.assign": ["partner", "manager"],
+  "finding.record": ["partner", "manager", "service_advisor", "technician"],
+  // The technician's own list of assigned inspections (menu item "My inspections").
+  "inspection.my_work": ["technician"],
+
+  // I1-04: price list. Technicians never see prices (AC2-30); changing prices is partner or manager
+  // (OD-12) until the per-user T4 toggle. Tax settings are partner-only until dual control (T-15).
+  "catalogue.read": ["partner", "manager", "service_advisor", "store_keeper", "accountant"],
+  "pricing.manage": ["partner", "manager"],
+  "tax.manage": ["partner"],
+
+  // I1-05: estimates. Technicians never see prices (AC2-30). Line discounts are managers and partners
+  // only until discount limits and approvals arrive in I3-06 (OD-19).
+  "estimate.read": ["partner", "manager", "service_advisor"],
+  "estimate.edit": ["partner", "manager", "service_advisor"],
+  "estimate.discount": ["partner", "manager"],
+  // I1-05b: presenting the estimate and recording the customer's in-person decision (L3, OD-20).
+  "estimate.send": ["partner", "manager", "service_advisor"],
+  "estimate.record_approval": ["partner", "manager", "service_advisor"],
+
+  // I1-06: the workshop board (no prices), assigning jobs (US-07.2, OD-26) and the assignee's own jobs. Managers
+  // and partners can be assignees (OD-27), so they have "My jobs" too.
+  "workshop.board": ["partner", "manager", "service_advisor"],
+  "workshop.assign": ["partner", "manager"],
+  "workshop.my_jobs": ["partner", "manager", "technician"],
+
+  // I1-07: stock and parts for jobs (OD-29). Stock values and line costs are shown to these roles only (T-24).
+  "stock.read": ["partner", "manager", "service_advisor", "store_keeper"],
+  "stock.receive": ["partner", "manager", "service_advisor", "store_keeper"],
+  "stock.issue": ["partner", "manager", "service_advisor", "store_keeper"],
+
+  // I1-08: QC (OD-36). Technicians may request QC only on repair orders they have a job on (checked in the command).
+  "qc.request": ["partner", "manager", "technician"],
+  "qc.decide": ["partner", "manager"],
 } as const satisfies Record<string, readonly Role[]>;
 
 export type Permission = keyof typeof PERMISSIONS;

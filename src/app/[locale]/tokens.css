@@ -23,6 +23,7 @@
   --primary-bg-hover: #8f3a14;
   --primary-fg: #ffffff;
   --danger-fg: #a12a1f;
+  --success-fg: #1e6b3a;
   --danger-bg: #fbe9e6;
   --danger-border: #e8b4ac;
   --warning-fg: #7a4b00;
@@ -81,6 +82,7 @@
     --primary-bg-hover: #ea8d61;
     --primary-fg: #15202b;
     --danger-fg: #ffb4a8;
+    --success-fg: #8fd6a4;
     --danger-bg: #3a1d1a;
     --danger-border: #6b302a;
     --warning-fg: #f3d08a;

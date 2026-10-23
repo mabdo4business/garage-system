@@ -26,11 +26,61 @@ export const NAV_ITEMS: readonly NavItem[] = [
     sections: ["/repair-orders", "/check-ins"],
   },
   {
+    key: "myInspections",
+    label: "nav.myInspections",
+    path: "/inspections",
+    permission: "inspection.my_work",
+    // A technician reaches the inspection screen (under /repair-orders) only from here.
+    sections: ["/inspections", "/repair-orders"],
+  },
+  {
+    key: "workshop",
+    label: "nav.workshop",
+    path: "/workshop",
+    permission: "workshop.board",
+    sections: ["/workshop"],
+  },
+  {
+    key: "myJobs",
+    label: "nav.myJobs",
+    path: "/jobs",
+    permission: "workshop.my_jobs",
+    sections: ["/jobs"],
+  },
+  {
+    key: "parts",
+    label: "nav.parts",
+    path: "/parts",
+    permission: "stock.read",
+    sections: ["/parts"],
+  },
+  {
+    key: "stock",
+    label: "nav.stock",
+    path: "/stock",
+    permission: "stock.read",
+    sections: ["/stock"],
+  },
+  {
     key: "directory",
     label: "nav.directory",
     path: "/search",
     permission: "directory.search",
     sections: ["/search", "/customers", "/vehicles"],
+  },
+  {
+    key: "catalogue",
+    label: "nav.catalogue",
+    path: "/catalogue",
+    permission: "catalogue.read",
+    sections: ["/catalogue"],
+  },
+  {
+    key: "taxSettings",
+    label: "nav.taxSettings",
+    path: "/settings/tax",
+    permission: "tax.manage",
+    sections: ["/settings/tax"],
   },
 ];
 

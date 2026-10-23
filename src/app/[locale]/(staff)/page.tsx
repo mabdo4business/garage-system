@@ -4,6 +4,9 @@ import { PageHeader } from "../../../components/ui";
 import { isLocale, t } from "../../../i18n";
 import { dubaiDate } from "../../../i18n/format";
 import { requirePageSession } from "../server-support";
+import { hasPermission } from "../../../server/auth/permissions";
+import { getDb } from "../../../server/db/client";
+import { NoTaxProfileBanner } from "./catalogue/shared";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +27,9 @@ export default async function TodayPage({ params }: { params: Promise<{ locale: 
         title={t(locale, "today.greeting", { name: session.displayName })}
         subtitle={t(locale, "home.businessDate", { date: dubaiDate(new Date()) })}
       />
+      {hasPermission(session.roles, "catalogue.read") ? (
+        <NoTaxProfileBanner db={getDb()} locale={locale} />
+      ) : null}
       <section aria-labelledby="quick-actions">
         <h2 id="quick-actions" className="visually-hidden">
           {t(locale, "today.quickActions")}

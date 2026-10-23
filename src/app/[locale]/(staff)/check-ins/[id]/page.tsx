@@ -4,7 +4,7 @@ import { Card, EmptyState, PageHeader, PlateBadge, StatusChip } from "../../../.
 import { isLocale, t, type MessageKey } from "../../../../../i18n";
 import { canReadContact } from "../../../../../server/customer/service";
 import { getDb } from "../../../../../server/db/client";
-import { getCheckInSettings } from "../../../../../server/repair-order/check-in";
+import { getCheckInSettings, openRepairOrderOf } from "../../../../../server/repair-order/check-in";
 import { getCheckIn } from "../../../../../server/repair-order/queries";
 import { requirePagePermission } from "../../../server-support";
 import { AbandonCheckInForm, CheckInForm } from "./check-in-form";
@@ -50,6 +50,7 @@ export default async function CheckInPage({ params }: { params: Promise<{ locale
   }
 
   const settings = await getCheckInSettings(db);
+  const open = await openRepairOrderOf(db, checkIn.vehicleId);
   const present = new Set(checkIn.photos.map((photo) => photo.slot));
   const missingSlots = settings.requiredSlots
     .filter((slot) => !present.has(slot))
@@ -99,6 +100,14 @@ export default async function CheckInPage({ params }: { params: Promise<{ locale
           idempotencyKey={randomUUID()}
           missingSlots={missingSlots}
           showContactMobile={canReadContact(session.roles)}
+          openRepairOrder={
+            open
+              ? {
+                  number: open.number,
+                  statusLabel: t(locale, `repairOrder.status.${open.status}` as MessageKey),
+                }
+              : null
+          }
           initial={{
             contactName: checkIn.contactName ?? "",
             contactMobile: checkIn.contactMobile ?? "",

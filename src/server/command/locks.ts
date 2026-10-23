@@ -21,6 +21,7 @@ export const LOCK_RANK = {
   invoice: 20,
   revision_line: 30,
   stock_balance: 40,
+  catalogue_item: 50, // I1-04 (T-16): price changes; read without locks when estimating
   number_series: 90,
 } as const;
 
@@ -30,6 +31,10 @@ const LOCK_TARGETS: Partial<Record<LockKind, { table: keyof DB; column: string }
   vehicle: { table: "vehicle", column: "id" },
   check_in: { table: "check_in", column: "id" },
   repair_order: { table: "repair_order", column: "id" },
+  catalogue_item: { table: "catalogue_item", column: "id" },
+  // I1-07: a job line's WIP pool, then the part's stock pool (repair order → revision line → stock).
+  revision_line: { table: "revision_line", column: "id" },
+  stock_balance: { table: "stock_balance", column: "item_id" },
   test_document: { table: "test_document", column: "id" },
   number_series: { table: "number_series", column: "series" },
 };

@@ -172,7 +172,7 @@ export function StatusChip({
   tone = "info",
 }: {
   children: ReactNode;
-  tone?: "info" | "neutral" | "warning";
+  tone?: "info" | "neutral" | "warning" | "success" | "danger";
 }) {
   return <span className={`chip chip-${tone}`}>{children}</span>;
 }

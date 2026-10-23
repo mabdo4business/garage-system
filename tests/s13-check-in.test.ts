@@ -821,8 +821,9 @@ describe("S13 — check-in over HTTP", () => {
     expect(new Uint8Array(await photo.arrayBuffer()).byteLength).toBeGreaterThan(0);
 
     expect((await handlers.getPhoto(get(`/api/media/${mediaId}`), mediaId)).status).toBe(401);
+    // AC2-30 (I1-03): a technician not assigned to this repair order gets "not found".
     expect((await handlers.getPhoto(get(`/api/media/${mediaId}`, technicianToken), mediaId)).status).toBe(
-      403,
+      404,
     );
 
     // Exclusion: advisor refused, manager allowed.

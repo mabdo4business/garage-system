@@ -6,41 +6,13 @@ import { Alert } from "../../../../../components/ui";
 import { t, type Locale, type MessageKey } from "../../../../../i18n";
 import { FormErrorMessage } from "../../../form-error";
 import { EMPTY_FORM_STATE } from "../../../form-state";
+import { uploadPhoto } from "../../photo-upload";
 import { discardPhotoAction } from "../actions";
 
 export interface SlotPhoto {
   id: string;
   slot: string;
 }
-
-/** Long edge the tablet scales photos down to before upload (T-07). */
-const UPLOAD_LONG_EDGE = 2560;
-
-/**
- * Re-encodes every camera photo as JPEG, at most UPLOAD_LONG_EDGE on its long side. Re-encoding also
- * drops metadata such as the GPS location (relevant to V-1).
- */
-async function prepare(file: File): Promise<Blob> {
-  if (typeof createImageBitmap !== "function") return file;
-  try {
-    const bitmap = await createImageBitmap(file);
-    const scale = Math.min(1, UPLOAD_LONG_EDGE / Math.max(bitmap.width, bitmap.height));
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.round(bitmap.width * scale);
-    canvas.height = Math.round(bitmap.height * scale);
-    canvas.getContext("2d")?.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.85));
-    return blob ?? file;
-  } catch {
-    // Formats the browser can't decode (e.g. some HEIC files) go up unchanged; the server decides.
-    return file;
-  }
-}
-
-const UPLOAD_ERRORS: Record<string, MessageKey> = {
-  too_large: "checkIn.photoError.tooLarge",
-  not_image: "checkIn.photoError.notImage",
-};
 
 export function PhotoSlots({
   locale,
@@ -63,19 +35,9 @@ export function PhotoSlots({
     setBusySlot(slot);
     setError(null);
     try {
-      const body = new FormData();
-      body.set("slot", slot);
-      body.set("idempotencyKey", crypto.randomUUID());
-      body.set("photo", await prepare(file), "photo");
-      const response = await fetch(`/api/check-ins/${checkInId}/photos`, { method: "POST", body });
-      if (!response.ok) {
-        const result = (await response.json().catch(() => ({}))) as { details?: { reason?: string } };
-        setError(UPLOAD_ERRORS[result.details?.reason ?? ""] ?? "checkIn.photoError.failed");
-        return;
-      }
-      router.refresh();
-    } catch {
-      setError("checkIn.photoError.failed");
+      const failure = await uploadPhoto(`/api/check-ins/${checkInId}/photos`, file, { slot });
+      if (failure) setError(failure);
+      else router.refresh();
     } finally {
       setBusySlot(null);
     }

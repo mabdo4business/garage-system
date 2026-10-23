@@ -10,6 +10,8 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   retries: process.env.CI ? 1 : 0,
+  // The dev server compiles each route on first use; a cold compile can take several seconds on a busy machine.
+  expect: { timeout: 15_000 },
   reporter: process.env.CI ? "github" : "list",
   use: {
     baseURL: `http://localhost:${E2E_PORT}`,

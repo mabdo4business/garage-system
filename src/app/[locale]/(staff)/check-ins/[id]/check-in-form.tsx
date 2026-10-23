@@ -42,6 +42,7 @@ export function CheckInForm({
   initial,
   missingSlots,
   showContactMobile,
+  openRepairOrder,
 }: {
   locale: Locale;
   checkInId: string;
@@ -50,6 +51,8 @@ export function CheckInForm({
   /** Required photo slots that have no photo yet, as labels. */
   missingSlots: string[];
   showContactMobile: boolean;
+  /** OQ-1: the vehicle's other open repair order, which completing must confirm. */
+  openRepairOrder: { number: string; statusLabel: string } | null;
 }) {
   const [state, formAction, pending] = useActionState(
     saveCheckInAction,
@@ -208,6 +211,18 @@ export function CheckInForm({
         />
       </Field>
 
+      {openRepairOrder ? (
+        <Alert tone="warning">
+          <p>
+            {t(locale, "checkIn.openRepairOrder", { status: openRepairOrder.statusLabel })}{" "}
+            <bdi dir="ltr">{openRepairOrder.number}</bdi>
+          </p>
+          <label className="checkbox">
+            <input type="checkbox" name="confirmOpenRepairOrder" value={openRepairOrder.number} />{" "}
+            {t(locale, "checkIn.confirmOpenRepairOrder")}
+          </label>
+        </Alert>
+      ) : null}
       <div className="form-actions">
         <Button name="intent" value="complete" disabled={pending}>
           {t(locale, "checkIn.complete")}

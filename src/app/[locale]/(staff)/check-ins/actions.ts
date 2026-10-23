@@ -68,8 +68,11 @@ export async function saveCheckInAction(
     // A repeated "Complete" from the same form (double tap, network retry) replays the completion
     // instead of failing in the save step on a check-in that is already completed.
     const key = field(formData, "idempotencyKey");
+    const confirm = field(formData, "confirmOpenRepairOrder") || null;
     if (complete && (await idempotencyKeyUsed(db, "check_in.complete", key))) {
-      repairOrderId = (await completeCheckIn(db, actor, checkInId, key)).result.repairOrderId;
+      repairOrderId = (
+        await completeCheckIn(db, actor, checkInId, key, undefined, { confirmOpenRepairOrder: confirm })
+      ).result.repairOrderId;
     } else {
       // Only fields the form actually has (a role without contact rights gets no mobile field).
       const present = Object.fromEntries(
@@ -77,7 +80,16 @@ export async function saveCheckInAction(
       );
       await updateCheckIn(db, actor, checkInId, checkInFieldsFrom(present));
       if (complete) {
-        const outcome = await completeCheckIn(db, actor, checkInId, field(formData, "idempotencyKey"));
+        const outcome = await completeCheckIn(
+          db,
+          actor,
+          checkInId,
+          field(formData, "idempotencyKey"),
+          undefined,
+          {
+            confirmOpenRepairOrder: confirm,
+          },
+        );
         repairOrderId = outcome.result.repairOrderId;
       }
     }
