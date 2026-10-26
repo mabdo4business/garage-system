@@ -1,98 +1,178 @@
 /*
- * Design tokens from the UI/UX deck (docs/ui-ux/ui-ux-deck.html, slide 13). Working palette only:
- * the final brand is decision D-29. Text/background pairs below meet 4.5:1 contrast in both themes.
+ * Design tokens. Working palette from the owners' redesign references (docs/design/*.dc.html, OD-49); the final
+ * brand is decision D-29. Text/background pairs meet 4.5:1 contrast and field edges 3:1 in both themes
+ * (checked by tests/s23-dashboard.test.tsx).
  */
 :root {
   /* Core palette */
-  --ink: #15202b;
-  --paper: #f4f1ea;
-  --action: #a8461a;
-  --info: #1f5f8b;
+  --ink: #0b1220;
+  --ground: #f4f6fa;
+  --action: #c2410c;
+  --accent-on-dark: #fb923c;
+  --info: #1d4ed8;
 
   /* Roles */
-  --bg: var(--paper);
+  --bg: var(--ground);
   --surface: #ffffff;
-  --surface-sunken: #ebe6dc;
+  --surface-sunken: #eaeef4;
+  --surface-hover: #f8fafc;
   --fg: var(--ink);
-  --muted: #525d68;
-  --border: #d9d2c4;
-  --border-strong: #8a8170; /* field edges: ≥ 3:1 on surface and page (WCAG 1.4.11) */
+  --fg-soft: #3b4556;
+  --muted: #5a6576;
+  --border: #e4e8ef;
+  --border-soft: #eef1f5;
+  --border-strong: #7b8698; /* field edges: ≥ 3:1 on surface and page (WCAG 1.4.11) */
   --link: var(--info);
+  --link-hover: #1e3a8a;
   --focus: var(--info);
   --primary-bg: var(--action);
-  --primary-bg-hover: #8f3a14;
+  --primary-bg-hover: #9a3412;
   --primary-fg: #ffffff;
   --danger-fg: #a12a1f;
   --success-fg: #1e6b3a;
   --danger-bg: #fbe9e6;
   --danger-border: #e8b4ac;
-  --warning-fg: #7a4b00;
-  --warning-bg: #fdf1d8;
-  --warning-border: #e9cf94;
+  --warning-fg: #7a3e0c;
+  --warning-bg: #fff4e6;
+  --warning-border: #f3c99c;
   --plate-bg: #ffffff;
   --plate-border: var(--ink);
+  --plate-fg: var(--ink);
   --nav-bg: var(--ink);
-  --nav-fg: #e8e4dc;
-  --nav-fg-muted: #a9b2bc;
-  --nav-active-bg: #2e4052;
-  --nav-marker: #e07a4a; /* ≥ 3:1 on --nav-active-bg in both themes */
+  --nav-fg: #cbd5e1;
+  --nav-fg-strong: #ffffff;
+  --nav-fg-muted: #94a3b8;
+  --nav-hover-bg: #1e293b;
+  --nav-active-bg: var(--accent-on-dark);
+  --nav-active-fg: var(--ink);
+  --nav-card-bg: #111a2e;
+  --track: #eef1f5; /* empty part of bars, rings and progress */
 
-  /* Type: next/font sets --font-rubik, --font-plex, --font-plex-arabic on <html> */
-  --font-heading: var(--font-rubik), var(--font-plex-arabic), system-ui, sans-serif;
-  --font-body: var(--font-plex), var(--font-plex-arabic), system-ui, sans-serif;
+  /*
+   * Repair order and job statuses (always shown with their word, never colour alone). Each has a chip
+   * background and ink, plus a solid colour for charts and progress. "diagnosing" is derived (the references
+   * show six statuses; the system has seven, OD-49).
+   */
+  --status-checked-bg: #e3e7ec;
+  --status-checked-ink: #2b3a48;
+  --status-checked-solid: #64748b;
+  --status-diagnosing-bg: #fbe0ec;
+  --status-diagnosing-ink: #831843;
+  --status-diagnosing-solid: #be185d;
+  --status-approval-bg: #fbe3c8;
+  --status-approval-ink: #7a3e0c;
+  --status-approval-solid: #c2410c;
+  --status-progress-bg: #d6e6f3;
+  --status-progress-ink: #1b4a6e;
+  --status-progress-solid: #2563eb;
+  --status-parts-bg: #e7ddf3;
+  --status-parts-ink: #4b2e73;
+  --status-parts-solid: #7c3aed;
+  --status-qc-bg: #d4ede8;
+  --status-qc-ink: #1d5a4f;
+  --status-qc-solid: #0d9488;
+  --status-ready-bg: #dcefd6;
+  --status-ready-ink: #2e5e1f;
+  --status-ready-solid: #16a34a;
+
+  /* Type: next/font sets --font-jakarta, --font-jetbrains, --font-plex-arabic on <html> */
+  --font-heading: var(--font-jakarta), var(--font-plex-arabic), system-ui, sans-serif;
+  --font-body: var(--font-jakarta), var(--font-plex-arabic), system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, monospace;
+  --text-xs: 0.75rem;
   --text-sm: 0.875rem;
   --text-md: 1rem;
-  --text-lg: 1.25rem;
+  --text-lg: 1.125rem;
   --text-xl: 1.625rem;
+  --text-2xl: 2.25rem;
+  --text-kpi: 2.125rem;
 
-  /* Space, shape, ergonomics (deck slide 15) */
+  /* Space, shape, ergonomics */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
   --space-4: 16px;
+  --space-card: 20px;
   --space-5: 24px;
+  --space-page: 28px;
   --space-6: 32px;
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 14px;
+  --radius-xl: 18px;
+  --radius-2xl: 22px;
+  --radius-pill: 999px;
   --touch: 48px;
-  --shadow-card: 0 1px 2px rgb(21 32 43 / 6%), 0 4px 12px rgb(21 32 43 / 5%);
+  --shadow-card: none;
+  --shadow-lift: 0 14px 30px rgb(11 18 32 / 9%);
+  --shadow-toast: 0 16px 40px rgb(11 18 32 / 25%);
+  --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
 
   color-scheme: light;
 }
 
-/* Arabic: the Arabic face leads both stacks (Rubik has no Arabic glyphs). */
+/* Arabic: the Arabic face leads both stacks (Plus Jakarta Sans has no Arabic glyphs). */
 :root:lang(ar) {
-  --font-heading: var(--font-plex-arabic), var(--font-rubik), system-ui, sans-serif;
-  --font-body: var(--font-plex-arabic), var(--font-plex), system-ui, sans-serif;
+  --font-heading: var(--font-plex-arabic), var(--font-jakarta), system-ui, sans-serif;
+  --font-body: var(--font-plex-arabic), var(--font-jakarta), system-ui, sans-serif;
 }
 
+/* Dark theme: derived from the references' dark bay screen (Bay.dc.html). */
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0f161d;
-    --surface: #18222c;
-    --surface-sunken: #121a22;
-    --fg: #ece8df;
-    --muted: #a9b2bc;
-    --border: #2b3946;
-    --border-strong: #5d7184;
-    --link: #8cc0e6;
-    --focus: #8cc0e6;
-    --primary-bg: #e07a4a;
-    --primary-bg-hover: #ea8d61;
-    --primary-fg: #15202b;
+    --bg: #0b1220;
+    --surface: #16213a;
+    --surface-sunken: #0f1a30;
+    --surface-hover: #1c2a47;
+    --fg: #f1f5f9;
+    --fg-soft: #cbd5e1;
+    --muted: #a3aec0;
+    --border: #26334d;
+    --border-soft: #1e2a42;
+    --border-strong: #6b7a94;
+    --link: #93c5fd;
+    --link-hover: #bfdbfe;
+    --focus: #93c5fd;
+    --primary-bg: var(--accent-on-dark);
+    --primary-bg-hover: #fdba74;
+    --primary-fg: #0b1220;
     --danger-fg: #ffb4a8;
     --success-fg: #8fd6a4;
     --danger-bg: #3a1d1a;
     --danger-border: #6b302a;
-    --warning-fg: #f3d08a;
-    --warning-bg: #33280f;
-    --warning-border: #5e4a1c;
-    --plate-bg: #ece8df;
-    --plate-border: #ece8df;
-    --nav-bg: #0b1117;
-    --nav-active-bg: #1d2a36;
-    --shadow-card: none;
+    --warning-fg: #fdc9a0;
+    --warning-bg: #3a2412;
+    --warning-border: #6b4320;
+    --plate-bg: #f1f5f9;
+    --plate-border: #f1f5f9;
+    --plate-fg: #0b1220;
+    --nav-bg: #070c16;
+    --nav-card-bg: #0f1a30;
+    --track: #26334d;
+    --shadow-lift: 0 14px 30px rgb(0 0 0 / 35%);
+    --shadow-toast: 0 16px 40px rgb(0 0 0 / 50%);
+
+    --status-checked-bg: #263244;
+    --status-checked-ink: #d5dee9;
+    --status-checked-solid: #8090a8;
+    --status-diagnosing-bg: #4a1730;
+    --status-diagnosing-ink: #f9c6dc;
+    --status-diagnosing-solid: #ec4899;
+    --status-approval-bg: #4a2510;
+    --status-approval-ink: #fdc9a0;
+    --status-approval-solid: #ea580c;
+    --status-progress-bg: #14304d;
+    --status-progress-ink: #bfdbfe;
+    --status-progress-solid: #3b82f6;
+    --status-parts-bg: #2e1d4a;
+    --status-parts-ink: #ddd0f5;
+    --status-parts-solid: #8b5cf6;
+    --status-qc-bg: #0e3b36;
+    --status-qc-ink: #a7e8dc;
+    --status-qc-solid: #0d9488;
+    --status-ready-bg: #173a1c;
+    --status-ready-ink: #bbe7b0;
+    --status-ready-solid: #65a30d;
     color-scheme: dark;
   }
 }

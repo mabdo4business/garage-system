@@ -14,16 +14,34 @@ export interface NavItem {
   permission: Permission | null;
   /** Path prefixes (after /{locale}) that count as this section, for the active marker. */
   sections: readonly string[];
+  /** SVG path data for the 24 × 24 line icon (decorative; the label carries the meaning). */
+  icon: string;
 }
 
+const ICON = {
+  today: "M3 3h7v9H3z M14 3h7v5h-7z M14 12h7v9h-7z M3 16h7v5H3z",
+  repairOrders: "M9 3h6v3H9z M7 4.5H5V21h14V4.5h-2 M8 11h8 M8 15h5",
+  inspections: "M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14 M20 20l-4-4 M8 11l2 2 4-4",
+  workshop: "M4 4h4v16H4z M10 4h4v10h-4z M16 4h4v13h-4z",
+  myJobs: "M6 2h12v20H6z M11 18h2",
+  parts: "M21 8l-9-5-9 5 9 5 9-5z M3 8v8l9 5 9-5V8 M12 13v8",
+  stock: "M4 7h16v4H4z M4 13h16v4H4z M8 9h.01 M8 15h.01",
+  directory:
+    "M16 20v-1a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v1 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8 M22 20v-1a4 4 0 0 0-3-3.9 M16 3.1a4 4 0 0 1 0 7.8",
+  catalogue: "M20 12l-8 8-9-9V3h8z M7.5 7.5h.01",
+  tax: "M19 5L5 19 M6.5 9a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5 M17.5 20a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5",
+  business: "M3 21h18 M5 21V7l7-4 7 4v14 M9 21v-6h6v6 M9 10h.01 M15 10h.01",
+} as const;
+
 export const NAV_ITEMS: readonly NavItem[] = [
-  { key: "today", label: "nav.today", path: "", permission: null, sections: [] },
+  { key: "today", label: "nav.today", path: "", permission: null, sections: [], icon: ICON.today },
   {
     key: "repairOrders",
     label: "nav.repairOrders",
     path: "/repair-orders",
     permission: "repair_order.read",
     sections: ["/repair-orders", "/check-ins"],
+    icon: ICON.repairOrders,
   },
   {
     key: "myInspections",
@@ -32,6 +50,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     permission: "inspection.my_work",
     // A technician reaches the inspection screen (under /repair-orders) only from here.
     sections: ["/inspections", "/repair-orders"],
+    icon: ICON.inspections,
   },
   {
     key: "workshop",
@@ -39,6 +58,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     path: "/workshop",
     permission: "workshop.board",
     sections: ["/workshop"],
+    icon: ICON.workshop,
   },
   {
     key: "myJobs",
@@ -46,6 +66,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     path: "/jobs",
     permission: "workshop.my_jobs",
     sections: ["/jobs"],
+    icon: ICON.myJobs,
   },
   {
     key: "parts",
@@ -53,6 +74,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     path: "/parts",
     permission: "stock.read",
     sections: ["/parts"],
+    icon: ICON.parts,
   },
   {
     key: "stock",
@@ -60,6 +82,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     path: "/stock",
     permission: "stock.read",
     sections: ["/stock"],
+    icon: ICON.stock,
   },
   {
     key: "directory",
@@ -67,6 +90,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     path: "/search",
     permission: "directory.search",
     sections: ["/search", "/customers", "/vehicles"],
+    icon: ICON.directory,
   },
   {
     key: "catalogue",
@@ -74,6 +98,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     path: "/catalogue",
     permission: "catalogue.read",
     sections: ["/catalogue"],
+    icon: ICON.catalogue,
   },
   {
     key: "taxSettings",
@@ -81,6 +106,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     path: "/settings/tax",
     permission: "tax.manage",
     sections: ["/settings/tax"],
+    icon: ICON.tax,
   },
   {
     key: "businessProfile",
@@ -88,6 +114,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     path: "/settings/business",
     permission: "business_profile.manage",
     sections: ["/settings/business"],
+    icon: ICON.business,
   },
 ];
 

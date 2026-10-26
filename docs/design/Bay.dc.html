@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Technician bay</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=JetBrains+Mono:wght@500;700&amp;family=IBM+Plex+Sans+Arabic:wght@500;600&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#93C5FD}a:hover{color:#BFDBFE}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes tick{from{stroke-dashoffset:24}to{stroke-dashoffset:0}}
+@keyframes boxin{0%{transform:scale(.6)}60%{transform:scale(1.12)}100%{transform:scale(1)}}
+@keyframes breathe{0%,100%{opacity:1}50%{opacity:.35}}
+@keyframes ready{0%{box-shadow:0 0 0 0 rgba(251,146,60,.6)}100%{box-shadow:0 0 0 16px rgba(251,146,60,0)}}
+@keyframes success{0%{opacity:0;transform:scale(.9)}100%{opacity:1;transform:none}}
+.rise{animation:rise .6s cubic-bezier(.2,.7,.2,1) both}
+.tickpath{stroke-dasharray:24;animation:tick .35s ease-out both}
+.boxin{animation:boxin .35s cubic-bezier(.2,.7,.2,1) both}
+.breathe{animation:breathe 1.4s ease-in-out infinite}
+.readyglow{animation:ready 1.6s ease-out infinite}
+.success{animation:success .45s cubic-bezier(.2,.7,.2,1) both}
+.taskrow{transition:background .2s ease}
+.taskrow:hover{background:#1C2A47}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+</style>
+</helmet>
+<div style="width: 1194px; height: 834px; box-sizing: border-box; padding: 24px 28px; background: #0B1220; color: #F8FAFC; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; display: flex; flex-direction: column; gap: 20px; overflow: hidden;">
+
+  <header style="display: flex; align-items: center; gap: 16px;">
+    <div style="display: flex; align-items: center; gap: 14px; flex-grow: 1;">
+      <span style="padding: 10px 16px; border-radius: 14px; background: #FB923C; color: #0B1220; font-size: 22px; font-weight: 800;">Bay 3</span>
+      <div style="display: flex; flex-direction: column;">
+        <span style="font-size: 20px; font-weight: 800;">Omar F.</span>
+        <span style="font-size: 15px; color: #CBD5E1;">Mechanical · shift 07:00–16:00</span>
+      </div>
+    </div>
+    <span style="display: inline-flex; align-items: center; min-height: 56px; padding: 0 18px; border-radius: 14px; background: #16213A; font-size: 18px; font-weight: 700; color: #E2E8F0;">EN · عربي</span>
+    <span style="display: inline-flex; align-items: center; min-height: 56px; padding: 0 18px; border-radius: 14px; background: #16213A; font-family: 'JetBrains Mono', monospace; font-size: 22px; font-weight: 700;">{{clock}}</span>
+  </header>
+
+  <div style="display: flex; gap: 20px; flex-grow: 1; min-height: 0;">
+    <section class="rise" style="flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 18px; padding: 24px; border-radius: 22px; background: #16213A; border: 1px solid #26334D;">
+
+      <div style="display: flex; align-items: center; gap: 20px;">
+        <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 8px;">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <span dir="ltr" style="padding: 6px 12px; border: 2px solid #F8FAFC; border-radius: 8px; font-family: 'JetBrains Mono', monospace; font-size: 20px; font-weight: 700;">AJM A · 11584</span>
+            <span style="padding: 6px 12px; border-radius: 10px; background: {{statusBg}}; color: {{statusInk}}; font-size: 16px; font-weight: 800;">{{statusLabel}}</span>
+          </div>
+          <span style="font-size: 30px; font-weight: 800; letter-spacing: -0.01em;">Kia Sportage 2022</span>
+          <span style="font-size: 18px; color: #CBD5E1;">RO-1046 · Engine diagnostics · customer reports rattle on cold start</span>
+        </div>
+        <div style="position: relative; width: 112px; height: 112px; flex-shrink: 0;">
+          <svg width="112" height="112" viewBox="0 0 100 100" role="img" aria-label="Tasks completed">
+            <circle cx="50" cy="50" r="38" fill="none" stroke="#26334D" stroke-width="10"></circle>
+            <circle cx="50" cy="50" r="38" fill="none" stroke="#FB923C" stroke-width="10" stroke-linecap="round" transform="rotate(-90 50 50)" style="stroke-dasharray: {{ringDash}}; transition: stroke-dasharray .6s cubic-bezier(.2,.7,.2,1);"></circle>
+          </svg>
+          <div style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+            <span style="font-size: 24px; font-weight: 800;">{{doneCount}}/{{totalCount}}</span>
+            <span style="font-size: 12px; color: #CBD5E1;">tasks</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 14px; padding: 14px 18px; border-radius: 16px; background: #0F1A30;">
+        <sc-if value="{{running}}" hint-placeholder-val="{{true}}">
+          <span class="breathe" style="width: 12px; height: 12px; border-radius: 999px; background: #4ADE80;"></span>
+        </sc-if>
+        <sc-if value="{{paused}}" hint-placeholder-val="{{false}}">
+          <span style="width: 12px; height: 12px; border-radius: 3px; background: #FBBF24;"></span>
+        </sc-if>
+        <span style="font-size: 16px; font-weight: 700; color: #CBD5E1;">{{timerLabel}}</span>
+        <span style="margin-left: auto; font-family: 'JetBrains Mono', monospace; font-size: 34px; font-weight: 700; font-variant-numeric: tabular-nums;">{{elapsed}}</span>
+        <span style="font-size: 15px; color: #CBD5E1;">of 1:30:00 booked</span>
+      </div>
+
+      <sc-if value="{{notDone}}" hint-placeholder-val="{{true}}">
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <sc-for list="{{tasks}}" as="k" hint-placeholder-count="5">
+            <button type="button" class="taskrow" onClick="{{k.toggle}}" aria-pressed="{{k.pressed}}" style="display: flex; align-items: center; gap: 16px; min-height: 60px; padding: 0 16px; border: 1px solid #26334D; border-radius: 14px; background: transparent; color: #F8FAFC; font: inherit; font-size: 19px; font-weight: 600; text-align: left; cursor: pointer;">
+              <sc-if value="{{k.done}}" hint-placeholder-val="{{false}}">
+                <span class="boxin" style="width: 34px; height: 34px; border-radius: 10px; background: #4ADE80; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0B1220" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path class="tickpath" d="M20 6L9 17l-5-5"></path></svg>
+                </span>
+                <span style="flex-grow: 1; color: #CBD5E1; text-decoration: line-through;">{{k.label}}</span>
+              </sc-if>
+              <sc-if value="{{k.todo}}" hint-placeholder-val="{{true}}">
+                <span style="width: 34px; height: 34px; box-sizing: border-box; border-radius: 10px; border: 2.5px solid #64748B; flex-shrink: 0;"></span>
+                <span style="flex-grow: 1;">{{k.label}}</span>
+              </sc-if>
+            </button>
+          </sc-for>
+        </div>
+
+        <div style="display: flex; gap: 12px; margin-top: auto;">
+          <button type="button" onClick="{{togglePause}}" style="flex: 1 1 0; min-height: 64px; border: 2px solid #475569; border-radius: 16px; background: transparent; color: #F8FAFC; font: inherit; font-size: 18px; font-weight: 700; cursor: pointer;">{{pauseLabel}}</button>
+          <button type="button" style="flex: 1 1 0; min-height: 64px; border: 2px solid #475569; border-radius: 16px; background: transparent; color: #F8FAFC; font: inherit; font-size: 18px; font-weight: 700; cursor: pointer;">+ Add photo</button>
+          <button type="button" style="flex: 1 1 0; min-height: 64px; border: 2px solid #FBBF24; border-radius: 16px; background: transparent; color: #FDE68A; font: inherit; font-size: 18px; font-weight: 700; cursor: pointer;">Report extra work</button>
+          <sc-if value="{{allDone}}" hint-placeholder-val="{{false}}">
+            <button type="button" class="readyglow" onClick="{{finish}}" style="flex: 1.6 1 0; min-height: 64px; border: none; border-radius: 16px; background: #FB923C; color: #0B1220; font: inherit; font-size: 19px; font-weight: 800; cursor: pointer;">Done · send to quality check →</button>
+          </sc-if>
+          <sc-if value="{{someLeft}}" hint-placeholder-val="{{true}}">
+            <button type="button" disabled="disabled" style="flex: 1.6 1 0; min-height: 64px; border: none; border-radius: 16px; background: #26334D; color: #CBD5E1; font: inherit; font-size: 19px; font-weight: 800;">{{doneBlocked}}</button>
+          </sc-if>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{finished}}" hint-placeholder-val="{{false}}">
+        <div class="success" style="flex-grow: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; text-align: center;">
+          <span style="width: 88px; height: 88px; border-radius: 999px; background: #4ADE80; display: inline-flex; align-items: center; justify-content: center;">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#0B1220" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path class="tickpath" d="M20 6L9 17l-5-5"></path></svg>
+          </span>
+          <span style="font-size: 30px; font-weight: 800;">Sent to quality check</span>
+          <span style="font-size: 18px; color: #CBD5E1;">Time on job {{elapsed}} · the advisor has been notified</span>
+          <button type="button" onClick="{{reset}}" style="min-height: 64px; padding: 0 28px; border: none; border-radius: 16px; background: #FB923C; color: #0B1220; font: inherit; font-size: 19px; font-weight: 800; cursor: pointer;">Start next job →</button>
+        </div>
+      </sc-if>
+    </section>
+
+    <aside class="rise" style="animation-delay: .15s; width: 330px; flex-shrink: 0; display: flex; flex-direction: column; gap: 16px;">
+      <div style="padding: 20px; border-radius: 22px; background: #16213A; border: 1px solid #26334D; display: flex; flex-direction: column; gap: 12px;">
+        <h2 style="margin: 0; font-size: 18px; font-weight: 800;">Advisor note</h2>
+        <p style="margin: 0; font-size: 17px; line-height: 1.5; color: #E2E8F0;">Customer approved diagnostics only. Any repair needs a new approval — report it as extra work.</p>
+        <span style="font-size: 14px; color: #CBD5E1;">Approved by customer · link · 08:42</span>
+      </div>
+      <div style="padding: 20px; border-radius: 22px; background: #16213A; border: 1px solid #26334D; display: flex; flex-direction: column; gap: 12px; flex-grow: 1;">
+        <h2 style="margin: 0; font-size: 18px; font-weight: 800;">Up next</h2>
+        <sc-for list="{{queue}}" as="q" hint-placeholder-count="2">
+          <div style="display: flex; flex-direction: column; gap: 6px; padding: 14px; border-radius: 14px; background: #0F1A30;">
+            <div style="display: flex; justify-content: space-between; gap: 8px;">
+              <span dir="ltr" style="font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 700;">{{q.plate}}</span>
+              <span style="font-size: 14px; font-weight: 700; color: #FDBA74;">{{q.when}}</span>
+            </div>
+            <span style="font-size: 17px; font-weight: 700;">{{q.car}}</span>
+            <span style="font-size: 15px; color: #CBD5E1;">{{q.job}}</span>
+          </div>
+        </sc-for>
+      </div>
+    </aside>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1194,"height":834}}'>
+class Component extends DCLogic {
+  componentDidMount() {
+    this.timer = setInterval(() => {
+      const s = this.state || {};
+      if (s.paused || s.finished) { this.setState({ now: Date.now() }); return; }
+      this.setState({ secs: (s.secs != null ? s.secs : 2530) + 1, now: Date.now() });
+    }, 1000);
+  }
+  componentWillUnmount() {
+    clearInterval(this.timer);
+  }
+  renderVals() {
+    const s = this.state || {};
+    const labels = ['Read fault codes (OBD scan)', 'Drain and inspect engine oil', 'Listen to timing chain on cold start', 'Inspect coolant hoses and clamps', 'Road test · 5 km'];
+    const done = s.done || [true, true, false, false, false];
+    const secs = s.secs != null ? s.secs : 2530;
+    const pad = (n) => String(n).padStart(2, '0');
+    const elapsed = Math.floor(secs / 3600) + ':' + pad(Math.floor((secs % 3600) / 60)) + ':' + pad(secs % 60);
+    const d = new Date(s.now || Date.now());
+    const clock = pad(d.getHours()) + ':' + pad(d.getMinutes());
+    const doneCount = done.filter(Boolean).length;
+    const total = labels.length;
+    const C = 2 * Math.PI * 38;
+    const left = total - doneCount;
+    const paused = !!s.paused;
+    const finished = !!s.finished;
+
+    return {
+      clock,
+      elapsed,
+      doneCount,
+      totalCount: total,
+      ringDash: ((doneCount / total) * C).toFixed(1) + ' ' + C.toFixed(1),
+      tasks: labels.map((label, i) => ({
+        label, done: done[i], todo: !done[i], pressed: done[i] ? 'true' : 'false',
+        toggle: () => this.setState({ done: done.map((v, j) => (j === i ? !v : v)) })
+      })),
+      running: !paused,
+      paused,
+      timerLabel: paused ? 'Paused' : 'Working',
+      pauseLabel: paused ? 'Resume' : 'Pause',
+      statusLabel: finished ? 'Quality check' : 'In progress',
+      statusBg: finished ? '#D4EDE8' : '#D6E6F3',
+      statusInk: finished ? '#1D5A4F' : '#1B4A6E',
+      allDone: left === 0,
+      someLeft: left > 0,
+      doneBlocked: 'Done — ' + left + (left === 1 ? ' task left' : ' tasks left'),
+      notDone: !finished,
+      finished,
+      togglePause: () => this.setState({ paused: !paused }),
+      finish: () => this.setState({ finished: true }),
+      reset: () => this.setState({ finished: false, done: [false, false, false, false, false], secs: 0, paused: false }),
+      queue: [
+        { plate: 'SHJ 3 · 21457', car: 'Mazda CX-5 2021', job: 'Headlight unit · parts arrive 14:00', when: '14:00' },
+        { plate: 'SHJ 2 · 66103', car: 'Hyundai Elantra 2019', job: 'Battery and starter check', when: 'After this' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

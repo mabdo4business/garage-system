@@ -46,6 +46,7 @@ describe("S12 — staff app shell", () => {
         path: "/x",
         permission: "customer.write" as const,
         sections: [],
+        icon: "M0 0h1",
       },
     ];
     for (const role of ROLES) {

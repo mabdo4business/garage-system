@@ -27,6 +27,7 @@ Status values: `not started` · `in progress` · `done (unmerged)` · `done` · 
 ## Current position
 
 - **Wave:** 1 · **Increment:** 1 · **Active story:** none; I1-01 to I1-08 and I1-11 are in `qa` (PRs #1–#4)
+- **Redesign:** UI-R1 (tokens, shell, dashboard) done, unmerged, on `ui/redesign` (branched from `story/I1-09b-printed-invoice`); UI-R2 (board) waits for the owner's review of the dashboard
 - **Next story:** I1-10 (payments & delivery). I1-09a and I1-09b are done, unmerged, on `story/I1-09b-printed-invoice` (branched from `story/I1-09-invoice`); merging that branch brings both
 - **Next decision needed:** check I1-10's needs before starting (v0.2 EP-10, v0.2.1 §3.8); V-2 must still confirm invoice content, titles and rounding (OD-42, OD-45) before real invoices
 
@@ -103,7 +104,17 @@ tests pass.
 | I1-09 | Invoice | L | I1-07, I1-08 | done (unmerged) | `story/I1-09b-printed-invoice` | 2026-10-26 | Split into I1-09a and I1-09b (I1-09b's branch includes I1-09a). Carries AC2-19; snapshot tax code, category (treatment), rate, registration status and TRN per line (needs a code+category+rate lookup); refuse invoicing without a tax profile; registration evidence attachment (spec §4.4) still deferred |
 | I1-09a | Invoice issue | M | I1-07, I1-08 | done (unmerged) | `story/I1-09-invoice` | 2026-10-26 | Migration 0017; drafts from done, authorized lines (T-29), issue under repair order → revision line → number series locks with the cap (AC21-02, AC21-04) and P0-06 for stock and non-stock parts (AT-12, B-08), tax per line on the invoice date (AC2-19, OD-41), gap-free INV numbers (AC2-17, OD-40), immutable invoices with a customer/vehicle snapshot (AC2-18, T-32), WIP → COGS (T-28), Ready on issue (B1), late parts to done lines (T-30); decisions OD-40–OD-44, T-28–T-32, OQ-2 open; 295 tests + 28 e2e |
 | I1-09b | Printed invoice | M | I1-09a, OD-42 | done (unmerged) | `story/I1-09b-printed-invoice` | 2026-10-26 | Migration 0018; partner-entered business profile kept as versions, the invoice records the one in force at issue (OD-46), no invoice without it (OD-47); bilingual A4 print view from `customerInvoice` only (rule 9, OD-48), "Tax Invoice / فاتورة ضريبية" or "Invoice / فاتورة" with TRN and VAT columns only when registered (AC2-19, OD-42), changed-tax lines and rounding footnote (OD-45, closes OQ-2); tablet menu now wraps; decisions OD-45–OD-48, T-33; 307 tests + 28 e2e; no warranty terms until D-15 (OD-43) |
-| I1-10 | Payments & delivery | M | I1-09 | not started | | | |
+| I1-10 | Payments & delivery | M | I1-09 | not started | | | The dashboard's "Ready · balance due" (UI-R1, `src/server/reporting/dashboard.ts`) uses the invoice total because no payments exist yet: switch it to the invoice balance; the board's locked Deliver (OD-50) unlocks here |
+
+### Redesign (owner request, 2026-10-27)
+
+Visual redesign from the owners' references (`docs/design/`): tokens, fonts and shell first, then one screen at a time, each reviewed by the owner before the next. Decisions OD-49, OD-50.
+
+| ID | Story | Size | Needs | Status | Branch | Updated | Notes |
+|---|---|---|---|---|---|---|---|
+| UI-R1 | Tokens, fonts, sidebar + workshop dashboard | M | I1-09 | done (unmerged) | `ui/redesign` | 2026-10-27 | Palette/status pairs/fonts as tokens (contrast tested), dark sidebar with icons and business name; dashboard from real figures (KPIs, 7-day revenue, status donut, bays, needs attention, open repair orders), money for partner/manager only; count-up, sparklines, bars, donut, progress; reduced motion; `npm run db:demo` sample data; branched from I1-09b |
+| UI-R2 | Workshop board | M | UI-R1 | not started | | | Card pop on status change, toast; Deliver locked with reason until I1-10 (OD-50) |
+| UI-R3 | Technician bay screen | M | UI-R1 | not started | | | Dark tablet screen, task ring and ticks (kept until Done, OD-50), timer from job history, no prices |
 
 ### Increment 2 — Approvals that hold up
 
@@ -277,3 +288,4 @@ versioned customer API built on P-01's sign-in.
 | 2026-10-23 | PR #4 merged: I1-03 to I1-08 done (in `qa`) |
 | 2026-10-26 | I1-09 split into I1-09a and I1-09b; I1-09a committed (done, unmerged) after integrity review fixes; OD-40–OD-44, T-28–T-32 recorded; OQ-2 opened |
 | 2026-10-26 | I1-09b committed (done, unmerged) after integrity review fixes; OQ-2 closed as OD-45; OD-46–OD-48, T-33 recorded; I1-09 complete |
+| 2026-10-27 | Redesign started on owner request (UI-R1–R3); UI-R1 committed (done, unmerged); OD-49, OD-50 recorded |
