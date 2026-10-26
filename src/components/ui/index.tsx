@@ -1,6 +1,6 @@
 import type { AnchorHTMLAttributes, ButtonHTMLAttributes, ReactNode } from "react";
 import { t, type Locale } from "../../i18n";
-import type { Emirate, RepairOrderStatus } from "../../server/db/schema";
+import type { Emirate, JobExecutionStatus, RepairOrderStatus } from "../../server/db/schema";
 
 /**
  * The shared component set from the UI/UX deck (slide 13). Plain components without hooks, so
@@ -180,6 +180,18 @@ export const REPAIR_ORDER_TONE: Record<RepairOrderStatus, StatusTone> = {
   ready: "ready",
   delivered: "checked",
   closed: "checked",
+  cancelled: "checked",
+};
+
+/** Job execution status → its colour pair (waiting parts is the purple pair of the references). */
+export const JOB_STATUS_TONE: Record<JobExecutionStatus, StatusTone> = {
+  not_authorized: "approval",
+  authorized: "checked",
+  waiting_parts: "parts",
+  in_progress: "progress",
+  paused: "approval",
+  done: "ready",
+  stopped_by_customer: "checked",
   cancelled: "checked",
 };
 

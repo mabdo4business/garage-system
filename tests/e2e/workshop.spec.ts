@@ -94,6 +94,16 @@ test("manager assigns on the board; the technician runs the job in Arabic, witho
   await manager.goto("/en/workshop");
   await expect(manager.locator(`li[data-job="${jobId}"]`)).toContainText("Done");
 
+  // UI-R2: all work done, so the board offers QC in one step; the card moves, pops, and a toast says so.
+  const card = manager.locator(`[data-card="${ro}"]`);
+  await card.getByRole("button", { name: "Send to quality check →" }).click();
+  const qcColumn = manager
+    .locator(".board-column")
+    .filter({ has: manager.getByRole("heading", { name: /Quality check/ }) });
+  await expect(qcColumn.locator(`[data-card="${ro}"]`)).toBeVisible();
+  await expect(manager.locator(".toast")).toContainText("moved to Quality check");
+  await expect(manager.locator(`[data-card="${ro}"]`)).toHaveClass(/\bpop\b/);
+
   // AC2-30: another technician gets "not found".
   const other = await pageFor(browser, "technician2");
   expect((await other.goto(`/en/jobs/${jobId}`))?.status()).toBe(404);

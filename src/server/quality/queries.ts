@@ -31,6 +31,23 @@ export interface QcView {
   blocker: "not_in_progress" | "decision_pending" | "work_not_finished" | null;
 }
 
+export type QcBlocker = "not_in_progress" | "decision_pending" | "work_not_finished";
+
+/** Why QC cannot be requested yet (null: it can). Jobs are the repair order's authorized, not removed jobs. */
+export function qcBlockerOf(
+  status: RepairOrderStatus,
+  decisionPending: boolean,
+  jobStatuses: readonly JobExecutionStatus[],
+): QcBlocker | null {
+  if (status !== "in_progress") return "not_in_progress";
+  if (decisionPending) return "decision_pending";
+  // Same finished set as requestQc and the database guard (migration 0016): done or stopped by the customer.
+  if (jobStatuses.some((job) => !["done", "stopped_by_customer"].includes(job))) {
+    return "work_not_finished";
+  }
+  return null;
+}
+
 export async function qcView(db: Kysely<DB>, repairOrderId: string): Promise<QcView | null> {
   if (!isUuid(repairOrderId)) return null;
   const ro = await db
@@ -67,14 +84,11 @@ export async function qcView(db: Kysely<DB>, repairOrderId: string): Promise<QcV
     .where("estimate.repair_order_id", "=", repairOrderId)
     .where("estimate_version.status", "=", "sent")
     .executeTakeFirst();
-  const blocker =
-    ro.status !== "in_progress"
-      ? "not_in_progress"
-      : sent
-        ? "decision_pending"
-        : jobs.some((job) => !["done", "stopped_by_customer", "cancelled"].includes(job.execution_status))
-          ? "work_not_finished"
-          : null;
+  const blocker = qcBlockerOf(
+    ro.status,
+    Boolean(sent),
+    jobs.map((job) => job.execution_status),
+  );
   return {
     repairOrderId: ro.id,
     number: ro.number,

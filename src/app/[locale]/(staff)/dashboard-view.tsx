@@ -1,18 +1,11 @@
 import type { CSSProperties } from "react";
 import { BarChart, Donut, ProgressBar, Sparkline } from "../../../components/dashboard/charts";
 import { CountUp, CountUpMoney } from "../../../components/dashboard/motion";
-import { PlateBadge, REPAIR_ORDER_TONE, StatusChip, type StatusTone } from "../../../components/ui";
+import { JOB_STATUS_TONE, PlateBadge, REPAIR_ORDER_TONE, StatusChip } from "../../../components/ui";
 import { t, type Locale, type MessageKey } from "../../../i18n";
-import {
-  dubaiDate,
-  formatAed,
-  formatAmountCompact,
-  formatBusinessDay,
-  formatDubaiDateTime,
-  formatDubaiTime,
-} from "../../../i18n/format";
+import { formatDuration, formatWhen } from "../../../i18n/time-labels";
+import { formatAed, formatAmountCompact, formatBusinessDay } from "../../../i18n/format";
 import { Money } from "../../../server/core/money";
-import type { JobExecutionStatus } from "../../../server/db/schema";
 import type { Attention, DashboardSummary } from "../../../server/reporting/dashboard";
 
 /**
@@ -20,27 +13,7 @@ import type { Attention, DashboardSummary } from "../../../server/reporting/dash
  * only when `summary.money` is set, which the page does for `dashboard.money` holders only.
  */
 
-export const JOB_STATUS_TONE: Record<JobExecutionStatus, StatusTone> = {
-  not_authorized: "approval",
-  authorized: "checked",
-  waiting_parts: "parts",
-  in_progress: "progress",
-  paused: "approval",
-  done: "ready",
-  stopped_by_customer: "checked",
-  cancelled: "checked",
-};
-
 const delay = (seconds: number) => ({ animationDelay: `${seconds.toFixed(2)}s` }) as CSSProperties;
-
-function duration(locale: Locale, seconds: number): string {
-  const minutes = Math.floor(seconds / 60);
-  const hours = Math.floor(minutes / 60);
-  if (hours > 0 && minutes % 60 === 0) return t(locale, "dashboard.duration.h", { h: String(hours) });
-  return hours > 0
-    ? t(locale, "dashboard.duration.hm", { h: String(hours), m: String(minutes % 60) })
-    : t(locale, "dashboard.duration.m", { m: String(minutes) });
-}
 
 function initials(name: string | null): string {
   if (!name) return "—";
@@ -54,13 +27,6 @@ function initials(name: string | null): string {
   )
     .join("")
     .toUpperCase();
-}
-
-/** Time only when it is today; otherwise date and time, so a stale estimate never looks fresh. */
-function when(instant: Date, locale: Locale, businessDate: string): string {
-  return dubaiDate(instant) === businessDate
-    ? formatDubaiTime(instant, locale)
-    : formatDubaiDateTime(instant, locale);
 }
 
 const aed = (amount: string, locale: Locale) => <bdi dir="ltr">{formatAed(Money.parse(amount), locale)}</bdi>;
@@ -83,7 +49,9 @@ function AttentionCard({
           <strong>{t(locale, "dashboard.attention.doNotStart", { number: item.number })}</strong>
           {item.since ? (
             <span className="muted">
-              {t(locale, "dashboard.attention.sentAt", { time: when(item.since, locale, businessDate) })}
+              {t(locale, "dashboard.attention.sentAt", {
+                time: formatWhen(item.since, locale, businessDate),
+              })}
             </span>
           ) : null}
           <a href={`${base}/repair-orders/${item.repairOrderId}`}>{t(locale, "dashboard.openRepairOrder")}</a>
@@ -199,7 +167,7 @@ export function DashboardView({ summary, locale }: { summary: DashboardSummary; 
           <p className="kpi-note">
             {summary.oldestAwaitingSince
               ? t(locale, "dashboard.kpi.oldestSent", {
-                  time: when(summary.oldestAwaitingSince, locale, summary.businessDate),
+                  time: formatWhen(summary.oldestAwaitingSince, locale, summary.businessDate),
                 })
               : t(locale, "dashboard.kpi.noneWaiting")}
           </p>
@@ -322,11 +290,11 @@ export function DashboardView({ summary, locale }: { summary: DashboardSummary; 
                         <span>
                           {bay.bookedSeconds
                             ? t(locale, "dashboard.bays.workedOf", {
-                                worked: duration(locale, bay.workedSeconds),
-                                booked: duration(locale, bay.bookedSeconds),
+                                worked: formatDuration(locale, bay.workedSeconds),
+                                booked: formatDuration(locale, bay.bookedSeconds),
                               })
                             : t(locale, "dashboard.bays.worked", {
-                                worked: duration(locale, bay.workedSeconds),
+                                worked: formatDuration(locale, bay.workedSeconds),
                               })}
                         </span>
                       </span>
@@ -436,11 +404,7 @@ export function DashboardView({ summary, locale }: { summary: DashboardSummary; 
                     </td>
                     <td className="num">
                       {order.promisedAt ? (
-                        <bdi dir="ltr">
-                          {dubaiDate(order.promisedAt) === summary.businessDate
-                            ? formatDubaiTime(order.promisedAt, locale)
-                            : formatDubaiDateTime(order.promisedAt, locale)}
-                        </bdi>
+                        <bdi dir="ltr">{formatWhen(order.promisedAt, locale, summary.businessDate)}</bdi>
                       ) : (
                         "—"
                       )}

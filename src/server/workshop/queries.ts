@@ -2,6 +2,7 @@ import type { Kysely } from "kysely";
 import { isUuid } from "../core/ids";
 import type { DB, Emirate, FindingSeverity, JobExecutionStatus, RepairOrderStatus } from "../db/schema";
 import { authorizedScope } from "../estimate/approval";
+import { qcBlockerOf, type QcBlocker } from "../quality/queries";
 
 /**
  * Workshop reads (I1-06). None of them returns a price, cost or customer contact (AC2-30, AC-07.3): every view is
@@ -36,7 +37,13 @@ export interface BoardRepairOrder {
   plate: Plate;
   make: string;
   model: string;
+  year: number;
   promisedAt: Date | null;
+  checkedInAt: Date;
+  /** When the estimate version awaiting the customer was sent (null when nothing is awaiting a decision). */
+  decisionSentAt: Date | null;
+  /** In progress: what still stops a QC request (null: it can be requested). Other statuses: null. */
+  qcBlocker: QcBlocker | null;
   jobs: BoardJob[];
   flags: { awaitingDecision: boolean; paused: boolean; workDone: boolean; anotherOpen: boolean };
 }
@@ -55,8 +62,10 @@ export async function workshopBoard(db: Kysely<DB>): Promise<BoardRepairOrder[]>
       "repair_order.status",
       "repair_order.vehicle_id",
       "repair_order.promised_at",
+      "repair_order.checked_in_at",
       "vehicle.make",
       "vehicle.model",
+      "vehicle.year",
       "vehicle_plate.emirate",
       "vehicle_plate.code",
       "vehicle_plate.number as plate_number",
@@ -89,11 +98,11 @@ export async function workshopBoard(db: Kysely<DB>): Promise<BoardRepairOrder[]>
   const sent = await db
     .selectFrom("estimate_version")
     .innerJoin("estimate", "estimate.id", "estimate_version.estimate_id")
-    .select("estimate.repair_order_id")
+    .select(["estimate.repair_order_id", "estimate_version.sent_at"])
     .where("estimate.repair_order_id", "in", ids)
     .where("estimate_version.status", "=", "sent")
     .execute();
-  const awaiting = new Set(sent.map((row) => row.repair_order_id));
+  const awaiting = new Map(sent.map((row) => [row.repair_order_id, row.sent_at]));
   const vehicles = new Map<string, number>();
   for (const order of orders) vehicles.set(order.vehicle_id, (vehicles.get(order.vehicle_id) ?? 0) + 1);
 
@@ -109,7 +118,18 @@ export async function workshopBoard(db: Kysely<DB>): Promise<BoardRepairOrder[]>
           : null,
       make: order.make,
       model: order.model,
+      year: order.year,
       promisedAt: order.promised_at,
+      checkedInAt: order.checked_in_at,
+      decisionSentAt: awaiting.get(order.id) ?? null,
+      qcBlocker:
+        order.status === "in_progress"
+          ? qcBlockerOf(
+              order.status,
+              awaiting.has(order.id),
+              own.map((job) => job.execution_status),
+            )
+          : null,
       jobs: own.map((job) => ({
         id: job.id,
         title: job.title,

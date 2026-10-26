@@ -209,3 +209,30 @@ export async function repairOrderBilling(
   }
   return { invoice: invoice ?? null, drafts: result };
 }
+
+export interface RepairOrderInvoiceSummary {
+  repairOrderId: string;
+  invoiceId: string;
+  number: string;
+  /** Invoice total (incl. VAT); callers show it only to holders of dashboard.money (OD-50). */
+  total: string;
+}
+
+/** The issued invoice of each given repair order (one per repair order until I3-02). */
+export async function invoicesForRepairOrders(
+  db: Kysely<DB>,
+  repairOrderIds: readonly string[],
+): Promise<RepairOrderInvoiceSummary[]> {
+  if (repairOrderIds.length === 0) return [];
+  const rows = await db
+    .selectFrom("invoice")
+    .select(["repair_order_id", "id", "number", "total"])
+    .where("repair_order_id", "in", [...repairOrderIds])
+    .execute();
+  return rows.map((row) => ({
+    repairOrderId: row.repair_order_id,
+    invoiceId: row.id,
+    number: row.number,
+    total: row.total,
+  }));
+}

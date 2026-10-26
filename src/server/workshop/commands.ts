@@ -41,6 +41,14 @@ async function jobHead(db: Kysely<DB>, jobId: string) {
 }
 
 /** The live assignee of a job, if any. */
+/** Jobs that can be assigned or reassigned (OD-26); the board offers the form only for these. */
+export const ASSIGNABLE_JOB_STATUSES: readonly JobExecutionStatus[] = [
+  "authorized",
+  "waiting_parts",
+  "in_progress",
+  "paused",
+];
+
 export async function liveAssignee(db: Kysely<DB>, jobId: string): Promise<string | null> {
   const row = await db
     .selectFrom("job_assignment")
@@ -91,7 +99,7 @@ export async function assignJob(
       .select(["execution_status"])
       .where("id", "=", jobId)
       .executeTakeFirstOrThrow();
-    if (!["authorized", "waiting_parts", "in_progress", "paused"].includes(current.execution_status)) {
+    if (!ASSIGNABLE_JOB_STATUSES.includes(current.execution_status)) {
       throw new ConflictError("job_not_assignable", `Job is ${current.execution_status}`, {
         status: current.execution_status,
       });
