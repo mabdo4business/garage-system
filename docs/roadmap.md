@@ -27,8 +27,8 @@ Status values: `not started` · `in progress` · `done (unmerged)` · `done` · 
 ## Current position
 
 - **Wave:** 1 · **Increment:** 1 · **Active story:** none; I1-01 to I1-08 and I1-11 are in `qa` (PRs #1–#4)
-- **Next story:** I1-09 (invoice), split before starting (L)
-- **Next decision needed:** none blocking I1-09; its open points are asked when it is split and planned
+- **Next story:** I1-09b (printed invoice) — I1-09a is committed on `story/I1-09-invoice` (done, unmerged)
+- **Next decision needed:** OQ-2 (changed-tax line presentation, V-2) before I1-09b prints such lines; the business profile (OD-42) is entered by a partner
 
 ### Housekeeping before more feature work
 
@@ -100,7 +100,9 @@ tests pass.
 | I1-06 | Workshop execution | M | I1-05 | done | `story/I1-06-workshop` | 2026-10-23 | Migration 0013; workshop board, assignment with bay (OD-26), My jobs and job card without prices, start/pause (reason)/resume/done with line outcomes by the assignee only (OD-27), AC2-01 refusal logged, AC2-30 scoping, DB-written job history; OQ-1 check-in warning with recorded confirmation; integrity review fixes and OD-31 (completion note) in a follow-up commit; 247 tests + 22 e2e |
 | I1-07 | Parts for a job (simple) | M | I1-05, I1-04 | done | `story/I1-07-parts` | 2026-10-23 | Migration 0014; goods receipt into per-part stock pools (OD-28), issue from stock under the pool rule (T-02/AT-17), receive-and-issue for special orders and non-stock costs (T-23, OD-30), no negative stock (AC2-13/14), v0.2.1 §3.3 issue guard with over-issue reason, Waiting parts (B2), costs excl. VAT (OD-32); Stock and Parts for jobs screens; decisions OD-28–OD-32, T-23–T-25; integrity review fixes (migration 0015; OD-33–OD-35) in a follow-up commit |
 | I1-08 | Quality check | S | I1-06 | done | `story/I1-08-quality-check` | 2026-10-23 | Migration 0016; QC request (B1, AC2-25), pass with the §G checklist incl. road test, odometer out (GAP-48) and old-parts disposition (GAP-47, OD-38), self-check rule (AC2-26, OD-37 = D-8), fail with optional rework (T-26, OD-39); Ready refused without a QC pass; decisions OD-36–OD-39, T-26, T-27; 279 tests + 26 e2e |
-| I1-09 | Invoice | L | I1-07, I1-08 | not started | | | Split before starting (L). Carries AC2-19; snapshot tax code, category (treatment), rate, registration status and TRN per line (needs a code+category+rate lookup); refuse invoicing without a tax profile; registration evidence attachment (spec §4.4) still deferred |
+| I1-09 | Invoice | L | I1-07, I1-08 | in progress | `story/I1-09-invoice` | 2026-10-26 | Split into I1-09a and I1-09b. Carries AC2-19; snapshot tax code, category (treatment), rate, registration status and TRN per line (needs a code+category+rate lookup); refuse invoicing without a tax profile; registration evidence attachment (spec §4.4) still deferred |
+| I1-09a | Invoice issue | M | I1-07, I1-08 | done (unmerged) | `story/I1-09-invoice` | 2026-10-26 | Migration 0017; drafts from done, authorized lines (T-29), issue under repair order → revision line → number series locks with the cap (AC21-02, AC21-04) and P0-06 for stock and non-stock parts (AT-12, B-08), tax per line on the invoice date (AC2-19, OD-41), gap-free INV numbers (AC2-17, OD-40), immutable invoices with a customer/vehicle snapshot (AC2-18, T-32), WIP → COGS (T-28), Ready on issue (B1), late parts to done lines (T-30); decisions OD-40–OD-44, T-28–T-32, OQ-2 open; 295 tests + 28 e2e |
+| I1-09b | Printed invoice | M | I1-09a, OD-42 | not started | | | Bilingual HTML print view from `customerInvoice` (rule 9); business profile (OD-42); OQ-2 decides changed-tax lines; no warranty terms until D-15 (OD-43) |
 | I1-10 | Payments & delivery | M | I1-09 | not started | | | |
 
 ### Increment 2 — Approvals that hold up
@@ -110,7 +112,7 @@ Decisions first: D-5, D-6, D-7, D-11, B-09, D-30.
 | ID | Story | Size | Needs | Status | Branch | Updated | Notes |
 |---|---|---|---|---|---|---|---|
 | I2-01 | Estimate versions | M | I1-05 | not started | | | Until withdrawal/expiry exist, a version with an undecided job blocks QC (AC2-25) for good; build early |
-| I2-02 | Amendments | L | I2-01 | not started | | | Split before starting (L) |
+| I2-02 | Amendments | L | I2-01 | not started | | | Split before starting (L). Once amendments can change outcomes after QC, issuing must refuse a draft that leaves out a billable line (one invoice per repair order, I1-09a review) |
 | I2-03 | Customer links | M | I2-01 | not started | | | Track C1 |
 | I2-04 | Step-up verification | M | I2-03, B-09, D-30 | not started | | | |
 | I2-05 | Phone approval | S | I2-04, D-7 | not started | | | |
@@ -126,7 +128,7 @@ Decisions first: B-01, B-02, B-03, D-33, T-1, T-2.
 | ID | Story | Size | Needs | Status | Branch | Updated | Notes |
 |---|---|---|---|---|---|---|---|
 | I3-01 | Funds invariant | M | I1-10 | not started | | | |
-| I3-02 | Credit notes | M | I3-01 | not started | | | |
+| I3-02 | Credit notes | M | I3-01 | not started | | | `invoice_guard` (0017) refuses any second invoice per repair order; relax it to "at most one not fully credited" (PRD v0.2 §D1) so AC21-03 replacement invoices work |
 | I3-03 | Refunds | M | I3-02, B-01, B-02 | not started | | | |
 | I3-04 | Credit applications | M | I3-02, D-33, B-03 | not started | | | |
 | I3-05 | Payment reversals | S | I3-01 | not started | | | |
@@ -273,3 +275,4 @@ versioned customer API built on P-01's sign-in.
 | 2026-10-23 | I1-07 review fixes; OD-33, OD-34, OD-35 recorded |
 | 2026-10-23 | I1-08 committed (done, unmerged); D-8 decided (OD-37); OD-36–OD-39, T-26, T-27 recorded |
 | 2026-10-23 | PR #4 merged: I1-03 to I1-08 done (in `qa`) |
+| 2026-10-26 | I1-09 split into I1-09a and I1-09b; I1-09a committed (done, unmerged) after integrity review fixes; OD-40–OD-44, T-28–T-32 recorded; OQ-2 opened |

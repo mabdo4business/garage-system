@@ -27,7 +27,7 @@ const MAX_AMOUNT = Money.parse("999999999999.99");
 const MAX_QTY = Qty.parse("100000");
 
 /** A tax rate such as "5.00" in hundredths of a percent (500n). */
-function rateHundredths(rate: string): bigint {
+export function rateHundredths(rate: string): bigint {
   const match = /^(\d{1,3})(?:\.(\d{1,2}))?$/.exec(rate);
   if (!match) throw new RangeError(`Invalid tax rate ${rate}`);
   return BigInt(match[1]!) * 100n + BigInt((match[2] ?? "").padEnd(2, "0"));

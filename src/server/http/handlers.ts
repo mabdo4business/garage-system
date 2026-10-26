@@ -61,6 +61,9 @@ import {
 import { partsForOpenJobs, stockList } from "../inventory/queries";
 import { failQc, passQc, requestQc } from "../quality/commands";
 import { qcView } from "../quality/queries";
+import { createInvoiceDraft, discardInvoiceDraft, issueInvoice } from "../billing/invoice";
+import { invoiceView, repairOrderBilling } from "../billing/queries";
+import { dubaiDate } from "../../i18n/format";
 import {
   changePlate,
   createVehicle,
@@ -130,6 +133,11 @@ const STATUS_BY_CODE: Record<string, number> = {
   work_not_finished: 409,
   qc_not_pending: 409,
   qc_self_check: 409,
+  qc_not_passed: 409,
+  nothing_to_invoice: 409,
+  draft_closed: 409,
+  invoice_cap: 409,
+  parts_not_issued: 409,
   try_again: 503,
 };
 
@@ -1213,6 +1221,77 @@ export function createHandlers(db: Kysely<DB>, storage: MediaStorage = getMediaS
                 : null;
         if (!outcome) return json(404, { error: "not_found" });
         return json(outcome.replayed ? 200 : 201, outcome.result);
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    // ------------------------------------------------------------------ I1-09 invoices
+
+    /** GET /api/repair-orders/:id/invoice — the issued invoice (if any) and open drafts with today's preview. */
+    async getRepairOrderBilling(request: Request, repairOrderId: string): Promise<Response> {
+      try {
+        await authorize(db, await currentSession(request), "invoice.read", {
+          entityType: "repair_order",
+          entityId: repairOrderId,
+        });
+        return json(200, await repairOrderBilling(db, repairOrderId, dubaiDate(new Date())));
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    /** POST /api/repair-orders/:id/invoice-drafts — { idempotencyKey }. */
+    async createInvoiceDraft(request: Request, repairOrderId: string): Promise<Response> {
+      try {
+        if (!sameOrigin(request)) return json(403, { error: "forbidden" });
+        const session = await authorize(db, await currentSession(request), "invoice.issue", {
+          entityType: "repair_order",
+          entityId: repairOrderId,
+        });
+        const body = await readBody(request);
+        const outcome = await createInvoiceDraft(db, session, repairOrderId, toStr(body.idempotencyKey));
+        return json(outcome.replayed ? 200 : 201, outcome.result);
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    /** POST /api/invoice-drafts/:id/:action — action = issue { taxChangeNotice? } | discard; with an idempotencyKey. */
+    async invoiceDraftAction(request: Request, draftId: string, action: string): Promise<Response> {
+      try {
+        if (!sameOrigin(request)) return json(403, { error: "forbidden" });
+        const session = await authorize(db, await currentSession(request), "invoice.issue", {
+          entityType: "invoice_draft",
+          entityId: draftId,
+        });
+        const body = await readBody(request);
+        const key = toStr(body.idempotencyKey);
+        const outcome =
+          action === "issue"
+            ? await issueInvoice(db, session, draftId, { taxChangeNotice: body.taxChangeNotice }, key)
+            : action === "discard"
+              ? await discardInvoiceDraft(db, session, draftId, key)
+              : null;
+        if (!outcome) return json(404, { error: "not_found" });
+        return json(outcome.replayed ? 200 : 201, outcome.result);
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    /** GET /api/invoices/:id — the issued invoice for staff (COGS only for the cost roles, T-24; never customer-facing). */
+    async getInvoice(request: Request, invoiceId: string): Promise<Response> {
+      try {
+        const session = await authorize(db, await currentSession(request), "invoice.read", {
+          entityType: "invoice",
+          entityId: invoiceId,
+        });
+        const view = await invoiceView(db, invoiceId);
+        if (!view) return json(404, { error: "not_found" });
+        if (hasPermission(session.roles, "stock.read")) return json(200, view);
+        const { cogs: _cogs, ...withoutCost } = view;
+        return json(200, withoutCost);
       } catch (error) {
         return errorResponse(error);
       }

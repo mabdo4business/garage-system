@@ -78,7 +78,7 @@ export interface PartLine {
   plate: { emirate: Emirate; code: string; number: string } | null;
 }
 
-/** Approved part lines of jobs on repair orders in progress — the store keeper's to-do list. */
+/** Approved part lines of running or finished-but-unbilled work — the store keeper's to-do list. */
 export async function partsForOpenJobs(db: Kysely<DB>): Promise<PartLine[]> {
   const jobs = await db
     .selectFrom("repair_job")
@@ -97,9 +97,16 @@ export async function partsForOpenJobs(db: Kysely<DB>): Promise<PartLine[]> {
       "vehicle_plate.code",
       "vehicle_plate.number as plate_number",
     ])
-    .where("repair_order.status", "=", "in_progress")
+    // P0-06: done, unbilled lines of a repair order in QC can still get the parts that were used.
+    .where("repair_order.status", "in", ["in_progress", "qc"])
     .where("repair_job.removed_at", "is", null)
-    .where("repair_job.execution_status", "in", ["authorized", "waiting_parts", "in_progress", "paused"])
+    .where("repair_job.execution_status", "in", [
+      "authorized",
+      "waiting_parts",
+      "in_progress",
+      "paused",
+      "done",
+    ])
     .orderBy("repair_order.checked_in_at")
     .orderBy("repair_job.created_at")
     .execute();
@@ -126,6 +133,31 @@ export async function partsForOpenJobs(db: Kysely<DB>): Promise<PartLine[]> {
       ])
       .where("revision_line.id", "in", scope)
       .where("revision_line.line_type", "=", "part")
+      // A done job lists only lines that can still take parts: live outcome "done", not yet billed (T-30).
+      .$if(job.execution_status === "done", (qb) =>
+        qb
+          .where((eb) =>
+            eb.exists(
+              eb
+                .selectFrom("job_line_outcome")
+                .select("job_line_outcome.id")
+                .whereRef("job_line_outcome.revision_line_id", "=", "revision_line.id")
+                .where("job_line_outcome.outcome", "=", "done")
+                .where("job_line_outcome.superseded_at", "is", null),
+            ),
+          )
+          .where((eb) =>
+            eb.not(
+              eb.exists(
+                eb
+                  .selectFrom("revision_line_billing")
+                  .select("revision_line_billing.revision_line_id")
+                  .whereRef("revision_line_billing.revision_line_id", "=", "revision_line.id")
+                  .where("revision_line_billing.net_billed_qty", ">", "0"),
+              ),
+            ),
+          ),
+      )
       .orderBy("revision_line.created_at")
       .execute();
     for (const line of lines) {

@@ -334,10 +334,14 @@ describe("S19 — parts for a job", () => {
     for (const line of [pending.partLines[0]!, declined.partLines[0]!]) {
       await expect(issue(line, "1")).rejects.toMatchObject({ code: "line_not_issuable" });
     }
-    const approved = await jobWith([{ itemId: pad, qty: "1" }]);
+    const approved = await jobWith([
+      { itemId: pad, qty: "1" },
+      { itemId: pad, qty: "1" },
+    ]);
     // Not a part line.
     await expect(issue(approved.laborLine, "1")).rejects.toMatchObject({ code: "line_not_issuable" });
-    // A done job takes no more parts.
+    // A done job still takes the parts used on a line marked done, until it is billed (P0-06, T-30) — but never
+    // on a line marked "not performed", whose cost could not be billed (T-29).
     await assignJob(db.app, people.manager!, approved.job, { assigneeId: people.tech!.userId }, randomUUID());
     await startJob(db.app, people.tech!, approved.job, randomUUID());
     await completeJob(
@@ -347,13 +351,18 @@ describe("S19 — parts for a job", () => {
       {
         lines: [
           { lineId: approved.laborLine, outcome: "done" },
-          { lineId: approved.partLines[0]!, outcome: "not_performed", reason: "Not needed" },
+          { lineId: approved.partLines[0]!, outcome: "done" },
+          { lineId: approved.partLines[1]!, outcome: "not_performed", reason: "Not needed" },
         ],
         note: "Done",
       },
       randomUUID(),
     );
-    await expect(issue(approved.partLines[0]!, "1")).rejects.toMatchObject({ code: "line_not_issuable" });
+    await expect(issue(approved.partLines[1]!, "1")).rejects.toMatchObject({ code: "line_not_issuable" });
+    const todo = (await partsForOpenJobs(db.app)).map((l) => l.lineId);
+    expect(todo).toContain(approved.partLines[0]);
+    expect(todo).not.toContain(approved.partLines[1]);
+    await issue(approved.partLines[0]!, "1");
 
     // Frozen: superseded by a line of a revision still awaiting a decision (set-up as the owner, guards off).
     const frozen = await jobWith([{ itemId: pad, qty: "1" }]);
