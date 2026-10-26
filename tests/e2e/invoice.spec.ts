@@ -2,9 +2,12 @@ import { randomUUID } from "node:crypto";
 import { expect, test, type Page } from "@playwright/test";
 import { makePng } from "../helpers/images";
 import { uniqueDigits } from "./fixtures";
-import { checkedInRepairOrder, pageFor, taxSetUp } from "./estimate-helpers";
+import { businessProfileSetUp, checkedInRepairOrder, pageFor, taxSetUp } from "./estimate-helpers";
 
-/** I1-09a in a real browser: after QC passes, the advisor prepares and issues the invoice; Arabic; Ready. */
+/**
+ * I1-09a in a real browser: after QC passes, the advisor prepares and issues the invoice; Arabic; Ready.
+ * I1-09b: the partner enters the business profile in Arabic; the advisor opens the bilingual printed invoice.
+ */
 
 const post = (page: Page, path: string, data: Record<string, unknown> = {}) =>
   page.request.post(path, { data: { idempotencyKey: randomUUID(), ...data } });
@@ -15,6 +18,8 @@ test("advisor prepares and issues the invoice after QC; the repair order becomes
   test.setTimeout(90_000);
   const partner = await pageFor(browser, "partner");
   const taxCode = await taxSetUp(partner);
+  const garageName = `Test Garage ${uniqueDigits(5)} LLC`;
+  await businessProfileSetUp(await pageFor(browser, "partner", "ar"), garageName);
   const manager = await pageFor(browser, "manager");
   const advisor = await pageFor(browser, "advisor");
   const tech = await pageFor(browser, "technician");
@@ -99,6 +104,25 @@ test("advisor prepares and issues the invoice after QC; the repair order becomes
   await expect(advisor.locator(".page-header")).toContainText(/INV-\d{6}/);
   await expect(advisor.locator("main")).toContainText("210.00");
   await expect(advisor.locator("main")).toContainText("100123456700003"); // TRN of the registered profile
+
+  // I1-09b: the printed invoice, both languages on one page, with the profile and the TRN (OD-42, OD-48).
+  const invoicePage = advisor.url();
+  await advisor.getByRole("link", { name: "طباعة الفاتورة" }).click();
+  await expect(advisor).toHaveURL(/\/ar\/invoices\/[0-9a-f-]{36}\/print$/);
+  const printed = advisor.locator("article.invoice-print");
+  await expect(printed.locator("h1")).toContainText("فاتورة ضريبية");
+  await expect(printed.locator("h1")).toContainText("Tax Invoice");
+  await expect(printed).toContainText(garageName);
+  await expect(printed).toContainText("كراج الاختبار ذ.م.م");
+  await expect(printed).toContainText("100123456700003");
+  await expect(printed).toContainText("صيانة المحرك");
+  await expect(printed).toContainText("Engine service");
+  await expect(printed).toContainText("210.00");
+  await expect(advisor.getByRole("button", { name: "طباعة" })).toBeVisible();
+  await expect(advisor.locator(".shell")).toHaveCount(0); // no staff shell on the document
+  expect((await tech.goto(`${invoicePage}/print`.replace("/ar/", "/en/")))?.status()).toBe(404);
+  const store = await pageFor(browser, "storekeeper");
+  expect((await store.goto(`${invoicePage}/print`.replace("/ar/", "/en/")))?.status()).toBe(404);
 
   await advisor.goto(`/en/repair-orders/${ro}`);
   await expect(advisor.locator(".page-header")).toContainText("Ready");

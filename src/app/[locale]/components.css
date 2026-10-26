@@ -205,8 +205,11 @@ a {
     padding: var(--space-2) var(--space-4);
   }
 
+  /* Tabs wrap onto a second row rather than widening the page (a partner's menu outgrew 820 px in I1-09b). */
   .shell-nav ul {
-    grid-auto-flow: column;
+    display: flex;
+    flex-wrap: wrap;
+    min-inline-size: 0;
   }
 
   .shell-nav a,

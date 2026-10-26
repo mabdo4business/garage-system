@@ -89,6 +89,8 @@ export const PERMISSIONS = {
   // I1-09: invoices. The accountant reads them (read-only role); advisors, managers and partners issue (PRD v0.2 §D1).
   "invoice.read": ["partner", "manager", "service_advisor", "accountant"],
   "invoice.issue": ["partner", "manager", "service_advisor"],
+  // I1-09b: the business profile printed on invoices is partner-entered (OD-42), like tax settings (T-15).
+  "business_profile.manage": ["partner"],
 } as const satisfies Record<string, readonly Role[]>;
 
 export type Permission = keyof typeof PERMISSIONS;

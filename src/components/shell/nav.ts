@@ -82,6 +82,13 @@ export const NAV_ITEMS: readonly NavItem[] = [
     permission: "tax.manage",
     sections: ["/settings/tax"],
   },
+  {
+    key: "businessProfile",
+    label: "nav.businessProfile",
+    path: "/settings/business",
+    permission: "business_profile.manage",
+    sections: ["/settings/business"],
+  },
 ];
 
 export function navFor(roles: readonly string[], items: readonly NavItem[] = NAV_ITEMS): NavItem[] {

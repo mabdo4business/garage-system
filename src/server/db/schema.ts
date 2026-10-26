@@ -324,6 +324,19 @@ export interface TaxProfileTable {
   created_by: string | null;
 }
 
+/** I1-09b: insert-only versions of the garage details printed on invoices (OD-42, OD-46). */
+export interface BusinessProfileTable {
+  id: Generated<string>;
+  supersedes_id: string | null;
+  legal_name_en: string;
+  legal_name_ar: string;
+  address_en: string;
+  address_ar: string;
+  phone: string;
+  created_at: Generated<Date>;
+  created_by: string | null;
+}
+
 export interface TaxCodeTable {
   code: string;
   label_en: string;
@@ -675,6 +688,8 @@ export interface InvoiceTable {
   plate_emirate: ColumnType<Emirate | null, never, never>;
   plate_code: ColumnType<string | null, never, never>;
   plate_number: ColumnType<string | null, never, never>;
+  // OD-46: the business profile version in force at issue, set by the database (NULL only before 0018).
+  business_profile_id: ColumnType<string | null, never, never>;
 }
 
 export interface InvoiceLineTable {
@@ -741,6 +756,7 @@ export interface DB {
   checklist_template_item: ChecklistTemplateItemTable;
   finding: FindingTable;
   tax_profile: TaxProfileTable;
+  business_profile: BusinessProfileTable;
   tax_code: TaxCodeTable;
   tax_code_rate: TaxCodeRateTable;
   catalogue_item: CatalogueItemTable;

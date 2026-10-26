@@ -15,6 +15,7 @@ import {
 import { invoiceView, customerInvoice } from "../src/server/billing/queries";
 import { createItem } from "../src/server/catalog/items";
 import { addTaxProfile, createTaxCode, setTaxCodeRate } from "../src/server/catalog/tax";
+import { setBusinessProfile } from "../src/server/settings/business-profile";
 import { createCustomer } from "../src/server/customer/service";
 import { recordInPersonApproval, sendVersion } from "../src/server/estimate/approval";
 import { addJob, addLine, openEstimate, type Staff } from "../src/server/estimate/commands";
@@ -78,6 +79,19 @@ describe("S21 — invoice issue", () => {
       db.app,
       people.partner!,
       { registrationStatus: "registered", trn: "100000000000003", effectiveFrom: "2026-01-01" },
+      randomUUID(),
+    );
+    // I1-09b: no invoice without the business profile (OD-47).
+    await setBusinessProfile(
+      db.app,
+      people.partner!,
+      {
+        legalNameEn: "Test Garage LLC",
+        legalNameAr: "كراج الاختبار",
+        addressEn: "Sharjah",
+        addressAr: "الشارقة",
+        phone: "06 555 1234",
+      },
       randomUUID(),
     );
     for (const code of ["STD", "CHG"]) {

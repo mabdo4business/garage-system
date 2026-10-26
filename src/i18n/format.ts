@@ -26,6 +26,12 @@ export function formatAed(amount: Money, locale: Locale): string {
   return formatter.format(amount.toString() as unknown as number);
 }
 
+/** An exact amount without the currency sign (for bilingual documents that state the currency once). */
+export function formatAmount(amount: Money): string {
+  const formatter = new Intl.NumberFormat("en-AE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return formatter.format(amount.toString() as unknown as number);
+}
+
 export function formatDubaiDateTime(instant: Date, locale: Locale): string {
   return new Intl.DateTimeFormat(intlLocale(locale), {
     timeZone: BUSINESS_TIME_ZONE,

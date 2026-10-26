@@ -63,6 +63,11 @@ import { failQc, passQc, requestQc } from "../quality/commands";
 import { qcView } from "../quality/queries";
 import { createInvoiceDraft, discardInvoiceDraft, issueInvoice } from "../billing/invoice";
 import { invoiceView, repairOrderBilling } from "../billing/queries";
+import {
+  businessProfileHistory,
+  currentBusinessProfile,
+  setBusinessProfile,
+} from "../settings/business-profile";
 import { dubaiDate } from "../../i18n/format";
 import {
   changePlate,
@@ -138,6 +143,8 @@ const STATUS_BY_CODE: Record<string, number> = {
   draft_closed: 409,
   invoice_cap: 409,
   parts_not_issued: 409,
+  no_business_profile: 409,
+  profile_changed: 409,
   try_again: 503,
 };
 
@@ -1394,6 +1401,49 @@ export function createHandlers(db: Kysely<DB>, storage: MediaStorage = getMediaS
           db,
           session,
           body as Parameters<typeof addTaxProfile>[2],
+          toStr(body.idempotencyKey),
+        );
+        return json(outcome.replayed ? 200 : 201, outcome.result);
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    // ------------------------------------------------------------------ I1-09b business profile
+
+    /** GET /api/settings/business-profile — the current version and the history (partners, OD-42). */
+    async getBusinessProfile(request: Request): Promise<Response> {
+      try {
+        await authorize(db, await currentSession(request), "business_profile.manage");
+        return json(200, {
+          current: await currentBusinessProfile(db),
+          history: await businessProfileHistory(db),
+        });
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    /**
+     * POST /api/settings/business-profile — JSON/form { legalNameEn, legalNameAr, addressEn, addressAr, phone,
+     * supersedesId (the version the form was filled from; empty for the first), idempotencyKey }.
+     */
+    async setBusinessProfile(request: Request): Promise<Response> {
+      try {
+        if (!sameOrigin(request)) return json(403, { error: "forbidden" });
+        const session = await authorize(db, await currentSession(request), "business_profile.manage");
+        const body = await readBody(request);
+        const outcome = await setBusinessProfile(
+          db,
+          session,
+          {
+            legalNameEn: body.legalNameEn,
+            legalNameAr: body.legalNameAr,
+            addressEn: body.addressEn,
+            addressAr: body.addressAr,
+            phone: body.phone,
+            supersedesId: body.supersedesId,
+          },
           toStr(body.idempotencyKey),
         );
         return json(outcome.replayed ? 200 : 201, outcome.result);

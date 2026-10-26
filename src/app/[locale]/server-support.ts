@@ -126,6 +126,8 @@ const ERROR_KEYS: Record<string, MessageKey> = {
   draft_closed: "error.draftClosed",
   invoice_cap: "error.invoiceCap",
   parts_not_issued: "error.partsNotIssued",
+  no_business_profile: "error.noBusinessProfile",
+  profile_changed: "error.profileChanged",
 };
 
 /**

@@ -11,6 +11,7 @@ import { authorizedScope } from "../estimate/approval";
 import { requirePermission, type Staff } from "../estimate/commands";
 import { rateHundredths } from "../estimate/pricing";
 import { allocateNumber } from "../numbering/numbering";
+import { currentBusinessProfile } from "../settings/business-profile";
 
 /**
  * Invoices (I1-09a). A draft lists the lines to bill; issuing turns it into an immutable invoice with a number from
@@ -400,6 +401,12 @@ export async function issueInvoice(
         field: "taxChangeNotice",
         reason: "tax_change_notice_required",
       });
+    }
+
+    // OD-47: nothing is printed without the garage details; refused before a number is taken. The database records
+    // the latest version on the invoice (OD-46) and refuses the same.
+    if (!(await currentBusinessProfile(ctx.tx))) {
+      throw new ConflictError("no_business_profile", "A partner must enter the business profile first");
     }
 
     const invoiceId = randomUUID();

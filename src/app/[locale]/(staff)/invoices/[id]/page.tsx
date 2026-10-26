@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { Card, PageHeader, PlateBadge, StatusChip } from "../../../../../components/ui";
+import { ButtonLink, Card, PageHeader, PlateBadge, StatusChip } from "../../../../../components/ui";
 import { isLocale, t, type MessageKey } from "../../../../../i18n";
 import { formatAed, formatDubaiDateTime } from "../../../../../i18n/format";
 import { hasPermission } from "../../../../../server/auth/permissions";
@@ -42,6 +42,11 @@ export default async function InvoicePage({ params }: { params: Promise<{ locale
             </bdi>{" "}
             <StatusChip tone="success">{t(locale, "invoice.issued")}</StatusChip>
           </>
+        }
+        actions={
+          <ButtonLink variant="primary" href={`/${locale}/invoices/${invoice.id}/print`}>
+            {t(locale, "invoice.print")}
+          </ButtonLink>
         }
       />
       <Card>

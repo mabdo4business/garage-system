@@ -3,6 +3,7 @@ import { ConflictError } from "../core/errors";
 import { isUuid } from "../core/ids";
 import { Money } from "../core/money";
 import type { DB, Emirate } from "../db/schema";
+import { businessProfileById, type BusinessProfileView } from "../settings/business-profile";
 import { invoicePreview, type InvoiceAmounts } from "./invoice";
 
 /**
@@ -44,6 +45,8 @@ export interface CustomerInvoice {
     vin: string | null;
     plate: { emirate: Emirate; code: string; number: string } | null;
   };
+  /** The garage details in force at issue (OD-46); null only for invoices issued before migration 0018. */
+  business: BusinessProfileView | null;
   registrationStatus: "not_registered" | "registered";
   trn: string | null;
   gross: string;
@@ -79,6 +82,7 @@ export async function invoiceView(db: Kysely<DB>, invoiceId: string): Promise<In
     .where("invoice_id", "=", invoiceId)
     .orderBy("position")
     .execute();
+  const business = head.business_profile_id ? await businessProfileById(db, head.business_profile_id) : null;
   const cogs = lines.reduce((sum, line) => (line.cogs ? sum.add(Money.parse(line.cogs)) : sum), Money.ZERO);
   return {
     id: head.id,
@@ -99,6 +103,7 @@ export async function invoiceView(db: Kysely<DB>, invoiceId: string): Promise<In
           ? { emirate: head.plate_emirate, code: head.plate_code, number: head.plate_number }
           : null,
     },
+    business,
     registrationStatus: head.registration_status,
     trn: head.trn,
     gross: head.gross,
@@ -141,6 +146,7 @@ export async function customerInvoice(db: Kysely<DB>, invoiceId: string): Promis
     customerNameEn: view.customerNameEn,
     customerNameAr: view.customerNameAr,
     vehicle: view.vehicle,
+    business: view.business,
     registrationStatus: view.registrationStatus,
     trn: view.trn,
     gross: view.gross,
