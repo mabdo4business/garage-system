@@ -42,6 +42,7 @@ import { addTaxProfile, getTaxSettings } from "../catalog/tax";
 import { addJob, addLine, openEstimate, setLineDiscount } from "../estimate/commands";
 import { estimateView } from "../estimate/queries";
 import { recordInPersonApproval, sendVersion } from "../estimate/approval";
+import { discardDraft, reproposeJob, startVersion, withdrawVersion } from "../estimate/versions";
 import {
   assignJob,
   completeJob,
@@ -123,6 +124,12 @@ const STATUS_BY_CODE: Record<string, number> = {
   estimate_not_sent: 409,
   estimate_expired: 409,
   estimate_changed: 409,
+  estimate_updated: 409,
+  version_still_open: 409,
+  not_reproposable: 409,
+  first_version: 409,
+  no_estimate: 409,
+  draft_open: 409,
   revision_not_pending: 409,
   open_repair_order_exists: 409,
   open_repair_order_gone: 409,
@@ -976,6 +983,78 @@ export function createHandlers(db: Kysely<DB>, storage: MediaStorage = getMediaS
         });
         const body = await readBody(request);
         const outcome = await sendVersion(db, session, repairOrderId, toStr(body.idempotencyKey));
+        return json(outcome.replayed ? 200 : 201, outcome.result);
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    // ------------------------------------------------------------------ I2-01 estimate versions
+
+    /** POST /api/repair-orders/:id/estimate/versions — { idempotencyKey }; starts the next version (OD-56). */
+    async startEstimateVersion(request: Request, repairOrderId: string): Promise<Response> {
+      try {
+        if (!sameOrigin(request)) return json(403, { error: "forbidden" });
+        const session = await authorize(db, await currentSession(request), "estimate.edit", {
+          entityType: "repair_order",
+          entityId: repairOrderId,
+        });
+        const body = await readBody(request);
+        const outcome = await startVersion(db, session, repairOrderId, toStr(body.idempotencyKey));
+        return json(outcome.replayed ? 200 : 201, outcome.result);
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    /** POST /api/repair-orders/:id/estimate/withdraw — { reasonCode, reason?, idempotencyKey } (OD-57). */
+    async withdrawEstimate(request: Request, repairOrderId: string): Promise<Response> {
+      try {
+        if (!sameOrigin(request)) return json(403, { error: "forbidden" });
+        const session = await authorize(db, await currentSession(request), "estimate.send", {
+          entityType: "repair_order",
+          entityId: repairOrderId,
+        });
+        const body = await readBody(request);
+        const outcome = await withdrawVersion(
+          db,
+          session,
+          repairOrderId,
+          { reasonCode: body.reasonCode, reason: body.reason },
+          toStr(body.idempotencyKey),
+        );
+        return json(200, outcome.result);
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    /** POST /api/repair-orders/:id/estimate/discard — { idempotencyKey }; a draft of version 2 onwards. */
+    async discardEstimateDraft(request: Request, repairOrderId: string): Promise<Response> {
+      try {
+        if (!sameOrigin(request)) return json(403, { error: "forbidden" });
+        const session = await authorize(db, await currentSession(request), "estimate.edit", {
+          entityType: "repair_order",
+          entityId: repairOrderId,
+        });
+        const body = await readBody(request);
+        const outcome = await discardDraft(db, session, repairOrderId, toStr(body.idempotencyKey));
+        return json(200, outcome.result);
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    /** POST /api/repair-jobs/:id/repropose — { idempotencyKey }; offers a declined or lapsed job again (OD-55). */
+    async reproposeEstimateJob(request: Request, jobId: string): Promise<Response> {
+      try {
+        if (!sameOrigin(request)) return json(403, { error: "forbidden" });
+        const session = await authorize(db, await currentSession(request), "estimate.edit", {
+          entityType: "repair_job",
+          entityId: jobId,
+        });
+        const body = await readBody(request);
+        const outcome = await reproposeJob(db, session, jobId, toStr(body.idempotencyKey));
         return json(outcome.replayed ? 200 : 201, outcome.result);
       } catch (error) {
         return errorResponse(error);

@@ -996,6 +996,36 @@ textarea.internal {
   text-align: end;
 }
 
+/* I2-01: the version history line ("v1 Withdrawn · No response from customer"). */
+.estimate-versions ol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-3);
+  padding: 0;
+  list-style: none;
+}
+
+.estimate-versions li {
+  padding-block: var(--space-1);
+  padding-inline: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.estimate-versions li[aria-current="true"] {
+  border-color: var(--border-strong);
+  color: var(--fg);
+  font-weight: 600;
+}
+
+.earlier-jobs li {
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
 .estimate-lines td .disclosure .form {
   min-inline-size: 220px;
   margin-block-end: var(--space-3);

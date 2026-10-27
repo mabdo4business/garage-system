@@ -193,6 +193,14 @@ export default async function RepairOrderPage({
               ? t(locale, `qc.status.${latestQc.status}` as MessageKey)
               : t(locale, `qc.blocker.${qc.blocker ?? "ready"}` as MessageKey)}
           </p>
+          {!latestQc &&
+          (qc.blocker === "decision_pending" || qc.blocker === "draft_open") &&
+          hasPermission(session.roles, "estimate.send") ? (
+            // X-12 / OD-59: withdraw a version nobody answers, or send or discard an unsent draft (I2-01).
+            <p>
+              <a href={`/${locale}/repair-orders/${ro.id}/estimate`}>{t(locale, "qc.openEstimate")}</a>
+            </p>
+          ) : null}
           {qc.blocker === null && hasPermission(session.roles, "qc.request") ? (
             <ActionForm
               locale={locale}

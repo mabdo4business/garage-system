@@ -217,7 +217,7 @@ describe("S17 — estimate send and in-person approval", () => {
     expect(sha256Hex(canonicalJson(version.snapshot))).toBe(version.content_hash);
 
     const snapshot = version.snapshot as EstimateSnapshot;
-    expect(snapshot.schema).toBe(1);
+    expect(snapshot.schema).toBe(2);
     expect(snapshot.jobs.map((job) => [job.jobId, job.title, job.findingSeverity, job.total])).toEqual([
       [brakes, "Brake pads at 2 mm", "urgent", "249.70"],
       [ac, "AC service", null, "150.00"],
@@ -305,7 +305,8 @@ describe("S17 — estimate send and in-person approval", () => {
     await setPrice(db.app, people.manager!, items.labor!, { price: "175.00", taxCode: "STD" }, randomUUID());
     await expect(
       addLine(db.app, people.advisor!, brakes, { itemId: items.labor, qty: "1" }, randomUUID()),
-    ).rejects.toMatchObject({ code: "estimate_closed" });
+    ).rejects.toMatchObject({ code: "no_draft" }); // Awaiting approval may hold a later draft (OD-56); there is none
+
     const after = await versionOf(ro);
     expect(after.content_hash).toBe(before.content_hash);
     expect((await estimateView(db.app, ro))!.totals.total).toBe("399.70");
@@ -707,9 +708,9 @@ describe("S17 — estimate send and in-person approval", () => {
       expect(
         ([first, second].find((r) => r.status === "rejected") as PromiseRejectedResult).reason,
       ).toMatchObject({
-        code: "estimate_closed",
+        code: "no_draft",
       });
-      if (line.status === "rejected") expect(line.reason).toMatchObject({ code: "estimate_closed" });
+      if (line.status === "rejected") expect(line.reason).toMatchObject({ code: "no_draft" });
     } finally {
       await holder.end();
     }

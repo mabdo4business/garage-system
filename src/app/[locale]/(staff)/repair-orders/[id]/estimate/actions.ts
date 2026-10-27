@@ -13,6 +13,12 @@ import {
   updateLineQty,
 } from "../../../../../../server/estimate/commands";
 import { sendVersion } from "../../../../../../server/estimate/approval";
+import {
+  discardDraft,
+  reproposeJob,
+  startVersion,
+  withdrawVersion,
+} from "../../../../../../server/estimate/versions";
 import type { FormState } from "../../../../form-state";
 import { errorFrom, field, localeOf, requireActionPermission, valuesOf } from "../../../../server-support";
 
@@ -150,4 +156,41 @@ export async function sendEstimateAction(previous: FormState, formData: FormData
     return { seq: previous.seq + 1, values: {}, error: errorFrom(error) };
   }
   redirect(`/${locale}/repair-orders/${repairOrderId}/estimate/approve`);
+}
+
+// --------------------------------------------------------------------------- I2-01 versions
+
+export async function startVersionAction(previous: FormState, formData: FormData): Promise<FormState> {
+  return run(previous, formData, [], async () => {
+    const session = await requireActionPermission("estimate.edit");
+    await startVersion(getDb(), session, field(formData, "repairOrderId"), field(formData, "idempotencyKey"));
+  });
+}
+
+/** Withdraws the sent version with a reason (OD-57); an overdue one is recorded as expired instead. */
+export async function withdrawAction(previous: FormState, formData: FormData): Promise<FormState> {
+  return run(previous, formData, ["reasonCode", "reason"], async (_, values) => {
+    const session = await requireActionPermission("estimate.send");
+    await withdrawVersion(
+      getDb(),
+      session,
+      field(formData, "repairOrderId"),
+      { reasonCode: values.reasonCode, reason: values.reason },
+      field(formData, "idempotencyKey"),
+    );
+  });
+}
+
+export async function discardDraftAction(previous: FormState, formData: FormData): Promise<FormState> {
+  return run(previous, formData, [], async () => {
+    const session = await requireActionPermission("estimate.edit");
+    await discardDraft(getDb(), session, field(formData, "repairOrderId"), field(formData, "idempotencyKey"));
+  });
+}
+
+export async function reproposeAction(previous: FormState, formData: FormData): Promise<FormState> {
+  return run(previous, formData, [], async () => {
+    const session = await requireActionPermission("estimate.edit");
+    await reproposeJob(getDb(), session, field(formData, "jobId"), field(formData, "idempotencyKey"));
+  });
 }

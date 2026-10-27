@@ -13,6 +13,7 @@ const ERROR_KEYS: Record<string, MessageKey> = {
   estimate_not_sent: "error.estimateNotSent",
   estimate_expired: "error.estimateExpired",
   estimate_changed: "error.estimateChanged",
+  estimate_updated: "error.estimateUpdated",
   revision_not_pending: "error.revisionNotPending",
   forbidden: "error.forbidden",
   unauthenticated: "error.signedOut",

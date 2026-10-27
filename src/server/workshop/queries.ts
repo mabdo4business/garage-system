@@ -1,4 +1,4 @@
-import type { Kysely } from "kysely";
+import { sql, type Kysely } from "kysely";
 import { isUuid } from "../core/ids";
 import { Qty } from "../core/money";
 import type {
@@ -109,8 +109,21 @@ export async function workshopBoard(db: Kysely<DB>): Promise<BoardRepairOrder[]>
     .select(["estimate.repair_order_id", "estimate_version.sent_at"])
     .where("estimate.repair_order_id", "in", ids)
     .where("estimate_version.status", "=", "sent")
+    // Past its expiry the customer can no longer decide (I2-01); the next action records the expiry.
+    .where("estimate_version.expires_at", ">", sql<Date>`now()`)
     .execute();
   const awaiting = new Map(sent.map((row) => [row.repair_order_id, row.sent_at]));
+  const drafts = new Set(
+    (
+      await db
+        .selectFrom("estimate_version")
+        .innerJoin("estimate", "estimate.id", "estimate_version.estimate_id")
+        .select("estimate.repair_order_id")
+        .where("estimate.repair_order_id", "in", ids)
+        .where("estimate_version.status", "=", "draft")
+        .execute()
+    ).map((row) => row.repair_order_id),
+  );
   const vehicles = new Map<string, number>();
   for (const order of orders) vehicles.set(order.vehicle_id, (vehicles.get(order.vehicle_id) ?? 0) + 1);
 
@@ -136,6 +149,7 @@ export async function workshopBoard(db: Kysely<DB>): Promise<BoardRepairOrder[]>
               order.status,
               awaiting.has(order.id),
               own.map((job) => job.execution_status),
+              drafts.has(order.id),
             )
           : null,
       jobs: own.map((job) => ({

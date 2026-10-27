@@ -231,6 +231,8 @@ export async function dashboardSummary(
         .select(["estimate.repair_order_id", "estimate_version.sent_at"])
         .where("estimate.repair_order_id", "in", ids)
         .where("estimate_version.status", "=", "sent")
+        // Past its expiry the customer can no longer decide (I2-01), as on the board.
+        .where("estimate_version.expires_at", ">", sql<Date>`now()`)
         .execute()
     : [];
   const sentAt = new Map(sent.map((row) => [row.repair_order_id, row.sent_at]));

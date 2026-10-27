@@ -382,7 +382,7 @@ describe("S16 — estimate draft", () => {
       ["Brake pads at 2 mm", pads, "urgent"],
     ]);
     expect(view.urgentFindings).toEqual([
-      { findingId: pads, title: "Brake pads at 2 mm", state: "included", reason: null },
+      { findingId: pads, title: "Brake pads at 2 mm", state: "included", reason: null, reofferJobId: null },
     ]);
     expect(view.otherFindings).toEqual([{ findingId: wipers, title: "Wiper blades worn", severity: "soon" }]);
 
@@ -439,7 +439,7 @@ describe("S16 — estimate draft", () => {
     let view = (await estimateView(db.app, ro))!;
     expect(view.jobs.map((job) => job.findingId)).toEqual([late]);
     expect(view.urgentFindings).toEqual([
-      { findingId: late, title: "Coolant leak", state: "included", reason: null },
+      { findingId: late, title: "Coolant leak", state: "included", reason: null, reofferJobId: null },
     ]);
 
     // A technician's edit raises a finding to urgent: it joins too (the technician sees no prices; the job has none).
@@ -489,7 +489,7 @@ describe("S16 — estimate draft", () => {
         .executeTakeFirstOrThrow()
     ).id;
     expect((await estimateView(db.app, ro))!.urgentFindings).toEqual([
-      { findingId: late, title: "Brake fluid leak", state: "open", reason: null },
+      { findingId: late, title: "Brake fluid leak", state: "open", reason: null, reofferJobId: null },
     ]);
     await expect(
       excludeUrgentFinding(db.app, people.advisor!, ro, { findingId: late, reason: " " }, randomUUID()),

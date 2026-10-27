@@ -26,9 +26,9 @@ Status values: `not started` · `in progress` · `done (unmerged)` · `done` · 
 
 ## Current position
 
-- **Wave:** 2 · **Increment:** 2 · **Active story:** none. Increment 1 is complete: every story and its exit test are in `qa` (PRs #1–#8), so the Wave 1 gate is passed
+- **Wave:** 2 · **Increment:** 2 · **Active story:** none; I2-01 (estimate versions) done, unmerged, on `story/I2-01-estimate-versions`. Increment 1 is complete: every story and its exit test are in `qa` (PRs #1–#8), so the Wave 1 gate is passed
 - **Redesign:** UI-R1 (tokens, shell, dashboard), UI-R2 (workshop board) and UI-R3 (technician bay screen) done, in `qa` (PR #5)
-- **Next story:** I2-01 (estimate versions), which needs no open decision; I2-02, I2-03, I2-06 and I2-09 follow from it. I2-04, I2-05, I2-07 and I2-08 wait for D-5, D-6, D-7, D-11, B-09 and D-30
+- **Next story:** I2-02 (amendments, L: split first) or I2-03 (customer links), both unblocked by I2-01; I2-06 and I2-09 follow I2-03. I2-04, I2-05, I2-07 and I2-08 wait for D-5, D-6, D-7, D-11, B-09 and D-30
 - **Next decision needed:** D-5, D-6, D-7, D-11, B-09 and D-30 before I2-04 onwards; V-2 must still confirm invoice content, titles and rounding (OD-42, OD-45) before real invoices
 
 ### Housekeeping before more feature work
@@ -120,13 +120,13 @@ Visual redesign from the owners' references (`docs/design/`): tokens, fonts and 
 | UI-R2 | Workshop board | M | UI-R1 | done | `ui/redesign` | 2026-10-27 | Dark header, six status columns with counts, cards with plate, time (sent / promised / overdue / on site), "do not start" while awaiting the customer, job chips (waiting parts in purple) and assignment; next step per card (request QC in one step, otherwise a link), Deliver locked with its reason (OD-50); card pop and toast on status change, live refresh; T-34 |
 | UI-R3 | Technician bay screen | M | UI-R1 | done | `ui/redesign` | 2026-10-27 | Job card as a dark tablet screen (tokens scoped to `.bay`): bay, technician, clock; plate, car, status word; task ring; time in progress from the job history against approved labour; tick or "not performed" with a reason, kept in the form until Done (OD-50); Done locked saying what is missing (OD-31); advisor note with how and when the customer approved, "do not start" without one (AC2-01); up next; no prices (AC2-30); T-35 |
 
-### Increment 2 — Approvals that hold up
+### Increment 2 — Approvals that hold up · in progress
 
 Decisions first: D-5, D-6, D-7, D-11, B-09, D-30.
 
 | ID | Story | Size | Needs | Status | Branch | Updated | Notes |
 |---|---|---|---|---|---|---|---|
-| I2-01 | Estimate versions | M | I1-05 | not started | | | Until withdrawal/expiry exist, a version with an undecided job blocks QC (AC2-25) for good; build early |
+| I2-01 | Estimate versions | M | I1-05 | done (unmerged) | `story/I2-01-estimate-versions` | 2026-10-27 | Migration 0020; version 2 onwards while Awaiting approval or In progress (OD-56), one open at a time; withdraw with a reason (OD-57), expiry by the scheduler function or at the moment anyone acts on an overdue version (AC21-07), approval racing withdrawal (AC21-05), partial decision then withdrawal (AC21-06); declined or lapsed jobs offered again as new revisions at today's prices (OD-55); earlier approvals as snapshot context (schema 2); urgent findings in every version (OD-58); QC unblocked by withdrawal (X-12) and refused over an unsent draft (OD-59); decisions OD-55–OD-59, T-37; 385 tests (25 new in s27) + 42 e2e (2 new). Expiry runs on its own once the I2-09 worker calls `expireDueEstimates` |
 | I2-02 | Amendments | L | I2-01 | not started | | | Split before starting (L). Once amendments can change outcomes after QC, issuing must refuse a draft that leaves out a billable line (one invoice per repair order, I1-09a review) |
 | I2-03 | Customer links | M | I2-01 | not started | | | Track C1 |
 | I2-04 | Step-up verification | M | I2-03, B-09, D-30 | not started | | | |
@@ -300,3 +300,4 @@ versioned customer API built on P-01's sign-in.
 | 2026-10-27 | PR #7 merged: I1-10 done (in `qa`); all Increment 1 stories done — exit check pending |
 | 2026-10-27 | Increment 1 exit test added: one repair order from check-in to handover through the staff screens, in Arabic and English, desktop and tablet; P0-06 refuses the invoice until the part is issued |
 | 2026-10-27 | PR #8 merged: Increment 1 exit test in `qa`; Increment 1 done, Wave 1 gate passed; I2-01 next |
+| 2026-10-27 | I2-01 committed (done, unmerged) after integrity review fixes; OD-55–OD-59, T-37 recorded |

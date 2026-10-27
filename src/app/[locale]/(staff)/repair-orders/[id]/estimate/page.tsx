@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { notFound } from "next/navigation";
+import type { ReactNode } from "react";
 import { Alert, Card, EmptyState, PageHeader, PlateBadge, StatusChip } from "../../../../../../components/ui";
 import { isLocale, t, type Locale, type MessageKey } from "../../../../../../i18n";
 import { formatAed, formatDubaiDateTime } from "../../../../../../i18n/format";
@@ -7,7 +8,13 @@ import { hasPermission } from "../../../../../../server/auth/permissions";
 import { KINDS, listCatalogue } from "../../../../../../server/catalog/items";
 import { Money } from "../../../../../../server/core/money";
 import { getDb } from "../../../../../../server/db/client";
-import { estimateView, type EstimateLineView } from "../../../../../../server/estimate/queries";
+import { OPEN_FOR_DRAFT } from "../../../../../../server/estimate/commands";
+import {
+  estimateView,
+  type EarlierJob,
+  type EstimateLineView,
+  type VersionSummary,
+} from "../../../../../../server/estimate/queries";
 import { getRepairOrder } from "../../../../../../server/repair-order/queries";
 import { requirePagePermission } from "../../../../server-support";
 import { NoTaxProfileBanner } from "../../../catalogue/shared";
@@ -16,16 +23,74 @@ import { StepForm, type StepField } from "./estimate-forms";
 export const dynamic = "force-dynamic";
 
 const SEVERITY_TONE = { ok: "success", soon: "warning", urgent: "danger" } as const;
-const STATE_TONE = { included: "success", excluded: "neutral", open: "danger" } as const;
+const STATE_TONE = { included: "success", decided: "neutral", excluded: "neutral", open: "danger" } as const;
+const WITHDRAW_REASONS = ["no_response", "needs_changes", "other"] as const;
 const REVISION_TONE: Record<string, "success" | "danger" | "warning" | "neutral"> = {
   approved: "success",
   declined: "danger",
   pending: "warning",
+  lapsed: "neutral",
 };
 
 const aed = (amount: string, locale: Locale) => <bdi>{formatAed(Money.parse(amount), locale)}</bdi>;
 
-/** Estimate builder (I1-05a): jobs, catalogue lines, discounts (OD-19), totals (AC-06.1, OD-18). */
+/** Jobs of earlier versions: title, the version, its status (and why it lapsed), the total as proposed. */
+function EarlierList({
+  locale,
+  jobs,
+  action,
+}: {
+  locale: Locale;
+  jobs: EarlierJob[];
+  action?: (job: EarlierJob) => ReactNode;
+}) {
+  return (
+    <ul className="result-list earlier-jobs">
+      {jobs.map((job) => (
+        <li key={job.revisionId}>
+          <span>
+            <strong dir="auto">{job.title}</strong>{" "}
+            <StatusChip tone={REVISION_TONE[job.status] ?? "neutral"}>
+              {t(locale, `estimate.revision.${job.status}` as MessageKey)}
+              {job.lapseReason
+                ? `${t(locale, "common.listSeparator")}${t(locale, `estimate.lapse.${job.lapseReason}` as MessageKey)}`
+                : ""}
+            </StatusChip>
+          </span>
+          <span className="meta">
+            {t(locale, "estimate.inVersion", { no: String(job.versionNo) })}
+            {t(locale, "common.listSeparator")}
+            {aed(job.total, locale)}
+          </span>
+          {action ? action(job) : null}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** One version in the history line: "v1 Withdrawn · No response from customer" (I2-01). */
+function versionLabel(locale: Locale, version: VersionSummary): string {
+  const parts = [
+    t(locale, "estimate.versionEntry", { no: String(version.versionNo) }),
+    t(locale, `estimate.status.${version.status}` as MessageKey),
+  ];
+  if (version.reasonCode) {
+    parts.push(
+      version.reasonCode === "other" && version.reason
+        ? version.reason
+        : t(locale, `estimate.endReason.${version.reasonCode}` as MessageKey),
+    );
+  } else if (version.outcome === "expired") {
+    parts.push(t(locale, "estimate.expiredBySystem"));
+  }
+  return parts.join(t(locale, "common.listSeparator"));
+}
+
+/**
+ * Estimate builder (I1-05a): jobs, catalogue lines, discounts (OD-19), totals (AC-06.1, OD-18). I2-01: the version
+ * history, withdrawal, a new version, work approved earlier (context) and declined or lapsed jobs to offer again.
+ */
 export default async function EstimatePage({ params }: { params: Promise<{ locale: string; id: string }> }) {
   const { locale, id } = await params;
   if (!isLocale(locale)) notFound();
@@ -39,7 +104,20 @@ export default async function EstimatePage({ params }: { params: Promise<{ local
   const view = await estimateView(db, id);
 
   const roOpen = ro.status === "checked_in" || ro.status === "diagnosing";
-  const canEdit = hasPermission(session.roles, "estimate.edit") && roOpen && view?.status === "draft";
+  const draftOpen = (OPEN_FOR_DRAFT as readonly string[]).includes(ro.status);
+  const canEdit = hasPermission(session.roles, "estimate.edit") && draftOpen && view?.status === "draft";
+  // A sent version past its expiry is shown as expired; the next action on it records that (§5).
+  const shownStatus = view?.overdue ? "expired" : view?.status;
+  const ended =
+    shownStatus === "closed" ||
+    shownStatus === "withdrawn" ||
+    shownStatus === "expired" ||
+    shownStatus === "discarded";
+  const canStartVersion =
+    view !== null &&
+    ended &&
+    (ro.status === "awaiting_approval" || ro.status === "in_progress") &&
+    hasPermission(session.roles, "estimate.edit");
   const canDiscount = canEdit && hasPermission(session.roles, "estimate.discount");
   const name = (line: { descriptionEn: string; descriptionAr: string }) =>
     locale === "ar" ? line.descriptionAr : line.descriptionEn;
@@ -61,7 +139,7 @@ export default async function EstimatePage({ params }: { params: Promise<{ local
             <>
               <StatusChip>{t(locale, "estimate.version", { no: String(view.versionNo) })}</StatusChip>{" "}
               <StatusChip tone={view.status === "draft" ? "warning" : "neutral"}>
-                {t(locale, `estimate.status.${view.status}` as MessageKey)}
+                {t(locale, `estimate.status.${shownStatus}` as MessageKey)}
               </StatusChip>
             </>
           ) : null}
@@ -128,6 +206,20 @@ export default async function EstimatePage({ params }: { params: Promise<{ local
   return (
     <>
       {header}
+      {view.versions.length > 1 ? (
+        <nav className="estimate-versions" aria-label={t(locale, "estimate.versions")}>
+          <ol>
+            {view.versions.map((version) => (
+              <li
+                key={version.versionNo}
+                aria-current={version.versionNo === view.versionNo ? "true" : undefined}
+              >
+                <bdi>{versionLabel(locale, version)}</bdi>
+              </li>
+            ))}
+          </ol>
+        </nav>
+      ) : null}
       {view.status === "draft" && !canEdit ? (
         <Alert tone="warning">
           <p>{t(locale, "estimate.readOnly")}</p>
@@ -135,10 +227,10 @@ export default async function EstimatePage({ params }: { params: Promise<{ local
       ) : null}
       {view.sentAt && view.expiresAt ? (
         <Card
-          title={t(locale, `estimate.status.${view.status}` as MessageKey)}
+          title={t(locale, `estimate.status.${shownStatus}` as MessageKey)}
           actions={
             view.status === "sent" &&
-            view.expiresAt.getTime() > Date.now() &&
+            !view.overdue &&
             hasPermission(session.roles, "estimate.record_approval") ? (
               <a className="btn btn-primary" href={`/${locale}/repair-orders/${id}/estimate/approve`}>
                 {t(locale, "estimate.recordDecision")}
@@ -155,6 +247,78 @@ export default async function EstimatePage({ params }: { params: Promise<{ local
           <p className="muted">
             {t(locale, "estimate.contentHash")}: <bdi dir="ltr">{view.contentHash?.slice(0, 12)}</bdi>
           </p>
+          {view.overdue ? <p className="muted">{t(locale, "estimate.overdue")}</p> : null}
+          {view.status === "sent" && hasPermission(session.roles, "estimate.send") ? (
+            <details className="disclosure">
+              <summary>{t(locale, "estimate.withdraw")}</summary>
+              <p className="muted">{t(locale, "estimate.withdrawHint")}</p>
+              <StepForm
+                locale={locale}
+                action="withdraw"
+                hidden={{ repairOrderId: id, idempotencyKey: randomUUID() }}
+                fields={[
+                  {
+                    name: "reasonCode",
+                    label: "estimate.withdrawReason",
+                    required: true,
+                    placeholder: "estimate.chooseReason",
+                    options: [
+                      {
+                        group: t(locale, "estimate.withdrawReason"),
+                        items: WITHDRAW_REASONS.map((code) => ({
+                          value: code,
+                          label: t(locale, `estimate.endReason.${code}`),
+                        })),
+                      },
+                    ],
+                  },
+                  { name: "reason", label: "estimate.withdrawReasonText" },
+                ]}
+                submit="estimate.withdraw"
+              />
+            </details>
+          ) : null}
+        </Card>
+      ) : null}
+      {canStartVersion ? (
+        <Card title={t(locale, "estimate.newVersion", { no: String(view.versionNo + 1) })}>
+          <p className="muted">{t(locale, "estimate.newVersionHint")}</p>
+          <StepForm
+            locale={locale}
+            action="startVersion"
+            hidden={{ repairOrderId: id, idempotencyKey: randomUUID() }}
+            submit="estimate.newVersion"
+            submitParams={{ no: String(view.versionNo + 1) }}
+            variant="primary"
+          />
+        </Card>
+      ) : null}
+      {view.earlierApproved.length > 0 ? (
+        <Card title={t(locale, "estimate.approvedEarlier")}>
+          <p className="muted">{t(locale, "estimate.approvedEarlierHint")}</p>
+          <EarlierList locale={locale} jobs={view.earlierApproved} />
+        </Card>
+      ) : null}
+      {view.reofferable.length > 0 ? (
+        <Card title={t(locale, "estimate.notApproved")}>
+          <p className="muted">
+            {t(locale, canEdit ? "estimate.notApprovedHint" : "estimate.offerAgainFirst")}
+          </p>
+          <EarlierList
+            locale={locale}
+            jobs={view.reofferable}
+            action={(job) =>
+              canEdit ? (
+                <StepForm
+                  locale={locale}
+                  action="repropose"
+                  hidden={{ repairOrderId: id, jobId: job.jobId, idempotencyKey: randomUUID() }}
+                  submit="estimate.offerAgain"
+                  inline
+                />
+              ) : null
+            }
+          />
         </Card>
       ) : null}
       <p className="muted">{t(locale, "estimate.pricesIncludeVat")}</p>
@@ -173,18 +337,31 @@ export default async function EstimatePage({ params }: { params: Promise<{ local
                   </StatusChip>
                 </div>
                 {finding.reason ? <p dir="auto">{finding.reason}</p> : null}
-                {canEdit && finding.state !== "included" ? (
+                {canEdit && (finding.state === "open" || finding.state === "excluded") ? (
                   <div className="form-actions">
-                    <StepForm
-                      locale={locale}
-                      action="addJob"
-                      hidden={{
-                        repairOrderId: id,
-                        findingId: finding.findingId,
-                        idempotencyKey: randomUUID(),
-                      }}
-                      submit="estimate.include"
-                    />
+                    {finding.reofferJobId ? (
+                      <StepForm
+                        locale={locale}
+                        action="repropose"
+                        hidden={{
+                          repairOrderId: id,
+                          jobId: finding.reofferJobId,
+                          idempotencyKey: randomUUID(),
+                        }}
+                        submit="estimate.offerAgain"
+                      />
+                    ) : (
+                      <StepForm
+                        locale={locale}
+                        action="addJob"
+                        hidden={{
+                          repairOrderId: id,
+                          findingId: finding.findingId,
+                          idempotencyKey: randomUUID(),
+                        }}
+                        submit="estimate.include"
+                      />
+                    )}
                     {finding.state === "open" ? (
                       <details className="disclosure">
                         <summary>{t(locale, "estimate.exclude")}</summary>
@@ -410,6 +587,19 @@ export default async function EstimatePage({ params }: { params: Promise<{ local
           <dd className="num">{aed(view.totals.net, locale)}</dd>
         </dl>
       </Card>
+
+      {canEdit && view.versionNo > 1 ? (
+        <details className="disclosure">
+          <summary>{t(locale, "estimate.discardDraft")}</summary>
+          <StepForm
+            locale={locale}
+            action="discard"
+            hidden={{ repairOrderId: id, idempotencyKey: randomUUID() }}
+            submit="estimate.discardDraft"
+            variant="quiet"
+          />
+        </details>
+      ) : null}
 
       {canEdit && hasPermission(session.roles, "estimate.send") && view.jobs.length > 0 ? (
         <Card title={t(locale, "estimate.send")}>

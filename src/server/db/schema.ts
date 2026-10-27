@@ -398,7 +398,9 @@ export type JobExecutionStatus =
   | "cancelled";
 export type RevisionKind =
   "original" | "add_scope" | "price_change" | "reduction" | "substitution" | "partial_work_agreement";
-export type RevisionStatus = "draft" | "pending" | "approved" | "declined" | "lapsed";
+export type RevisionStatus = "draft" | "pending" | "approved" | "declined" | "lapsed" | "discarded";
+export type VersionEndOutcome = "withdrawn" | "expired" | "discarded";
+export type WithdrawReasonCode = "no_response" | "needs_changes" | "other";
 export type RevisionLineType = "labor" | "part" | "package" | "fee" | "customer_supplied_part";
 
 export interface EstimateTable {
@@ -453,6 +455,16 @@ export interface JobRevisionTable {
   lapse_reason: "withdrawn" | "expired" | null;
   created_at: Generated<Date>;
   created_by: string | null;
+}
+
+/** How a version ended (migration 0020, I2-01): insert-only. */
+export interface EstimateVersionEndTable {
+  estimate_version_id: string;
+  outcome: VersionEndOutcome;
+  reason_code: WithdrawReasonCode | null;
+  reason: string | null;
+  ended_by: string | null;
+  ended_at: Generated<Date>;
 }
 
 export interface RevisionLineTable {
@@ -792,6 +804,7 @@ export interface DB {
   catalogue_price: CataloguePriceTable;
   estimate: EstimateTable;
   estimate_version: EstimateVersionTable;
+  estimate_version_end: EstimateVersionEndTable;
   repair_job: RepairJobTable;
   job_revision: JobRevisionTable;
   revision_line: RevisionLineTable;

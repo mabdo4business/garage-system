@@ -8,6 +8,7 @@ import { inspectImage } from "../media/image";
 import type { MediaStorage } from "../media/storage";
 import { lockDraft, requirePermission, type Staff } from "./commands";
 import { buildSnapshot, hashSnapshot } from "./snapshot";
+import { expireIfDue } from "./versions";
 
 /**
  * Sending an estimate and recording the customer's in-person decision (I1-05b).
@@ -69,7 +70,8 @@ export async function sendVersion(
       throw new ConflictError("job_without_lines", "Every job needs at least one item before sending");
     }
 
-    // AC-05.2: every active urgent finding is in the estimate or left out with a reason.
+    // AC-05.2, in every version (OD-58): each active urgent finding is in this version, was decided by the
+    // customer earlier, or is left out with a reason recorded for this version. A job that only lapsed does not count.
     const openUrgent = await ctx.tx
       .selectFrom("finding")
       .select("id")
@@ -80,9 +82,19 @@ export async function sendVersion(
         not(
           exists(
             selectFrom("repair_job")
+              .innerJoin("job_revision", "job_revision.job_id", "repair_job.id")
               .select("repair_job.id")
               .whereRef("repair_job.finding_id", "=", "finding.id")
-              .where("repair_job.removed_at", "is", null),
+              .where("repair_job.removed_at", "is", null)
+              .where((eb) =>
+                eb.or([
+                  eb.and([
+                    eb("job_revision.proposed_in_version_id", "=", versionId),
+                    eb("job_revision.status", "=", "draft"),
+                  ]),
+                  eb("job_revision.status", "in", ["approved", "declined"]),
+                ]),
+              ),
           ),
         ),
       )
@@ -172,11 +184,16 @@ export async function sendVersion(
         jobs.map((job) => job.revision_id),
       )
       .execute();
-    await ctx.tx
-      .updateTable("repair_order")
-      .set({ status: "awaiting_approval" })
-      .where("id", "=", repairOrderId)
-      .execute();
+    // v0.2 §5: the first version moves the car to Awaiting approval; a later one leaves it where it is
+    // (Awaiting approval, or In progress while approved work continues, §3.2).
+    const firstSend = ro.status === "checked_in" || ro.status === "diagnosing";
+    if (firstSend) {
+      await ctx.tx
+        .updateTable("repair_order")
+        .set({ status: "awaiting_approval" })
+        .where("id", "=", repairOrderId)
+        .execute();
+    }
 
     await ctx.audit({
       action: "estimate.sent",
@@ -188,16 +205,19 @@ export async function sendVersion(
         expiresAt: expiresAt.toISOString(),
         total: snapshot.totals.total,
         jobs: jobs.length,
+        versionNo: snapshot.versionNo,
         terms,
       },
     });
-    await ctx.audit({
-      action: "ro.awaiting_approval",
-      entityType: "repair_order",
-      entityId: repairOrderId,
-      before: { status: ro.status },
-      after: { status: "awaiting_approval" },
-    });
+    if (firstSend) {
+      await ctx.audit({
+        action: "ro.awaiting_approval",
+        entityType: "repair_order",
+        entityId: repairOrderId,
+        before: { status: ro.status },
+        after: { status: "awaiting_approval" },
+      });
+    }
     return { versionId, contentHash };
   });
 }
@@ -212,6 +232,9 @@ export interface InPersonApprovalInput {
   decisions: unknown;
   signature: Uint8Array;
 }
+
+type ApprovalResult =
+  { kind: "expired"; approvalEventId: null } | { kind: "recorded"; approvalEventId: string };
 
 interface Decision {
   revisionId: string;
@@ -305,20 +328,30 @@ export async function recordInPersonApproval(
       },
     },
   };
-  return runCommand(db, options, async (ctx) => {
+  const outcome = await runCommand(db, options, async (ctx): Promise<ApprovalResult> => {
     await ctx.locks.acquire("repair_order", [repairOrderId]);
+    // §5 / AC21-07: an overdue version expires now, scheduler or not. The expiry must commit, so the refusal is
+    // returned as a result and thrown after the transaction.
+    const expired = await expireIfDue(ctx, repairOrderId, "submission");
+    if (expired?.versionId === versionId) return { kind: "expired", approvalEventId: null } as ApprovalResult;
     const version = await ctx.tx
       .selectFrom("estimate_version")
       .select(["status", "content_hash", "expires_at", "terms_ar_id", "terms_en_id"])
       .where("id", "=", versionId)
       .executeTakeFirstOrThrow();
-    if (version.status !== "sent") {
+    if (version.status === "expired") {
+      throw new ConflictError("estimate_expired", "This estimate has expired");
+    }
+    if (version.status === "draft") {
       throw new ConflictError("estimate_not_sent", "This estimate is not awaiting a decision", {
         status: version.status,
       });
     }
-    if (!version.expires_at || version.expires_at <= ctx.txTime) {
-      throw new ConflictError("estimate_expired", "This estimate has expired");
+    if (version.status !== "sent") {
+      // AC21-05: withdrawn (or fully decided) before this submission got the lock.
+      throw new ConflictError("estimate_updated", "This estimate has been updated", {
+        status: version.status,
+      });
     }
     if (version.content_hash !== contentHash) {
       throw new ConflictError("estimate_changed", "The estimate shown is not the one that was sent");
@@ -435,8 +468,12 @@ export async function recordInPersonApproval(
         after: { status: "in_progress" },
       });
     }
-    return { approvalEventId: event.id, repairOrderId };
+    return { kind: "recorded", approvalEventId: event.id } as ApprovalResult;
   });
+  if (outcome.result.kind === "expired") {
+    throw new ConflictError("estimate_expired", "This estimate has expired");
+  }
+  return { ...outcome, result: { approvalEventId: outcome.result.approvalEventId, repairOrderId } };
 }
 
 // --------------------------------------------------------------------------- authorized scope

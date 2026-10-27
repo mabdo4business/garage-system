@@ -1,7 +1,14 @@
 import type { Kysely } from "kysely";
 import { isUuid } from "../core/ids";
 import { Money } from "../core/money";
-import type { DB, EstimateVersionStatus, FindingSeverity, RevisionLineType } from "../db/schema";
+import type {
+  DB,
+  EstimateVersionStatus,
+  FindingSeverity,
+  RevisionLineType,
+  VersionEndOutcome,
+  WithdrawReasonCode,
+} from "../db/schema";
 import { findingsForEstimate } from "../inspection/queries";
 import { sumLines, type EstimateTotals } from "./pricing";
 import type { EstimateSnapshot } from "./snapshot";
@@ -42,9 +49,37 @@ export interface EstimateJobView {
 export interface UrgentFindingStatus {
   findingId: string;
   title: string;
-  /** "included" has a live job; "excluded" has a recorded reason; "open" needs one or the other (AC-05.2). */
-  state: "included" | "excluded" | "open";
+  /**
+   * "included": its job is in this version; "decided": the customer approved or declined it earlier; "excluded":
+   * a reason is recorded for this version; "open": needs one or the other before sending (AC-05.2, OD-58).
+   */
+  state: "included" | "decided" | "excluded" | "open";
   reason: string | null;
+  /** Its job, when that job lapsed and is offered again rather than included anew (OD-55). */
+  reofferJobId: string | null;
+}
+
+/** One version in the estimate's history (I2-01). */
+export interface VersionSummary {
+  versionNo: number;
+  status: EstimateVersionStatus;
+  sentAt: Date | null;
+  outcome: VersionEndOutcome | null;
+  reasonCode: WithdrawReasonCode | null;
+  reason: string | null;
+  endedAt: Date | null;
+}
+
+/** A job of an earlier version: approved work (context), or declined / lapsed work that may be offered again. */
+export interface EarlierJob {
+  jobId: string;
+  revisionId: string;
+  title: string;
+  findingSeverity: FindingSeverity | null;
+  versionNo: number;
+  status: "approved" | "declined" | "lapsed";
+  lapseReason: "withdrawn" | "expired" | null;
+  total: string;
 }
 
 export interface EstimateView {
@@ -52,6 +87,13 @@ export interface EstimateView {
   versionId: string;
   versionNo: number;
   status: EstimateVersionStatus;
+  /** Sent, and past its expiry though not yet recorded as expired (the next action on it expires it). */
+  overdue: boolean;
+  versions: VersionSummary[];
+  /** Approved jobs from earlier versions (context only). */
+  earlierApproved: EarlierJob[];
+  /** Jobs whose latest proposal was declined or lapsed and that are not in this version (OD-55). */
+  reofferable: EarlierJob[];
   sentAt: Date | null;
   expiresAt: Date | null;
   contentHash: string | null;
@@ -113,6 +155,7 @@ export async function estimateView(db: Kysely<DB>, repairOrderId: string): Promi
       "job_revision.status as revision_status",
     ])
     .where("job_revision.proposed_in_version_id", "=", version.id)
+    .where("job_revision.status", "<>", "discarded")
     .where("repair_job.removed_at", "is", null)
     .orderBy("repair_job.created_at")
     .orderBy("repair_job.id")
@@ -181,6 +224,20 @@ export async function estimateView(db: Kysely<DB>, repairOrderId: string): Promi
     .execute();
   const findings = await findingsForEstimate(db, repairOrderId);
   const included = new Set(jobViews.map((job) => job.findingId).filter((id) => id !== null));
+  const history = await earlierJobs(db, repairOrderId, version.id);
+  // OD-58: decided by the customer if any revision of the finding's job was approved or declined (as send checks),
+  // even when a later re-offer of it lapsed.
+  const decidedRows = await db
+    .selectFrom("repair_job")
+    .innerJoin("job_revision", "job_revision.job_id", "repair_job.id")
+    .select("repair_job.finding_id")
+    .where("repair_job.repair_order_id", "=", repairOrderId)
+    .where("repair_job.removed_at", "is", null)
+    .where("repair_job.finding_id", "is not", null)
+    .where("job_revision.status", "in", ["approved", "declined"])
+    .execute();
+  const decided = new Set(decidedRows.map((row) => row.finding_id));
+  const withJob = new Set(history.map((job) => job.findingId).filter((id) => id !== null));
   const urgentFindings: UrgentFindingStatus[] = findings
     .filter((finding) => finding.severity === "urgent")
     .map((finding) => {
@@ -188,12 +245,21 @@ export async function estimateView(db: Kysely<DB>, repairOrderId: string): Promi
       return {
         findingId: finding.id,
         title: finding.title,
-        state: included.has(finding.id) ? "included" : exclusion ? "excluded" : "open",
+        state: included.has(finding.id)
+          ? "included"
+          : decided.has(finding.id)
+            ? "decided"
+            : exclusion
+              ? "excluded"
+              : "open",
         reason: exclusion?.reason ?? null,
+        reofferJobId: history.find((job) => job.findingId === finding.id && job.reofferable)?.jobId ?? null,
       };
     });
   const otherFindings = findings
-    .filter((finding) => finding.severity !== "urgent" && !included.has(finding.id))
+    .filter(
+      (finding) => finding.severity !== "urgent" && !included.has(finding.id) && !withJob.has(finding.id),
+    )
     .map((finding) => ({ findingId: finding.id, title: finding.title, severity: finding.severity }));
 
   return {
@@ -201,6 +267,11 @@ export async function estimateView(db: Kysely<DB>, repairOrderId: string): Promi
     versionId: version.id,
     versionNo: version.version_no,
     status: version.status,
+    overdue:
+      version.status === "sent" && version.expires_at !== null && version.expires_at.getTime() <= Date.now(),
+    versions: await versionHistory(db, version.estimate_id),
+    earlierApproved: history.filter((job) => job.status === "approved").map(earlierJob),
+    reofferable: history.filter((job) => job.reofferable).map(earlierJob),
     sentAt: version.sent_at,
     expiresAt: version.expires_at,
     contentHash: version.content_hash,
@@ -209,6 +280,122 @@ export async function estimateView(db: Kysely<DB>, repairOrderId: string): Promi
     otherFindings,
     totals: totalsJson(sumLines(allAmounts)),
   };
+}
+
+const earlierJob = (job: EarlierJob): EarlierJob => ({
+  jobId: job.jobId,
+  revisionId: job.revisionId,
+  title: job.title,
+  findingSeverity: job.findingSeverity,
+  versionNo: job.versionNo,
+  status: job.status,
+  lapseReason: job.lapseReason,
+  total: job.total,
+});
+
+async function versionHistory(db: Kysely<DB>, estimateId: string): Promise<VersionSummary[]> {
+  const rows = await db
+    .selectFrom("estimate_version")
+    .leftJoin("estimate_version_end", "estimate_version_end.estimate_version_id", "estimate_version.id")
+    .select([
+      "estimate_version.version_no",
+      "estimate_version.status",
+      "estimate_version.sent_at",
+      "estimate_version_end.outcome",
+      "estimate_version_end.reason_code",
+      "estimate_version_end.reason",
+      "estimate_version_end.ended_at",
+    ])
+    .where("estimate_version.estimate_id", "=", estimateId)
+    .orderBy("estimate_version.version_no")
+    .execute();
+  return rows.map((row) => ({
+    versionNo: row.version_no,
+    status: row.status,
+    sentAt: row.sent_at,
+    outcome: row.outcome,
+    reasonCode: row.reason_code,
+    reason: row.reason,
+    endedAt: row.ended_at,
+  }));
+}
+
+/**
+ * Each job's latest decided-or-lapsed revision from versions other than `versionId`: approved work, or declined /
+ * lapsed work. A job with an open revision elsewhere, or approved at all, is not offered again (OD-55).
+ */
+async function earlierJobs(
+  db: Kysely<DB>,
+  repairOrderId: string,
+  versionId: string,
+): Promise<(EarlierJob & { findingId: string | null; reofferable: boolean })[]> {
+  const rows = await db
+    .selectFrom("job_revision")
+    .innerJoin("repair_job", "repair_job.id", "job_revision.job_id")
+    .innerJoin("estimate_version", "estimate_version.id", "job_revision.proposed_in_version_id")
+    .leftJoin("finding", "finding.id", "repair_job.finding_id")
+    .select([
+      "repair_job.id as job_id",
+      "repair_job.title",
+      "repair_job.finding_id",
+      "finding.severity",
+      "job_revision.id as revision_id",
+      "job_revision.revision_no",
+      "job_revision.status",
+      "job_revision.lapse_reason",
+      "job_revision.proposed_in_version_id",
+      "estimate_version.version_no",
+    ])
+    .where("repair_job.repair_order_id", "=", repairOrderId)
+    .where("repair_job.removed_at", "is", null)
+    .orderBy("repair_job.created_at")
+    .orderBy("repair_job.id")
+    .orderBy("job_revision.revision_no", "desc")
+    .execute();
+  const settled = rows.filter(
+    (row) =>
+      row.proposed_in_version_id !== versionId &&
+      (row.status === "approved" || row.status === "declined" || row.status === "lapsed"),
+  );
+  const lines =
+    settled.length === 0
+      ? []
+      : await db
+          .selectFrom("revision_line")
+          .select(["revision_id", "line_total"])
+          .where(
+            "revision_id",
+            "in",
+            settled.map((row) => row.revision_id),
+          )
+          .where("removed_at", "is", null)
+          .execute();
+  const result: (EarlierJob & { findingId: string | null; reofferable: boolean })[] = [];
+  const seen = new Set<string>();
+  for (const row of settled) {
+    const own = rows.filter((other) => other.job_id === row.job_id);
+    const approved = own.some((other) => other.status === "approved");
+    // Approved revisions are all listed (context); otherwise only the latest settled one per job.
+    if (row.status !== "approved" && (approved || seen.has(row.job_id))) continue;
+    if (row.status !== "approved") seen.add(row.job_id);
+    result.push({
+      jobId: row.job_id,
+      revisionId: row.revision_id,
+      title: row.title,
+      findingId: row.finding_id,
+      findingSeverity: row.severity,
+      versionNo: row.version_no,
+      status: row.status as EarlierJob["status"],
+      lapseReason: row.lapse_reason,
+      total: lines
+        .filter((line) => line.revision_id === row.revision_id)
+        .reduce((sum, line) => sum.add(Money.parse(line.line_total)), Money.ZERO)
+        .toString(),
+      reofferable:
+        row.status !== "approved" && !own.some((other) => ["draft", "pending"].includes(other.status)),
+    });
+  }
+  return result;
 }
 
 export interface ApprovalScreenView {
@@ -225,7 +412,7 @@ export interface ApprovalScreenView {
   termsBody: { ar: string | null; en: string | null };
 }
 
-/** The sent (or closed) version as the customer is shown it, or null while there is none. */
+/** The latest version as the customer is shown it, if it is sent (or closed); otherwise null. */
 export async function approvalScreenView(
   db: Kysely<DB>,
   repairOrderId: string,
@@ -242,10 +429,17 @@ export async function approvalScreenView(
       "estimate_version.snapshot",
     ])
     .where("estimate.repair_order_id", "=", repairOrderId)
-    .where("estimate_version.status", "in", ["sent", "closed"])
     .orderBy("estimate_version.version_no", "desc")
     .executeTakeFirst();
-  if (!version || !version.content_hash || !version.expires_at) return null;
+  // Only the latest version, and only once sent: an earlier closed version is never shown in place of a newer
+  // draft, withdrawn or expired one (I2-01).
+  if (
+    !version ||
+    !["sent", "closed"].includes(version.status) ||
+    !version.content_hash ||
+    !version.expires_at
+  )
+    return null;
   const pending = await db
     .selectFrom("job_revision")
     .select("id")

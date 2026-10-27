@@ -8,13 +8,17 @@ import { EMPTY_FORM_STATE } from "../../../../form-state";
 import {
   addJobAction,
   addLineAction,
+  discardDraftAction,
   discountAction,
   excludeFindingAction,
   openEstimateAction,
   removeJobAction,
   removeLineAction,
+  reproposeAction,
   sendEstimateAction,
+  startVersionAction,
   updateQtyAction,
+  withdrawAction,
 } from "./actions";
 
 /**
@@ -32,6 +36,10 @@ const ACTIONS = {
   discount: discountAction,
   removeLine: removeLineAction,
   send: sendEstimateAction,
+  startVersion: startVersionAction,
+  withdraw: withdrawAction,
+  discard: discardDraftAction,
+  repropose: reproposeAction,
 } as const;
 
 export interface StepField {
@@ -51,6 +59,7 @@ export function StepForm({
   hidden,
   fields = [],
   submit,
+  submitParams,
   variant = "secondary",
   inline = false,
 }: {
@@ -59,6 +68,7 @@ export function StepForm({
   hidden: Record<string, string>;
   fields?: StepField[];
   submit: MessageKey;
+  submitParams?: Record<string, string>;
   variant?: "primary" | "secondary" | "quiet";
   inline?: boolean;
 }) {
@@ -105,7 +115,7 @@ export function StepForm({
       })}
       <div className="form-actions">
         <Button variant={variant} disabled={pending}>
-          {t(locale, submit)}
+          {t(locale, submit, submitParams)}
         </Button>
       </div>
     </form>

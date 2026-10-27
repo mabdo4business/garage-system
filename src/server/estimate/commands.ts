@@ -13,12 +13,16 @@ import { computeLine, parseDiscount, parseQty } from "./pricing";
 /**
  * Estimate drafts (I1-05a): jobs, their original revisions and lines (v0.2.1 §2), totals (AC-06.1).
  * Every command locks the repair order first (T-19), so all edits of one estimate are serialised, and
- * re-checks inside the transaction that the draft is still open. Sending and approval are I1-05b.
+ * re-checks inside the transaction that the draft is still open. Sending and approval are I1-05b; later
+ * versions, withdrawal and expiry are I2-01 (versions.ts).
  */
 
 export type Staff = Pick<SessionUser, "userId" | "roles">;
 
+/** Version 1 is started while the car is checked in or diagnosed. */
 const OPEN_FOR_ESTIMATE = ["checked_in", "diagnosing"] as const;
+/** A draft (version 2 onwards too, OD-56) is edited until QC: Awaiting approval and In progress as well. */
+export const OPEN_FOR_DRAFT = ["checked_in", "diagnosing", "awaiting_approval", "in_progress"] as const;
 const actorOf = (staff: Staff) => ({ kind: "user" as const, userId: staff.userId });
 
 export function requirePermission(staff: Staff, permission: Permission): void {
@@ -33,7 +37,11 @@ function requiredText(value: unknown, field: string, max: number): string {
 }
 
 /** Locks the repair order and checks it can still be estimated. */
-async function lockRepairOrder(ctx: CommandContext, repairOrderId: string) {
+export async function lockRepairOrder(
+  ctx: CommandContext,
+  repairOrderId: string,
+  allowed: readonly string[] = OPEN_FOR_DRAFT,
+) {
   await ctx.locks.acquire("repair_order", [repairOrderId]);
   const ro = await ctx.tx
     .selectFrom("repair_order")
@@ -41,14 +49,14 @@ async function lockRepairOrder(ctx: CommandContext, repairOrderId: string) {
     .where("id", "=", repairOrderId)
     .executeTakeFirst();
   if (!ro) throw new NotFoundError("repair_order", repairOrderId);
-  if (!(OPEN_FOR_ESTIMATE as readonly string[]).includes(ro.status)) {
+  if (!allowed.includes(ro.status)) {
     throw new ConflictError("estimate_closed", `Repair order is ${ro.status}`, { status: ro.status });
   }
   return ro;
 }
 
 /** The repair order's draft version, if it has one (callers hold the repair-order lock). */
-async function draftOf(ctx: CommandContext, repairOrderId: string) {
+export async function draftOf(ctx: CommandContext, repairOrderId: string) {
   return ctx.tx
     .selectFrom("estimate_version")
     .innerJoin("estimate", "estimate.id", "estimate_version.estimate_id")
@@ -79,7 +87,7 @@ export function requireAllowedQty(qty: Qty, unit: string | null): void {
 }
 
 /** The repair order a job belongs to (unlocked read; callers lock and re-read). */
-async function repairOrderOfJob(db: Kysely<DB>, jobId: string): Promise<string> {
+export async function repairOrderOfJob(db: Kysely<DB>, jobId: string): Promise<string> {
   if (!isUuid(jobId)) throw new NotFoundError("repair_job", jobId);
   const row = await db
     .selectFrom("repair_job")
@@ -114,6 +122,7 @@ async function draftJob(ctx: CommandContext, jobId: string, versionId: string) {
       "repair_job.finding_id",
       "repair_job.removed_at",
       "job_revision.id as revision_id",
+      "job_revision.revision_no",
     ])
     .where("repair_job.id", "=", jobId)
     .where("job_revision.status", "=", "draft")
@@ -174,7 +183,7 @@ export async function openEstimate(
     idempotency: { key: idempotencyKey, payload: { repairOrderId } },
   };
   return runCommand(db, options, async (ctx) => {
-    await lockRepairOrder(ctx, repairOrderId);
+    await lockRepairOrder(ctx, repairOrderId, OPEN_FOR_ESTIMATE);
     const existing = await ctx.tx
       .selectFrom("estimate")
       .select("id")
@@ -339,7 +348,8 @@ export async function preselectUrgentFinding(
 
 /**
  * Removes a draft job (never deleted). Removing the job of an urgent finding needs a reason, recorded as
- * the finding's exclusion (AC-05.2).
+ * the finding's exclusion (AC-05.2). A job offered again (I2-01) keeps its history: only its draft revision
+ * is taken out (Discarded).
  */
 export async function removeJob(
   db: Kysely<DB>,
@@ -372,12 +382,31 @@ export async function removeJob(
         excluded = true;
       }
     }
-    await ctx.tx
-      .updateTable("repair_job")
-      .set({ removed_at: ctx.txTime, removed_by: staff.userId, updated_by: staff.userId })
-      .where("id", "=", jobId)
-      .execute();
-    if (excluded) {
+    const reoffered = job.revision_no > 1;
+    if (reoffered) {
+      await ctx.tx
+        .updateTable("job_revision")
+        .set({ status: "discarded" })
+        .where("id", "=", job.revision_id)
+        .execute();
+    } else {
+      await ctx.tx
+        .updateTable("repair_job")
+        .set({ removed_at: ctx.txTime, removed_by: staff.userId, updated_by: staff.userId })
+        .where("id", "=", jobId)
+        .execute();
+    }
+    // A reason may already stand for this version (left out, then offered again): it is kept, not doubled.
+    const standing =
+      excluded &&
+      (await ctx.tx
+        .selectFrom("urgent_finding_exclusion")
+        .select("id")
+        .where("estimate_version_id", "=", versionId)
+        .where("finding_id", "=", job.finding_id!)
+        .where("cleared_at", "is", null)
+        .executeTakeFirst());
+    if (excluded && !standing) {
       await ctx.tx
         .insertInto("urgent_finding_exclusion")
         .values({
@@ -392,8 +421,14 @@ export async function removeJob(
       action: "estimate.job_removed",
       entityType: "repair_job",
       entityId: jobId,
-      before: { title: job.title, findingId: job.finding_id },
-      details: excluded ? { urgentFindingExcluded: job.finding_id, reason } : null,
+      before: { title: job.title, findingId: job.finding_id, revisionId: job.revision_id },
+      details:
+        reoffered || excluded
+          ? {
+              ...(reoffered ? { revisionDiscarded: job.revision_id } : {}),
+              ...(excluded ? { urgentFindingExcluded: job.finding_id, reason } : {}),
+            }
+          : null,
     });
     return { jobId };
   });
@@ -428,11 +463,23 @@ export async function excludeUrgentFinding(
       .where("severity", "=", "urgent")
       .executeTakeFirst();
     if (!finding) throw new ValidationError("Unknown urgent finding", { field: "findingId" });
+    // Addressed already: its job is in this draft, or the customer decided it. A job whose proposal only
+    // lapsed leaves the finding open, so this version must include or exclude it again (OD-58).
     const included = await ctx.tx
       .selectFrom("repair_job")
-      .select("id")
-      .where("finding_id", "=", findingId)
-      .where("removed_at", "is", null)
+      .innerJoin("job_revision", "job_revision.job_id", "repair_job.id")
+      .select("repair_job.id")
+      .where("repair_job.finding_id", "=", findingId)
+      .where("repair_job.removed_at", "is", null)
+      .where((eb) =>
+        eb.or([
+          eb.and([
+            eb("job_revision.proposed_in_version_id", "=", versionId),
+            eb("job_revision.status", "=", "draft"),
+          ]),
+          eb("job_revision.status", "in", ["approved", "declined"]),
+        ]),
+      )
       .executeTakeFirst();
     if (included) throw new ConflictError("finding_already_included", "Remove the finding's job instead");
     const live = await ctx.tx
@@ -489,78 +536,146 @@ export async function addLine(
     async (ctx) => {
       const { versionId } = await lockDraft(ctx, repairOrderId);
       const job = await draftJob(ctx, jobId, versionId);
-      const item = await ctx.tx
-        .selectFrom("catalogue_item")
-        .select(["id", "kind", "name_en", "name_ar", "unit", "active"])
-        .where("id", "=", itemId)
-        .executeTakeFirst();
-      if (!item?.active)
-        throw new ValidationError("Choose an active item from the price list", { field: "itemId" });
-      const unit = item.kind === "labor_rate" ? "hour" : item.kind === "part" ? item.unit : null;
-      requireAllowedQty(qty, unit);
-      const price = await priceInForce(ctx.tx, itemId);
-      if (!price) throw new ValidationError("This item has no price yet", { field: "itemId" });
-
-      const profile = await taxProfileOn(ctx.tx, ctx.businessDate);
-      if (!profile) throw new ConflictError("no_tax_profile", "No tax profile is in force");
-      let rate = "0.00";
-      if (profile.registrationStatus === "registered") {
-        const codeRate = await taxCodeRateOn(ctx.tx, price.taxCode, ctx.businessDate);
-        if (codeRate === null) {
-          throw new ConflictError("no_tax_rate", `Tax code ${price.taxCode} has no rate in force`, {
-            taxCode: price.taxCode,
-          });
+      const priced = await priceCatalogueLine(ctx, itemId, qty);
+      if (!priced.ok) {
+        switch (priced.reason) {
+          case "inactive":
+            throw new ValidationError("Choose an active item from the price list", { field: "itemId" });
+          case "no_price":
+            throw new ValidationError("This item has no price yet", { field: "itemId" });
+          case "fraction":
+            requireAllowedQty(qty, priced.unit);
+            throw new ValidationError("This item is counted in whole numbers", { field: "qty" });
+          case "no_tax_rate":
+            throw new ConflictError("no_tax_rate", `Tax code ${priced.taxCode} has no rate in force`, {
+              taxCode: priced.taxCode,
+            });
         }
-        rate = codeRate;
       }
-
-      const unitPrice = Money.parse(price.price);
-      const amounts = computeLine({ qty, unitPrice, discount: Money.ZERO, rate });
-      const lineType: RevisionLineType = LINE_TYPE_OF_KIND[item.kind];
-      const line = await ctx.tx
-        .insertInto("revision_line")
-        .values({
-          revision_id: job.revision_id,
-          line_type: lineType,
-          catalogue_item_id: item.id,
-          catalogue_price_id: price.priceId,
-          description_en: item.name_en,
-          description_ar: item.name_ar,
-          unit,
-          qty: qty.toString(),
-          unit_price: unitPrice.toString(),
-          gross: amounts.gross.toString(),
-          discount: "0.00",
-          line_total: amounts.total.toString(),
-          net: amounts.net.toString(),
-          vat: amounts.vat.toString(),
-          tax_code: price.taxCode,
-          tax_rate: rate,
-          supersedes_line_id: null,
-          removed_at: null,
-          created_by: staff.userId,
-          updated_by: staff.userId,
-        })
-        .returning("id")
-        .executeTakeFirstOrThrow();
-      await ctx.audit({
-        action: "estimate.line_added",
-        entityType: "revision_line",
-        entityId: line.id,
-        after: {
-          jobId,
-          itemId,
-          priceId: price.priceId,
-          qty: qty.toString(),
-          unitPrice: unitPrice.toString(),
-          total: amounts.total.toString(),
-          taxCode: price.taxCode,
-          taxRate: rate,
-        },
-      });
-      return { lineId: line.id };
+      const lineId = await insertPricedLine(ctx, staff, jobId, job.revision_id, priced.line);
+      return { lineId };
     },
   );
+}
+
+export interface PricedLine {
+  itemId: string;
+  lineType: RevisionLineType;
+  priceId: string;
+  descriptionEn: string;
+  descriptionAr: string;
+  unit: string | null;
+  qty: Qty;
+  unitPrice: Money;
+  amounts: ReturnType<typeof computeLine>;
+  taxCode: string;
+  rate: string;
+}
+
+type PriceRefusal =
+  | { ok: false; reason: "inactive" | "no_price" }
+  | { ok: false; reason: "fraction"; unit: string | null }
+  | { ok: false; reason: "no_tax_rate"; taxCode: string };
+
+/**
+ * Prices a catalogue item for an estimate line: the price row in force now (T-18) and the VAT rate on today's
+ * business date, or 0 while the garage is not registered. Says why an item cannot be priced instead of throwing,
+ * so offering a job again (I2-01) can skip such items.
+ */
+export async function priceCatalogueLine(
+  ctx: CommandContext,
+  itemId: string,
+  qty: Qty,
+): Promise<{ ok: true; line: PricedLine } | PriceRefusal> {
+  const item = await ctx.tx
+    .selectFrom("catalogue_item")
+    .select(["id", "kind", "name_en", "name_ar", "unit", "active"])
+    .where("id", "=", itemId)
+    .executeTakeFirst();
+  if (!item?.active) return { ok: false, reason: "inactive" };
+  const unit = item.kind === "labor_rate" ? "hour" : item.kind === "part" ? item.unit : null;
+  if (qty.milli % 1000n !== 0n && !FRACTIONAL_UNITS.includes(unit))
+    return { ok: false, reason: "fraction", unit };
+  const price = await priceInForce(ctx.tx, itemId);
+  if (!price) return { ok: false, reason: "no_price" };
+
+  const profile = await taxProfileOn(ctx.tx, ctx.businessDate);
+  if (!profile) throw new ConflictError("no_tax_profile", "No tax profile is in force");
+  let rate = "0.00";
+  if (profile.registrationStatus === "registered") {
+    const codeRate = await taxCodeRateOn(ctx.tx, price.taxCode, ctx.businessDate);
+    if (codeRate === null) return { ok: false, reason: "no_tax_rate", taxCode: price.taxCode };
+    rate = codeRate;
+  }
+  const unitPrice = Money.parse(price.price);
+  return {
+    ok: true,
+    line: {
+      itemId: item.id,
+      lineType: LINE_TYPE_OF_KIND[item.kind],
+      priceId: price.priceId,
+      descriptionEn: item.name_en,
+      descriptionAr: item.name_ar,
+      unit,
+      qty,
+      unitPrice,
+      amounts: computeLine({ qty, unitPrice, discount: Money.ZERO, rate }),
+      taxCode: price.taxCode,
+      rate,
+    },
+  };
+}
+
+/** Inserts a priced line into a draft revision, with its audit event. */
+export async function insertPricedLine(
+  ctx: CommandContext,
+  staff: Staff,
+  jobId: string,
+  revisionId: string,
+  priced: PricedLine,
+): Promise<string> {
+  const line = await ctx.tx
+    .insertInto("revision_line")
+    .values({
+      revision_id: revisionId,
+      line_type: priced.lineType,
+      catalogue_item_id: priced.itemId,
+      catalogue_price_id: priced.priceId,
+      description_en: priced.descriptionEn,
+      description_ar: priced.descriptionAr,
+      unit: priced.unit,
+      qty: priced.qty.toString(),
+      unit_price: priced.unitPrice.toString(),
+      gross: priced.amounts.gross.toString(),
+      discount: "0.00",
+      line_total: priced.amounts.total.toString(),
+      net: priced.amounts.net.toString(),
+      vat: priced.amounts.vat.toString(),
+      tax_code: priced.taxCode,
+      tax_rate: priced.rate,
+      supersedes_line_id: null,
+      removed_at: null,
+      created_by: staff.userId,
+      updated_by: staff.userId,
+    })
+    .returning("id")
+    .executeTakeFirstOrThrow();
+  await ctx.audit({
+    action: "estimate.line_added",
+    entityType: "revision_line",
+    entityId: line.id,
+    after: {
+      jobId,
+      itemId: priced.itemId,
+      priceId: priced.priceId,
+      qty: priced.qty.toString(),
+      unitPrice: priced.unitPrice.toString(),
+      total: priced.amounts.total.toString(),
+      taxCode: priced.taxCode,
+      taxRate: priced.rate,
+    },
+  });
+  return line.id;
 }
 
 /** Locks the draft and returns a live line of it. */

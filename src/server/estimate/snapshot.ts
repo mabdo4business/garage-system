@@ -14,7 +14,8 @@ import { sumLines } from "./pricing";
  * of fields so new internal columns never leak by default.
  */
 
-export const SNAPSHOT_SCHEMA = 1;
+/** 2 (I2-01): adds `earlierApproved`, the work approved in earlier versions, shown as context only. */
+export const SNAPSHOT_SCHEMA = 2;
 
 export interface SnapshotLine {
   lineId: string;
@@ -44,6 +45,18 @@ export interface SnapshotJob {
   total: string;
 }
 
+/**
+ * Work the customer approved in an earlier version: context only, never re-decided (v0.2.1 §2.1 #4, AC21-01).
+ * Totals as approved (VAT-inclusive, after line discounts).
+ */
+export interface SnapshotContextJob {
+  jobId: string;
+  revisionId: string;
+  title: string;
+  versionNo: number;
+  total: string;
+}
+
 export interface EstimateSnapshot {
   schema: number;
   estimateVersionId: string;
@@ -59,6 +72,8 @@ export interface EstimateSnapshot {
   /** OD-14 and OD-18: prices quoted including VAT, VAT taken out per line, rounded half-up. */
   pricing: { pricesIncludeVat: true; vatMethod: "per_line_inclusive_half_up" };
   jobs: SnapshotJob[];
+  /** Since schema 2; absent from version-1 snapshots made before I2-01. */
+  earlierApproved?: SnapshotContextJob[];
   totals: {
     gross: string;
     discount: string;
@@ -91,6 +106,7 @@ export async function buildSnapshot(
     )
     .select([
       "estimate_version.version_no",
+      "repair_order.id as repair_order_id",
       "repair_order.number",
       "vehicle.make",
       "vehicle.model",
@@ -132,6 +148,38 @@ export async function buildSnapshot(
           .where("removed_at", "is", null)
           .orderBy("created_at")
           .orderBy("id")
+          .execute();
+
+  // Approved revisions of this repair order's jobs, proposed in other versions (§2.1 #4).
+  const approved = await db
+    .selectFrom("job_revision")
+    .innerJoin("repair_job", "repair_job.id", "job_revision.job_id")
+    .innerJoin("estimate_version", "estimate_version.id", "job_revision.proposed_in_version_id")
+    .select([
+      "repair_job.id as job_id",
+      "repair_job.title",
+      "job_revision.id as revision_id",
+      "estimate_version.version_no",
+    ])
+    .where("repair_job.repair_order_id", "=", head.repair_order_id)
+    .where("job_revision.status", "=", "approved")
+    .where("job_revision.proposed_in_version_id", "<>", versionId)
+    .orderBy("estimate_version.version_no")
+    .orderBy("repair_job.created_at")
+    .orderBy("repair_job.id")
+    .execute();
+  const approvedLines =
+    approved.length === 0
+      ? []
+      : await db
+          .selectFrom("revision_line")
+          .select(["revision_id", "line_total"])
+          .where(
+            "revision_id",
+            "in",
+            approved.map((row) => row.revision_id),
+          )
+          .where("removed_at", "is", null)
           .execute();
 
   const amounts = lines.map((line) => ({
@@ -187,6 +235,16 @@ export async function buildSnapshot(
         })),
       };
     }),
+    earlierApproved: approved.map((row) => ({
+      jobId: row.job_id,
+      revisionId: row.revision_id,
+      title: row.title,
+      versionNo: row.version_no,
+      total: approvedLines
+        .filter((line) => line.revision_id === row.revision_id)
+        .reduce((sum, line) => sum.add(Money.parse(line.line_total)), Money.ZERO)
+        .toString(),
+    })),
     totals: {
       gross: totals.gross.toString(),
       discount: totals.discount.toString(),

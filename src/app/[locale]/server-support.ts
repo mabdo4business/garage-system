@@ -106,6 +106,13 @@ const ERROR_KEYS: Record<string, MessageKey> = {
   estimate_expired: "error.estimateExpired",
   estimate_changed: "error.estimateChanged",
   revision_not_pending: "error.revisionNotPending",
+  // I2-01 estimate versions
+  estimate_updated: "error.estimateUpdated",
+  version_still_open: "error.versionStillOpen",
+  not_reproposable: "error.notReproposable",
+  first_version: "error.firstVersion",
+  no_estimate: "error.noEstimate",
+  draft_open: "error.draftOpen",
   open_repair_order_exists: "error.openRepairOrderExists",
   open_repair_order_gone: "error.openRepairOrderGone",
   job_not_assignable: "error.jobNotAssignable",

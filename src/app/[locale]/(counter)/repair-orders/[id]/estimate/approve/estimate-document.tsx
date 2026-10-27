@@ -21,6 +21,21 @@ export function EstimateDocument({ snapshot, locale }: { snapshot: EstimateSnaps
         : "";
   return (
     <div className="estimate-document">
+      {snapshot.earlierApproved && snapshot.earlierApproved.length > 0 ? (
+        // Context only (v0.2.1 §2.1 #4, AC21-01): no decision control here.
+        <section className="card estimate-document-context">
+          <h2>{t(locale, "approval.alreadyApproved")}</h2>
+          <p className="muted">{t(locale, "approval.alreadyApprovedHint")}</p>
+          <ul className="result-list">
+            {snapshot.earlierApproved.map((job) => (
+              <li key={job.revisionId} data-context-revision={job.revisionId}>
+                <span dir="auto">{job.title}</span>
+                <span className="num">{aed(job.total, locale)}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
       {snapshot.jobs.map((job) => (
         <section key={job.jobId} className="card estimate-document-job" data-revision={job.revisionId}>
           <header className="finding-head">

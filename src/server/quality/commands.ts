@@ -5,6 +5,7 @@ import { ConflictError, NotFoundError, ValidationError } from "../core/errors";
 import { isUuid } from "../core/ids";
 import type { DB, OldPartsDisposition } from "../db/schema";
 import { requirePermission, type Staff } from "../estimate/commands";
+import { expireIfDue } from "../estimate/versions";
 import { denyAsNotFound } from "../inspection/access";
 
 /**
@@ -78,7 +79,9 @@ export async function requestQc(
         status: ro.status,
       });
     }
-    // AC2-25: no estimate version awaiting the customer's decision.
+    // AC2-25: no estimate version awaiting the customer's decision. An overdue one has expired (§5), so it is
+    // recorded as expired and no longer blocks.
+    await expireIfDue(ctx, repairOrderId, "qc_request");
     const sent = await ctx.tx
       .selectFrom("estimate_version")
       .innerJoin("estimate", "estimate.id", "estimate_version.estimate_id")
@@ -93,6 +96,24 @@ export async function requestQc(
         {
           reason: "decision_pending",
           version: String(sent.version_no),
+        },
+      );
+    }
+    // OD-59: an unsent later version would be stranded once the car leaves In progress.
+    const draft = await ctx.tx
+      .selectFrom("estimate_version")
+      .innerJoin("estimate", "estimate.id", "estimate_version.estimate_id")
+      .select("estimate_version.version_no")
+      .where("estimate.repair_order_id", "=", repairOrderId)
+      .where("estimate_version.status", "=", "draft")
+      .executeTakeFirst();
+    if (draft) {
+      throw new ConflictError(
+        "draft_open",
+        `Version ${draft.version_no} is an unsent draft — send or discard it first`,
+        {
+          reason: "draft_open",
+          version: String(draft.version_no),
         },
       );
     }

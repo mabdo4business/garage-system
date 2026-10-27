@@ -1,4 +1,4 @@
-import type { Kysely } from "kysely";
+import { sql, type Kysely } from "kysely";
 import { isUuid } from "../core/ids";
 import type { DB, JobExecutionStatus, OldPartsDisposition, QcStatus, RepairOrderStatus } from "../db/schema";
 
@@ -28,19 +28,22 @@ export interface QcView {
   jobs: { id: string; title: string; status: JobExecutionStatus; assigneeName: string | null }[];
   records: QcRecordView[];
   /** What still stops a QC request, if anything (B1 / AC2-25). */
-  blocker: "not_in_progress" | "decision_pending" | "work_not_finished" | null;
+  blocker: QcBlocker | null;
 }
 
-export type QcBlocker = "not_in_progress" | "decision_pending" | "work_not_finished";
+export type QcBlocker = "not_in_progress" | "decision_pending" | "draft_open" | "work_not_finished";
 
 /** Why QC cannot be requested yet (null: it can). Jobs are the repair order's authorized, not removed jobs. */
 export function qcBlockerOf(
   status: RepairOrderStatus,
   decisionPending: boolean,
   jobStatuses: readonly JobExecutionStatus[],
+  draftOpen = false,
 ): QcBlocker | null {
   if (status !== "in_progress") return "not_in_progress";
   if (decisionPending) return "decision_pending";
+  // OD-59: an unsent later version is sent or discarded first, never stranded by QC.
+  if (draftOpen) return "draft_open";
   // Same finished set as requestQc and the database guard (migration 0016): done or stopped by the customer.
   if (jobStatuses.some((job) => !["done", "stopped_by_customer"].includes(job))) {
     return "work_not_finished";
@@ -83,11 +86,21 @@ export async function qcView(db: Kysely<DB>, repairOrderId: string): Promise<QcV
     .select("estimate_version.id")
     .where("estimate.repair_order_id", "=", repairOrderId)
     .where("estimate_version.status", "=", "sent")
+    // An overdue version no longer blocks: requesting QC records its expiry (I2-01).
+    .where("estimate_version.expires_at", ">", sql<Date>`now()`)
+    .executeTakeFirst();
+  const draft = await db
+    .selectFrom("estimate_version")
+    .innerJoin("estimate", "estimate.id", "estimate_version.estimate_id")
+    .select("estimate_version.id")
+    .where("estimate.repair_order_id", "=", repairOrderId)
+    .where("estimate_version.status", "=", "draft")
     .executeTakeFirst();
   const blocker = qcBlockerOf(
     ro.status,
     Boolean(sent),
     jobs.map((job) => job.execution_status),
+    Boolean(draft),
   );
   return {
     repairOrderId: ro.id,
