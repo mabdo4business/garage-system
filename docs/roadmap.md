@@ -26,14 +26,14 @@ Status values: `not started` · `in progress` · `done (unmerged)` · `done` · 
 
 ## Current position
 
-- **Wave:** 1 · **Increment:** 1 · **Active story:** none; every Increment 1 story is in `qa` (PRs #1–#7)
+- **Wave:** 2 · **Increment:** 2 · **Active story:** none. Increment 1 is complete: every story and its exit test are in `qa` (PRs #1–#8), so the Wave 1 gate is passed
 - **Redesign:** UI-R1 (tokens, shell, dashboard), UI-R2 (workshop board) and UI-R3 (technician bay screen) done, in `qa` (PR #5)
-- **Next story:** Increment 2. I2-01 (estimate versions) needs no open decision; I2-04/I2-05/I2-07/I2-08 wait for D-5, D-6, D-7, D-11, B-09, D-30. Increment 1 exit test (`tests/e2e/exit-increment-1.spec.ts`) passes, unmerged, on `test/I1-exit-e2e`
-- **Next decision needed:** check I1-10's needs before starting (v0.2 EP-10, v0.2.1 §3.8); V-2 must still confirm invoice content, titles and rounding (OD-42, OD-45) before real invoices
+- **Next story:** I2-01 (estimate versions), which needs no open decision; I2-02, I2-03, I2-06 and I2-09 follow from it. I2-04, I2-05, I2-07 and I2-08 wait for D-5, D-6, D-7, D-11, B-09 and D-30
+- **Next decision needed:** D-5, D-6, D-7, D-11, B-09 and D-30 before I2-04 onwards; V-2 must still confirm invoice content, titles and rounding (OD-42, OD-45) before real invoices
 
 ### Housekeeping before more feature work
 
-`qa` holds Increment 0, I1-01, I1-11, I1-02 to I1-10 and the redesign UI-R1 to UI-R3 (PRs #1–#7); `main` is still at "Initial commit" (it moves only after UAT).
+`qa` holds Increment 0, I1-01, I1-11, I1-02 to I1-10 and the redesign UI-R1 to UI-R3 (PRs #1–#8); `main` is still at "Initial commit" (it moves only after UAT).
 
 - [x] Finish I1-11: `npm run check` and `npm run test:e2e` pass, integrity review, commit (include `AGENTS.md`)
 - [x] Push `feature/increment-0` and `story/I1-11-app-shell` (I1-01 reached GitHub inside the I1-11 branch)
@@ -43,6 +43,7 @@ Status values: `not started` · `in progress` · `done (unmerged)` · `done` · 
 - [x] I1-03 to I1-08 pushed and merged into `qa` together (PR #4, from `story/I1-08-quality-check`)
 - [x] I1-09a, I1-09b and UI-R1 to UI-R3 pushed and merged into `qa` together (PR #5, from `ui/redesign`)
 - [x] I1-10 pushed and merged into `qa` (PR #7)
+- [x] Increment 1 exit test pushed and merged into `qa` (PR #8)
 - [ ] Never commit `.next-preview/` (the preview server's build cache, one file over 200 MB): branches older than `ui/redesign` do not ignore it, so `git add -A` there picks it up and GitHub refuses the push
 - [ ] Before committing yourself: `git add -A` first. `git commit -a` and most IDE defaults skip new files (this broke `qa` twice)
 - [ ] Rule from now on: every story branch is pushed the same day it is committed
@@ -86,7 +87,7 @@ Scope, spec references and tests per story: `docs/implementation-plan.md` Part 3
 |---|---|---|---|---|---|
 | I0 | Foundations (roles, auth, audit, idempotency, numbering, outbox, i18n) | done | `feature/increment-0` | 2026-10-15 | 80 tests; merged to `qa` (PR #1) |
 
-### Increment 1 — Walking skeleton · complete (exit test passing; merge `test/I1-exit-e2e`)
+### Increment 1 — Walking skeleton · done
 
 Decisions first: B-08. Exit: a full repair order runs through the UI in Arabic and English; P0-06 guard active; all I1
 tests pass.
@@ -298,3 +299,4 @@ versioned customer API built on P-01's sign-in.
 | 2026-10-27 | I1-10 committed (done, unmerged) after integrity review fixes; OD-51–OD-54 (D-13 closed as OD-52), T-36 recorded |
 | 2026-10-27 | PR #7 merged: I1-10 done (in `qa`); all Increment 1 stories done — exit check pending |
 | 2026-10-27 | Increment 1 exit test added: one repair order from check-in to handover through the staff screens, in Arabic and English, desktop and tablet; P0-06 refuses the invoice until the part is issued |
+| 2026-10-27 | PR #8 merged: Increment 1 exit test in `qa`; Increment 1 done, Wave 1 gate passed; I2-01 next |
