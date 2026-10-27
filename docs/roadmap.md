@@ -26,14 +26,14 @@ Status values: `not started` · `in progress` · `done (unmerged)` · `done` · 
 
 ## Current position
 
-- **Wave:** 1 · **Increment:** 1 · **Active story:** none; I1-10 (payments & delivery) done, unmerged, on `story/I1-10-payments-delivery` (branched from `qa` after PR #6) — Increment 1 complete once merged; I1-01 to I1-09 and I1-11 are in `qa` (PRs #1–#5)
+- **Wave:** 1 · **Increment:** 1 · **Active story:** none; every Increment 1 story is in `qa` (PRs #1–#7)
 - **Redesign:** UI-R1 (tokens, shell, dashboard), UI-R2 (workshop board) and UI-R3 (technician bay screen) done, in `qa` (PR #5)
-- **Next story:** Increment 2 after I1-10 is merged: I2-01 (estimate versions) needs no open decision; I2-04/I2-05/I2-07/I2-08 wait for D-5, D-6, D-7, D-11, B-09, D-30. Increment 1 exit check first: a full repair order through the UI in Arabic and English
+- **Next story:** Increment 1 exit check first — one repair order end to end through the UI in Arabic and English (the stories' specs cover each step separately; there is no single end-to-end run yet). Then Increment 2: I2-01 (estimate versions) needs no open decision; I2-04/I2-05/I2-07/I2-08 wait for D-5, D-6, D-7, D-11, B-09, D-30
 - **Next decision needed:** check I1-10's needs before starting (v0.2 EP-10, v0.2.1 §3.8); V-2 must still confirm invoice content, titles and rounding (OD-42, OD-45) before real invoices
 
 ### Housekeeping before more feature work
 
-`qa` holds Increment 0, I1-01, I1-11, I1-02 to I1-09 and the redesign UI-R1 to UI-R3 (PRs #1–#5); `main` is still at "Initial commit" (it moves only after UAT).
+`qa` holds Increment 0, I1-01, I1-11, I1-02 to I1-10 and the redesign UI-R1 to UI-R3 (PRs #1–#7); `main` is still at "Initial commit" (it moves only after UAT).
 
 - [x] Finish I1-11: `npm run check` and `npm run test:e2e` pass, integrity review, commit (include `AGENTS.md`)
 - [x] Push `feature/increment-0` and `story/I1-11-app-shell` (I1-01 reached GitHub inside the I1-11 branch)
@@ -42,6 +42,7 @@ Status values: `not started` · `in progress` · `done (unmerged)` · `done` · 
 - [x] I1-02 merged into `qa` (PR #3); `qa` builds again
 - [x] I1-03 to I1-08 pushed and merged into `qa` together (PR #4, from `story/I1-08-quality-check`)
 - [x] I1-09a, I1-09b and UI-R1 to UI-R3 pushed and merged into `qa` together (PR #5, from `ui/redesign`)
+- [x] I1-10 pushed and merged into `qa` (PR #7)
 - [ ] Never commit `.next-preview/` (the preview server's build cache, one file over 200 MB): branches older than `ui/redesign` do not ignore it, so `git add -A` there picks it up and GitHub refuses the push
 - [ ] Before committing yourself: `git add -A` first. `git commit -a` and most IDE defaults skip new files (this broke `qa` twice)
 - [ ] Rule from now on: every story branch is pushed the same day it is committed
@@ -85,7 +86,7 @@ Scope, spec references and tests per story: `docs/implementation-plan.md` Part 3
 |---|---|---|---|---|---|
 | I0 | Foundations (roles, auth, audit, idempotency, numbering, outbox, i18n) | done | `feature/increment-0` | 2026-10-15 | 80 tests; merged to `qa` (PR #1) |
 
-### Increment 1 — Walking skeleton · in progress
+### Increment 1 — Walking skeleton · stories done; exit check pending
 
 Decisions first: B-08. Exit: a full repair order runs through the UI in Arabic and English; P0-06 guard active; all I1
 tests pass.
@@ -106,7 +107,7 @@ tests pass.
 | I1-09 | Invoice | L | I1-07, I1-08 | done | `story/I1-09b-printed-invoice` | 2026-10-26 | Split into I1-09a and I1-09b (I1-09b's branch includes I1-09a). Carries AC2-19; snapshot tax code, category (treatment), rate, registration status and TRN per line (needs a code+category+rate lookup); refuse invoicing without a tax profile; registration evidence attachment (spec §4.4) still deferred |
 | I1-09a | Invoice issue | M | I1-07, I1-08 | done | `story/I1-09-invoice` | 2026-10-26 | Migration 0017; drafts from done, authorized lines (T-29), issue under repair order → revision line → number series locks with the cap (AC21-02, AC21-04) and P0-06 for stock and non-stock parts (AT-12, B-08), tax per line on the invoice date (AC2-19, OD-41), gap-free INV numbers (AC2-17, OD-40), immutable invoices with a customer/vehicle snapshot (AC2-18, T-32), WIP → COGS (T-28), Ready on issue (B1), late parts to done lines (T-30); decisions OD-40–OD-44, T-28–T-32, OQ-2 open; 295 tests + 28 e2e |
 | I1-09b | Printed invoice | M | I1-09a, OD-42 | done | `story/I1-09b-printed-invoice` | 2026-10-26 | Migration 0018; partner-entered business profile kept as versions, the invoice records the one in force at issue (OD-46), no invoice without it (OD-47); bilingual A4 print view from `customerInvoice` only (rule 9, OD-48), "Tax Invoice / فاتورة ضريبية" or "Invoice / فاتورة" with TRN and VAT columns only when registered (AC2-19, OD-42), changed-tax lines and rounding footnote (OD-45, closes OQ-2); tablet menu now wraps; decisions OD-45–OD-48, T-33; 307 tests + 28 e2e; no warranty terms until D-15 (OD-43) |
-| I1-10 | Payments & delivery | M | I1-09 | done (unmerged) | `story/I1-10-payments-delivery` | 2026-10-27 | Migration 0019; payments (cash, card with approval code, transfer with reference — OD-51; no rounding, OD-52) insert-only, one per key (AC2-20, AT-03/04), same-amount confirmation, no overpayment also when racing (AC2-21), card numbers refused (AC2-22); handover with keys and belongings (OD-54), balance due blocks it unless a partner releases with a reason (AC2-27, OD-53) — audited, outbox alert, Needs attention for partners and the manager, weekly list query; Delivered → Closed at balance 0 (B1); board Take payment / Hand over and real balances on the dashboard (lifts the OD-50 lock); T-36; 360 tests (21 new in s26, 1 in s24) + 36 e2e (2 new) |
+| I1-10 | Payments & delivery | M | I1-09 | done | `story/I1-10-payments-delivery` | 2026-10-27 | Migration 0019; payments (cash, card with approval code, transfer with reference — OD-51; no rounding, OD-52) insert-only, one per key (AC2-20, AT-03/04), same-amount confirmation, no overpayment also when racing (AC2-21), card numbers refused (AC2-22); handover with keys and belongings (OD-54), balance due blocks it unless a partner releases with a reason (AC2-27, OD-53) — audited, outbox alert, Needs attention for partners and the manager, weekly list query; Delivered → Closed at balance 0 (B1); board Take payment / Hand over and real balances on the dashboard (lifts the OD-50 lock); T-36; 360 tests (21 new in s26, 1 in s24) + 36 e2e (2 new) |
 
 ### Redesign (owner request, 2026-10-27)
 
@@ -295,3 +296,4 @@ versioned customer API built on P-01's sign-in.
 | 2026-10-27 | UI-R3 (technician bay screen) committed (done, unmerged); T-35 recorded; redesign complete pending the owner's review |
 | 2026-10-27 | PR #5 merged: I1-09 (I1-09a, I1-09b) and the redesign UI-R1 to UI-R3 done (in `qa`) |
 | 2026-10-27 | I1-10 committed (done, unmerged) after integrity review fixes; OD-51–OD-54 (D-13 closed as OD-52), T-36 recorded |
+| 2026-10-27 | PR #7 merged: I1-10 done (in `qa`); all Increment 1 stories done — exit check pending |
