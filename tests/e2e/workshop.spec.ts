@@ -64,7 +64,8 @@ test("manager assigns on the board; the technician runs the job in Arabic, witho
   await job.locator("select[name=assigneeId]").selectOption({ label: "Tariq Technician · Technician" });
   await job.locator("input[name=bay]").fill("Bay 3");
   await job.getByRole("button", { name: "Assign" }).click();
-  await expect(manager.locator(`li[data-job="${jobId}"]`)).toContainText("Tariq Technician");
+  // The assignee line, not the open form (whose options also name Tariq).
+  await expect(manager.locator(`li[data-job="${jobId}"] .board-job-who`)).toContainText("Tariq Technician");
   await expect(manager.locator(`li[data-job="${jobId}"]`)).toContainText("Bay 3");
 
   // Technician, in Arabic.

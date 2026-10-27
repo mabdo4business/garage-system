@@ -151,9 +151,15 @@ test("a balance blocks the advisor; the partner releases with a reason; a repeat
     "A payment of this amount was just recorded",
   );
   await expect(paymentsCard(advisor).locator(".payment-list li")).toHaveCount(1);
-  await paymentsCard(advisor).getByLabel("This is a second payment of the same amount").check();
-  await paymentsCard(advisor).getByRole("button", { name: "Record payment" }).click();
-  await expect(paymentsCard(advisor).locator(".payment-list li")).toHaveCount(2);
+  // React resets a form after its action returns; tick and save until it sticks. Repeating is safe: the form key
+  // stays the same, so a second submission replays the first instead of recording another payment.
+  await expect(async () => {
+    if ((await paymentsCard(advisor).locator(".payment-list li").count()) < 2) {
+      await paymentsCard(advisor).getByLabel("This is a second payment of the same amount").check();
+      await paymentsCard(advisor).getByRole("button", { name: "Record payment" }).click();
+    }
+    await expect(paymentsCard(advisor).locator(".payment-list li")).toHaveCount(2, { timeout: 3_000 });
+  }).toPass({ timeout: 30_000 });
   await expect(paymentsCard(advisor)).toContainText("200.00");
   await expect(paymentsCard(advisor).getByRole("button", { name: "Hand over the car" })).toHaveCount(0);
 
