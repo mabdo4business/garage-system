@@ -38,6 +38,21 @@ export async function taxSetUp(partner: Page): Promise<string> {
   return taxCode;
 }
 
+/** The business profile printed on invoices (OD-42), entered by a partner in Arabic; a new version each run. */
+export async function businessProfileSetUp(partnerAr: Page, legalNameEn: string): Promise<void> {
+  await partnerAr.goto("/ar/settings/business");
+  await expect(partnerAr.locator("html")).toHaveAttribute("dir", "rtl");
+  const form = partnerAr.locator("main form.form");
+  if (!(await form.isVisible())) await partnerAr.locator("main summary").click();
+  await partnerAr.locator("#legalNameEn").fill(legalNameEn);
+  await partnerAr.locator("#legalNameAr").fill("كراج الاختبار ذ.م.م");
+  await partnerAr.locator("#addressEn").fill("Industrial Area 6, Sharjah");
+  await partnerAr.locator("#addressAr").fill("المنطقة الصناعية 6، الشارقة");
+  await partnerAr.locator("#phone").fill("06 555 1234");
+  await partnerAr.getByRole("button", { name: "حفظ كنسخة جديدة" }).click();
+  await expect(partnerAr.locator("main dl").first()).toContainText(legalNameEn);
+}
+
 export async function addItem(
   manager: Page,
   kind: "labor_rate" | "part",

@@ -18,6 +18,7 @@
     "test:watch": "vitest",
     "check": "npm run typecheck && npm run lint && npm run format:check && npm test",
     "db:dev": "tsx scripts/dev-db.ts",
+    "db:demo": "tsx scripts/demo-data.ts",
     "db:bootstrap": "tsx scripts/bootstrap-roles.ts",
     "db:migrate": "tsx scripts/migrate.ts",
     "user:create": "tsx scripts/create-user.ts",

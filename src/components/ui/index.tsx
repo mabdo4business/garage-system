@@ -1,6 +1,6 @@
 import type { AnchorHTMLAttributes, ButtonHTMLAttributes, ReactNode } from "react";
 import { t, type Locale } from "../../i18n";
-import type { Emirate } from "../../server/db/schema";
+import type { Emirate, JobExecutionStatus, RepairOrderStatus } from "../../server/db/schema";
 
 /**
  * The shared component set from the UI/UX deck (slide 13). Plain components without hooks, so
@@ -166,13 +166,47 @@ function cx(...classes: (string | undefined)[]): string {
   return classes.filter(Boolean).join(" ");
 }
 
-/** A status shown in words with a coloured edge (deck: status never by colour alone). */
+/** The six status colour pairs of the redesign references, plus "diagnosing" (tokens.css, OD-49). */
+export type StatusTone = "checked" | "diagnosing" | "approval" | "progress" | "parts" | "qc" | "ready";
+
+/** Repair order status → its colour pair. Closed states reuse the neutral pair; the word still says which. */
+export const REPAIR_ORDER_TONE: Record<RepairOrderStatus, StatusTone> = {
+  checked_in: "checked",
+  diagnosing: "diagnosing",
+  awaiting_approval: "approval",
+  in_progress: "progress",
+  qc: "qc",
+  release_check: "qc",
+  ready: "ready",
+  delivered: "checked",
+  closed: "checked",
+  cancelled: "checked",
+};
+
+/** Job execution status → its colour pair (waiting parts is the purple pair of the references). */
+export const JOB_STATUS_TONE: Record<JobExecutionStatus, StatusTone> = {
+  not_authorized: "approval",
+  authorized: "checked",
+  waiting_parts: "parts",
+  in_progress: "progress",
+  paused: "approval",
+  done: "ready",
+  stopped_by_customer: "checked",
+  cancelled: "checked",
+};
+
+/**
+ * A status shown in words (deck: status never by colour alone): a coloured edge by tone, or the filled
+ * colour pair of a workshop status.
+ */
 export function StatusChip({
   children,
   tone = "info",
+  status,
 }: {
   children: ReactNode;
   tone?: "info" | "neutral" | "warning" | "success" | "danger";
+  status?: StatusTone;
 }) {
-  return <span className={`chip chip-${tone}`}>{children}</span>;
+  return <span className={`chip ${status ? `chip-status-${status}` : `chip-${tone}`}`}>{children}</span>;
 }

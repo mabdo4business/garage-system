@@ -85,6 +85,17 @@ export const PERMISSIONS = {
   // I1-08: QC (OD-36). Technicians may request QC only on repair orders they have a job on (checked in the command).
   "qc.request": ["partner", "manager", "technician"],
   "qc.decide": ["partner", "manager"],
+
+  // I1-09: invoices. The accountant reads them (read-only role); advisors, managers and partners issue (PRD v0.2 §D1).
+  "invoice.read": ["partner", "manager", "service_advisor", "accountant"],
+  "invoice.issue": ["partner", "manager", "service_advisor"],
+  // I1-09b: the business profile printed on invoices is partner-entered (OD-42), like tax settings (T-15).
+  "business_profile.manage": ["partner"],
+
+  // Redesign (OD-50): the workshop dashboard for front-office roles; its money figures (revenue, amounts) for
+  // partners and the manager only until the per-user report toggle T1 (I5-01).
+  "dashboard.read": ["partner", "manager", "service_advisor"],
+  "dashboard.money": ["partner", "manager"],
 } as const satisfies Record<string, readonly Role[]>;
 
 export type Permission = keyof typeof PERMISSIONS;

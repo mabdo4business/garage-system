@@ -15,6 +15,7 @@ import { formatAed } from "../../../../../i18n/format";
 import { qcView } from "../../../../../server/quality/queries";
 import { ActionForm } from "../../../action-form";
 import { requestQcAction } from "./qc/actions";
+import { InvoiceCard } from "./invoice/invoice-card";
 import { randomUUID } from "node:crypto";
 
 export const dynamic = "force-dynamic";
@@ -201,6 +202,15 @@ export default async function RepairOrderPage({
             />
           ) : null}
         </Card>
+      ) : null}
+
+      {hasPermission(session.roles, "invoice.read") ? (
+        <InvoiceCard
+          locale={locale}
+          repairOrderId={ro.id}
+          canIssue={hasPermission(session.roles, "invoice.issue")}
+          qcPassed={latestQc?.status === "passed"}
+        />
       ) : null}
 
       {hasPermission(session.roles, "estimate.read") ? (

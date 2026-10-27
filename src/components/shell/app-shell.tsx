@@ -9,6 +9,12 @@ export interface ShellUser {
   roles: readonly string[];
 }
 
+/** The garage's name from the business profile (I1-09b), if a partner has entered it. */
+export interface ShellBrand {
+  nameAr: string;
+  nameEn: string;
+}
+
 /**
  * Every staff screen: menu by role, the global search bar (deck: "on every staff screen"), the
  * signed-in user, language switch and sign-out. Display only — each page checks its own
@@ -17,12 +23,15 @@ export interface ShellUser {
 export function AppShell({
   locale,
   user,
+  brand = null,
   children,
 }: {
   locale: Locale;
   user: ShellUser;
+  brand?: ShellBrand | null;
   children: ReactNode;
 }) {
+  const brandName = brand ? (locale === "ar" ? brand.nameAr : brand.nameEn) : t(locale, "app.name");
   const roleNames = user.roles
     .filter(isRole)
     .map((role) => t(locale, `shell.role.${role}` as MessageKey))
@@ -32,7 +41,15 @@ export function AppShell({
   return (
     <div className="shell">
       <nav className="shell-nav" aria-label={t(locale, "nav.label")}>
-        <div className="shell-brand">{t(locale, "app.name")}</div>
+        <div className="shell-brand">
+          <span className="mark" aria-hidden="true">
+            {Array.from(brandName)[0]}
+          </span>
+          <span className="names">
+            <strong>{brandName}</strong>
+            <small>{t(locale, "shell.tagline")}</small>
+          </span>
+        </div>
         <NavLinks locale={locale} items={navFor(user.roles)} />
       </nav>
       <div className="shell-main">

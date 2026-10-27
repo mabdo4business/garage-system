@@ -13,7 +13,20 @@ export function NavLinks({ locale, items }: { locale: Locale; items: NavItem[] }
       {items.map((item) => (
         <li key={item.key}>
           <a href={`/${locale}${item.path}`} aria-current={isActive(item, rest) ? "page" : undefined}>
-            {t(locale, item.label)}
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d={item.icon} />
+            </svg>
+            <span>{t(locale, item.label)}</span>
           </a>
         </li>
       ))}

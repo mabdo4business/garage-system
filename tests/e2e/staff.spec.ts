@@ -20,8 +20,12 @@ test("advisor: Today, search, duplicate warning, vehicle, two plate changes with
 }) => {
   await signIn(page, "en", "advisor");
   await expect(page.locator("html")).toHaveAttribute("dir", "ltr");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("Amal Advisor");
-  await expect(page.locator(".quick-actions a")).toHaveCount(3);
+  // Today is the workshop dashboard for advisors, without money (OD-50: revenue and amounts are partner/manager).
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Workshop overview");
+  await expect(page.locator(".kpi")).toHaveCount(3);
+  await expect(page.locator("main")).not.toContainText("Revenue");
+  await expect(page.locator("main")).not.toContainText("AED");
+  await expect(page.locator(".orders-table th")).not.toContainText(["Amount"]);
 
   // The global search bar is on every staff screen; an unknown query shows the empty state.
   await page.locator("#shell-search").fill("Nobody Here Zzz");
@@ -97,7 +101,10 @@ test("technician: search only, no phone numbers, no registration pages", async (
 
   const page = await (await browser.newContext()).newPage();
   await signIn(page, "en", "technician");
-  await expect(page.locator(".quick-actions a")).toHaveCount(1);
+  // Technicians land on My jobs; Today sends them there too (OD-50).
+  await expect(page).toHaveURL(/\/en\/jobs$/);
+  await page.goto("/en");
+  await expect(page).toHaveURL(/\/en\/jobs$/);
 
   await page.goto(`/en/search?q=${encodeURIComponent(name)}`);
   await expect(page.getByRole("link", { name: "New customer" })).toHaveCount(0);

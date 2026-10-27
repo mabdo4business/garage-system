@@ -121,6 +121,13 @@ const ERROR_KEYS: Record<string, MessageKey> = {
   work_not_finished: "error.workNotFinished",
   qc_not_pending: "error.qcNotPending",
   qc_self_check: "error.qcSelfCheck",
+  qc_not_passed: "error.qcNotPassed",
+  nothing_to_invoice: "error.nothingToInvoice",
+  draft_closed: "error.draftClosed",
+  invoice_cap: "error.invoiceCap",
+  parts_not_issued: "error.partsNotIssued",
+  no_business_profile: "error.noBusinessProfile",
+  profile_changed: "error.profileChanged",
 };
 
 /**

@@ -324,6 +324,19 @@ export interface TaxProfileTable {
   created_by: string | null;
 }
 
+/** I1-09b: insert-only versions of the garage details printed on invoices (OD-42, OD-46). */
+export interface BusinessProfileTable {
+  id: Generated<string>;
+  supersedes_id: string | null;
+  legal_name_en: string;
+  legal_name_ar: string;
+  address_en: string;
+  address_ar: string;
+  phone: string;
+  created_at: Generated<Date>;
+  created_by: string | null;
+}
+
 export interface TaxCodeTable {
   code: string;
   label_en: string;
@@ -631,6 +644,94 @@ export interface QcRecordTable {
   decided_at: Date | null;
 }
 
+// I1-09 — invoices (migration 0017). Amounts and quantities as strings (Num).
+export interface InvoiceDraftTable {
+  id: Generated<string>;
+  repair_order_id: string;
+  status: Generated<"draft" | "issued" | "discarded">;
+  created_by: string | null;
+  created_at: Generated<Date>;
+  closed_by: string | null;
+  closed_at: Date | null;
+}
+
+export interface InvoiceDraftLineTable {
+  draft_id: string;
+  revision_line_id: string;
+}
+
+export interface InvoiceTable {
+  id: string;
+  number: string;
+  repair_order_id: string;
+  customer_id: string;
+  draft_id: string;
+  registration_status: "not_registered" | "registered";
+  trn: string | null;
+  gross: Num;
+  discount: Num;
+  net: Num;
+  vat: Num;
+  total: Num;
+  tax_change_notice: string | null;
+  issued_by: string | null;
+  issued_at: Generated<Date>;
+  business_date: ColumnType<string, string | undefined, never>;
+  // T-32: snapshot set by the invoice_guard trigger from the live rows; never written by the app.
+  ro_number: ColumnType<string, never, never>;
+  customer_name_en: ColumnType<string | null, never, never>;
+  customer_name_ar: ColumnType<string | null, never, never>;
+  vehicle_make: ColumnType<string, never, never>;
+  vehicle_model: ColumnType<string, never, never>;
+  vehicle_year: ColumnType<number, never, never>;
+  vehicle_vin: ColumnType<string | null, never, never>;
+  plate_emirate: ColumnType<Emirate | null, never, never>;
+  plate_code: ColumnType<string | null, never, never>;
+  plate_number: ColumnType<string | null, never, never>;
+  // OD-46: the business profile version in force at issue, set by the database (NULL only before 0018).
+  business_profile_id: ColumnType<string | null, never, never>;
+}
+
+export interface InvoiceLineTable {
+  id: Generated<string>;
+  invoice_id: string;
+  position: number;
+  revision_line_id: string;
+  job_id: string;
+  description_en: string;
+  description_ar: string;
+  line_type: string;
+  unit: string | null;
+  qty: Num;
+  unit_price: Num;
+  unit_price_net: Num;
+  gross: Num;
+  discount: Num;
+  net: Num;
+  vat: Num;
+  total: Num;
+  tax_code: string;
+  tax_category: string;
+  tax_rate: Num;
+  cogs: ColumnType<string | null, string | null, string | null>;
+}
+
+export interface RevisionLineBillingTable {
+  revision_line_id: string;
+  net_billed_qty: Num;
+  net_billed_net: Num;
+}
+
+export interface LineCogsMovementTable {
+  id: Generated<string>;
+  revision_line_id: string;
+  invoice_line_id: string;
+  qty: Num;
+  value: Num;
+  created_at: Generated<Date>;
+  business_date: ColumnType<string, string | undefined, never>;
+}
+
 export interface DB {
   app_user: AppUserTable;
   user_role: UserRoleTable;
@@ -655,6 +756,7 @@ export interface DB {
   checklist_template_item: ChecklistTemplateItemTable;
   finding: FindingTable;
   tax_profile: TaxProfileTable;
+  business_profile: BusinessProfileTable;
   tax_code: TaxCodeTable;
   tax_code_rate: TaxCodeRateTable;
   catalogue_item: CatalogueItemTable;
@@ -676,5 +778,11 @@ export interface DB {
   line_wip: LineWipTable;
   line_cost_movement: LineCostMovementTable;
   qc_record: QcRecordTable;
+  invoice_draft: InvoiceDraftTable;
+  invoice_draft_line: InvoiceDraftLineTable;
+  invoice: InvoiceTable;
+  invoice_line: InvoiceLineTable;
+  revision_line_billing: RevisionLineBillingTable;
+  line_cogs_movement: LineCogsMovementTable;
   schema_migration: SchemaMigrationTable;
 }

@@ -78,21 +78,39 @@ test("manager assigns on the board; the technician runs the job in Arabic, witho
   await expect(tech.locator("main")).not.toContainText("درهم");
 
   await tech.getByRole("button", { name: "بدء العمل" }).click();
-  await expect(tech.locator(".page-header")).toContainText("قيد التنفيذ");
+  await expect(tech.locator(".bay-status")).toContainText("قيد التنفيذ");
   await tech.locator("summary", { hasText: "إيقاف مؤقت" }).click();
   await tech.locator("#pauseReason").fill("بانتظار قرار العميل");
   await tech.getByRole("button", { name: "إيقاف مؤقت" }).click();
-  await expect(tech.locator(".page-header")).toContainText("متوقف مؤقتًا");
+  await expect(tech.locator(".bay-status")).toContainText("متوقف مؤقتًا");
   await tech.getByRole("button", { name: "استئناف العمل" }).click();
-  await expect(tech.locator(".page-header")).toContainText("قيد التنفيذ");
-  await tech.locator("label.choice-approved").first().click();
+  await expect(tech.locator(".bay-status")).toContainText("قيد التنفيذ");
+  // UI-R3 bay screen: Done is locked while an item has no outcome, then until the note is written.
+  await expect(tech.locator(".bay-done")).toBeDisabled();
+  await expect(tech.locator(".bay-done")).toContainText("بنود متبقية: 1");
+  await tech.locator(".bay-skip").first().click();
+  await expect(tech.locator(".bay-done")).toContainText("اكتب سبب كل بند لم يُنفَّذ");
+  await tech.locator(".bay-tick").first().click(); // changes the item to done
+  await expect(tech.locator(".bay-ring")).toHaveAttribute("aria-label", "1 من 1 بنود لها نتيجة");
+  await expect(tech.locator(".bay-done")).toContainText("ملاحظة الاكتمال");
   await tech.locator("#note").fill("تم تنظيف الفرامل");
   await tech.getByRole("button", { name: "تسجيل اكتمال العمل" }).click();
-  await expect(tech.locator(".page-header")).toContainText("مكتمل");
+  await expect(tech.locator(".bay-status")).toContainText("مكتمل");
+  await expect(tech.locator(".bay-finished")).toContainText("اكتمل العمل");
   await expect(tech.locator("main")).toContainText("بانتظار قرار العميل"); // history keeps the pause reason
 
   await manager.goto("/en/workshop");
   await expect(manager.locator(`li[data-job="${jobId}"]`)).toContainText("Done");
+
+  // UI-R2: all work done, so the board offers QC in one step; the card moves, pops, and a toast says so.
+  const card = manager.locator(`[data-card="${ro}"]`);
+  await card.getByRole("button", { name: "Send to quality check →" }).click();
+  const qcColumn = manager
+    .locator(".board-column")
+    .filter({ has: manager.getByRole("heading", { name: /Quality check/ }) });
+  await expect(qcColumn.locator(`[data-card="${ro}"]`)).toBeVisible();
+  await expect(manager.locator(".toast")).toContainText("moved to Quality check");
+  await expect(manager.locator(`[data-card="${ro}"]`)).toHaveClass(/\bpop\b/);
 
   // AC2-30: another technician gets "not found".
   const other = await pageFor(browser, "technician2");

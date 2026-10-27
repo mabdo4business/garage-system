@@ -9,7 +9,9 @@ export async function signIn(page: Page, locale: "ar" | "en", user: keyof typeof
   await page.locator("#username").fill(E2E_USERS[user].username);
   await page.locator("#password").fill(E2E_PASSWORD);
   await page.locator("form.form button[type=submit]").click();
-  await expect(page).toHaveURL(new RegExp(`/${locale}$`));
+  // Technicians land on My jobs; everyone else on Today (OD-50).
+  const landing = E2E_USERS[user].role === "technician" ? "/jobs" : "";
+  await expect(page).toHaveURL(new RegExp(`/${locale}${landing}$`));
 }
 
 /** Submits the form inside the page content (not the top bar's search form). */
