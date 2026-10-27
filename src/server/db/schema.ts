@@ -732,6 +732,35 @@ export interface LineCogsMovementTable {
   business_date: ColumnType<string, string | undefined, never>;
 }
 
+// I1-10 — payments and delivery (migration 0019). Insert-only.
+export type PaymentMethod = "cash" | "card" | "transfer";
+
+export interface PaymentTable {
+  id: Generated<string>;
+  invoice_id: string;
+  repair_order_id: string;
+  amount: ColumnType<string, string, never>; // numeric(14,2)
+  method: PaymentMethod;
+  reference: string | null;
+  idempotency_key: string;
+  recorded_by: string;
+  recorded_at: Generated<Date>;
+  business_date: ColumnType<string, string | undefined, never>;
+}
+
+export interface VehicleDeliveryTable {
+  id: Generated<string>;
+  repair_order_id: string;
+  keys_returned: boolean;
+  belongings_returned: boolean;
+  /** Set by the database from the invoice and payments (vehicle_delivery_guard). */
+  balance_due: ColumnType<string, string | undefined, never>;
+  override_reason: string | null;
+  delivered_by: string;
+  delivered_at: Generated<Date>;
+  business_date: ColumnType<string, string | undefined, never>;
+}
+
 export interface DB {
   app_user: AppUserTable;
   user_role: UserRoleTable;
@@ -784,5 +813,7 @@ export interface DB {
   invoice_line: InvoiceLineTable;
   revision_line_billing: RevisionLineBillingTable;
   line_cogs_movement: LineCogsMovementTable;
+  payment: PaymentTable;
+  vehicle_delivery: VehicleDeliveryTable;
   schema_migration: SchemaMigrationTable;
 }

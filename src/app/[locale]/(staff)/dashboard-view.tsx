@@ -109,6 +109,23 @@ function AttentionCard({
           <a href={`${base}/repair-orders/${item.repairOrderId}`}>{t(locale, "dashboard.openRepairOrder")}</a>
         </li>
       );
+    case "released_unpaid":
+      return (
+        <li className="attention attention-approval lift">
+          <span className="attention-kind">{t(locale, "dashboard.attention.releasedUnpaid")}</span>
+          <strong>
+            {item.balance
+              ? t(locale, "dashboard.attention.balanceDue", {
+                  amount: `\u2068${formatAed(Money.parse(item.balance), locale)}\u2069`,
+                })
+              : t(locale, "dashboard.attention.notPaid")}
+          </strong>
+          <span className="muted">
+            <bdi dir="ltr">{item.number}</bdi>
+          </span>
+          <a href={`${base}/repair-orders/${item.repairOrderId}`}>{t(locale, "dashboard.openRepairOrder")}</a>
+        </li>
+      );
   }
 }
 

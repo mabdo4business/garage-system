@@ -1,5 +1,6 @@
 import { sql, type Kysely } from "kysely";
 import { hasPermission } from "../auth/permissions";
+import { balancesFor } from "../billing/payments";
 import { Money } from "../core/money";
 import type { DB, Emirate, JobExecutionStatus, RepairOrderStatus } from "../db/schema";
 import { bookedSecondsOf, workedSeconds } from "../workshop/queries";
@@ -51,7 +52,15 @@ export type Attention =
       repairOrderId: string;
       number: string;
       invoiceNumber: string | null;
-      /** Invoice total still due (no payments exist before I1-10); money callers only. */
+      /** Balance due (invoice total − payments, I1-10); money callers only. */
+      balance: string | null;
+    }
+  | {
+      /** AC2-27: handed over with a balance by a partner's release override, not yet paid. */
+      kind: "released_unpaid";
+      repairOrderId: string;
+      number: string;
+      /** Money callers only. */
       balance: string | null;
     };
 
@@ -293,14 +302,44 @@ export async function dashboardSummary(
       });
     }
   }
-  for (const order of orders.filter((row) => row.status === "ready")) {
+  // Ready and not fully paid (I1-10: the real balance); a paid Ready car only waits for its owner.
+  const readyOrders = orders.filter((row) => row.status === "ready");
+  const balances = await balancesFor(
+    db,
+    readyOrders.map((order) => order.id),
+  );
+  for (const order of readyOrders) {
     const invoice = invoiceOf.get(order.id);
+    const balance = balances.get(order.id);
+    if (balance !== undefined && Money.parse(balance).isZero()) continue;
     attention.push({
       kind: "ready_unpaid",
       repairOrderId: order.id,
       number: order.number,
       invoiceNumber: invoice?.number ?? null,
-      balance: options.money && invoice ? Money.parse(invoice.total).toString() : null,
+      balance: options.money && balance !== undefined ? balance : null,
+    });
+  }
+  // A delivered order is still open only while a balance is due (delivery at balance 0 closes it, B1). Shown to
+  // partners and the manager (T-36), who would otherwise get the release alert.
+  const released = !options.money
+    ? []
+    : await db
+        .selectFrom("repair_order")
+        .select(["id", "number"])
+        .where("status", "=", "delivered")
+        .orderBy("number")
+        .execute();
+  const releasedBalances = await balancesFor(
+    db,
+    released.map((order) => order.id),
+  );
+  for (const order of released) {
+    attention.push({
+      kind: "released_unpaid",
+      repairOrderId: order.id,
+      number: order.number,
+      balance: releasedBalances.get(order.id) ?? null,
     });
   }
 

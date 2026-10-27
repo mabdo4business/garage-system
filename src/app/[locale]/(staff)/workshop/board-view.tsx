@@ -7,6 +7,7 @@ import { formatDuration, formatWhen } from "../../../../i18n/time-labels";
 import { Money } from "../../../../server/core/money";
 import type { RepairOrderStatus } from "../../../../server/db/schema";
 import { ASSIGNABLE_JOB_STATUSES } from "../../../../server/workshop/commands";
+import type { BoardAccess, BoardInvoice } from "../../../../server/workshop/board-access";
 import type { BoardJob, BoardRepairOrder } from "../../../../server/workshop/queries";
 
 /**
@@ -14,8 +15,8 @@ import type { BoardJob, BoardRepairOrder } from "../../../../server/workshop/que
  * every status in words, no prices on cards (AC-07.3). Each card says what happens next: a button only where the
  * board can do it in one step (request QC), otherwise a link to the screen that records it (approval needs a
  * signature, QC its checklist). Work never starts without a recorded approval (AC2-01, enforced in the database):
- * an order awaiting the customer says "do not start". Deliver stays locked, saying why, until payments (I1-10,
- * OD-50).
+ * an order awaiting the customer says "do not start". Deliver stays locked, saying why, while a balance is due
+ * (AC2-27); "Take payment" and "Hand over" open the repair order's payments (I1-10).
  */
 
 export const BOARD_COLUMNS = [
@@ -31,18 +32,8 @@ type Column = (typeof BOARD_COLUMNS)[number];
 const columnOf = (status: RepairOrderStatus): Column =>
   status === "release_check" ? "qc" : (status as Column);
 
-export interface BoardInvoice {
-  number: string;
-  /** Only for dashboard.money holders (OD-50); null otherwise. */
-  total: string | null;
-}
-
-export interface BoardPermissions {
-  editEstimate: boolean;
-  recordApproval: boolean;
-  requestQc: boolean;
-  decideQc: boolean;
-}
+export type { BoardInvoice } from "../../../../server/workshop/board-access";
+export type BoardPermissions = BoardAccess["can"];
 
 export function BoardView({
   locale,
@@ -125,18 +116,28 @@ export function BoardView({
           : locked(t(locale, "board.action.waitingQc"));
       case "ready": {
         const invoice = invoices.get(order.id);
+        if (invoice?.paid) {
+          return can.deliver
+            ? link(`/repair-orders/${order.id}#payments`, "board.action.handOver")
+            : link(`/repair-orders/${order.id}`, "board.action.open");
+        }
         const reason = !invoice
           ? t(locale, "board.deliver.noInvoice")
-          : invoice.total
+          : invoice.balance
             ? t(locale, "board.deliver.balanceDue", {
-                amount: `⁨${formatAed(Money.parse(invoice.total), locale)}⁩`,
+                amount: `⁨${formatAed(Money.parse(invoice.balance), locale)}⁩`,
               })
             : t(locale, "board.deliver.notPaid");
         return (
           <div className="board-deliver">
             {locked(reason)}
             <p className="muted">{t(locale, "board.deliver.why")}</p>
-            {link(`/repair-orders/${order.id}`, invoice ? "board.action.openInvoice" : "board.action.open")}
+            {invoice && can.takePayment
+              ? link(`/repair-orders/${order.id}#payments`, "board.action.takePayment")
+              : link(
+                  `/repair-orders/${order.id}`,
+                  invoice ? "board.action.openInvoice" : "board.action.open",
+                )}
           </div>
         );
       }

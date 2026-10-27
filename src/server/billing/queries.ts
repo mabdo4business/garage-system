@@ -5,6 +5,7 @@ import { Money } from "../core/money";
 import type { DB, Emirate } from "../db/schema";
 import { businessProfileById, type BusinessProfileView } from "../settings/business-profile";
 import { invoicePreview, type InvoiceAmounts } from "./invoice";
+import { balancesFor } from "./payments";
 
 /**
  * Invoice reads (I1-09). `invoiceView` is the issued document as staff see it; `customerInvoice` (no COGS, no staff
@@ -216,6 +217,8 @@ export interface RepairOrderInvoiceSummary {
   number: string;
   /** Invoice total (incl. VAT); callers show it only to holders of dashboard.money (OD-50). */
   total: string;
+  /** Total − payments (I1-10); amounts again only for dashboard.money holders. */
+  balance: string;
 }
 
 /** The issued invoice of each given repair order (one per repair order until I3-02). */
@@ -229,10 +232,12 @@ export async function invoicesForRepairOrders(
     .select(["repair_order_id", "id", "number", "total"])
     .where("repair_order_id", "in", [...repairOrderIds])
     .execute();
+  const balances = await balancesFor(db, [...repairOrderIds]);
   return rows.map((row) => ({
     repairOrderId: row.repair_order_id,
     invoiceId: row.id,
     number: row.number,
     total: row.total,
+    balance: balances.get(row.repair_order_id) ?? row.total,
   }));
 }

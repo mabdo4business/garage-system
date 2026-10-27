@@ -123,4 +123,11 @@ export const FIELD_LABELS: Record<string, MessageKey> = {
   jobIds: "qc.returnJobs",
   // I1-09 invoice
   taxChangeNotice: "invoice.taxChangeNotice",
+  // I1-10 payments and delivery
+  method: "payment.method",
+  approvalCode: "payment.reference",
+  transferReference: "payment.reference",
+  keysReturned: "delivery.keys",
+  belongingsReturned: "delivery.belongings",
+  overrideReason: "delivery.overrideReason",
 };
