@@ -43,12 +43,25 @@ export interface BayRow {
   reason: string | null;
 }
 
+/**
+ * Something a person should act on. `since` is when it started waiting, where the tables record it (estimate sent,
+ * job paused or put on waiting parts); the list is ordered most urgent first (UI-R4): the customer's decision blocks
+ * work, then money released or due, then stalled jobs; oldest first within a kind.
+ */
 export type Attention =
   | { kind: "awaiting_decision"; repairOrderId: string; number: string; since: Date | null }
-  | { kind: "paused"; jobId: string; number: string; title: string; reason: string | null }
-  | { kind: "waiting_parts"; jobId: string; number: string; title: string }
+  | {
+      kind: "paused";
+      jobId: string;
+      number: string;
+      title: string;
+      reason: string | null;
+      since: Date | null;
+    }
+  | { kind: "waiting_parts"; jobId: string; number: string; title: string; since: Date | null }
   | {
       kind: "ready_unpaid";
+      since: null;
       repairOrderId: string;
       number: string;
       invoiceNumber: string | null;
@@ -58,6 +71,7 @@ export type Attention =
   | {
       /** AC2-27: handed over with a balance by a partner's release override, not yet paid. */
       kind: "released_unpaid";
+      since: null;
       repairOrderId: string;
       number: string;
       /** Money callers only. */
@@ -73,6 +87,8 @@ export interface OrderRow {
   services: string[];
   technicians: string[];
   promisedAt: Date | null;
+  /** Past its promised time and not waiting for its owner (Ready, release check; T-38). */
+  overdue: boolean;
   /** Invoice total once issued, otherwise the approved amount; null without money or before any approval. */
   amount: string | null;
 }
@@ -89,7 +105,9 @@ export interface DailyAmount {
 
 export interface DashboardSummary {
   businessDate: string;
-  statusCounts: { status: DashboardStatus; count: number }[];
+  /** The instant the figures were read; relative times ("overdue by 2 h") are measured from it. */
+  generatedAt: Date;
+  statusCounts: { status: DashboardStatus; count: number; overdue: number }[];
   carsIn: number;
   /** Check-ins per business day, oldest first, the last seven days including today. */
   checkInsByDay: DailyCount[];
@@ -107,6 +125,27 @@ export interface DashboardSummary {
   attention: Attention[];
   orders: OrderRow[];
 }
+
+/** T-38: the customer's decision blocks work, then money, then stalled jobs. */
+const URGENCY: Attention["kind"][] = [
+  "awaiting_decision",
+  "released_unpaid",
+  "ready_unpaid",
+  "paused",
+  "waiting_parts",
+];
+
+/** Most urgent kind first; within a kind, longest waiting first (items without a start time last). In place. */
+export function sortAttention(items: Attention[]): Attention[] {
+  return items.sort(
+    (a, b) =>
+      URGENCY.indexOf(a.kind) - URGENCY.indexOf(b.kind) ||
+      (a.since?.getTime() ?? Infinity) - (b.since?.getTime() ?? Infinity),
+  );
+}
+
+/** Waiting for the owner, not the workshop: never overdue (T-38). */
+const WAITING_FOR_OWNER: RepairOrderStatus[] = ["ready", "release_check"];
 
 const asDashboardStatus = (status: RepairOrderStatus): DashboardStatus =>
   status === "release_check" ? "qc" : (status as DashboardStatus);
@@ -273,6 +312,10 @@ export async function dashboardSummary(
     })
     .sort((a, b) => (a.bay ?? "￿").localeCompare(b.bay ?? "￿", "en", { numeric: true }));
 
+  /** When a job entered its current status (its latest status event). */
+  const enteredAt = (jobId: string): Date | null =>
+    events.filter((event) => event.job_id === jobId).at(-1)?.occurred_at ?? null;
+
   const attention: Attention[] = [];
   // Only orders still Awaiting approval: under T-22 a partly decided version stays "sent" while approved jobs run.
   const awaitingOrders = orders.filter(
@@ -294,6 +337,7 @@ export async function dashboardSummary(
         number: numberOf.get(job.repair_order_id) ?? "",
         title: job.title,
         reason: job.execution_reason,
+        since: enteredAt(job.id),
       });
     } else if (job.execution_status === "waiting_parts") {
       attention.push({
@@ -301,6 +345,7 @@ export async function dashboardSummary(
         jobId: job.id,
         number: numberOf.get(job.repair_order_id) ?? "",
         title: job.title,
+        since: enteredAt(job.id),
       });
     }
   }
@@ -316,6 +361,7 @@ export async function dashboardSummary(
     if (balance !== undefined && Money.parse(balance).isZero()) continue;
     attention.push({
       kind: "ready_unpaid",
+      since: null,
       repairOrderId: order.id,
       number: order.number,
       invoiceNumber: invoice?.number ?? null,
@@ -339,11 +385,14 @@ export async function dashboardSummary(
   for (const order of released) {
     attention.push({
       kind: "released_unpaid",
+      since: null,
       repairOrderId: order.id,
       number: order.number,
       balance: releasedBalances.get(order.id) ?? null,
     });
   }
+
+  sortAttention(attention);
 
   const rows: OrderRow[] = orders.map((order) => {
     const own = byOrder(order.id);
@@ -369,6 +418,10 @@ export async function dashboardSummary(
       services: own.map((job) => job.title),
       technicians: [...new Set(own.map((job) => job.display_name).filter((name) => name !== null))],
       promisedAt: order.promised_at,
+      overdue:
+        order.promised_at !== null &&
+        order.promised_at.getTime() < now.getTime() &&
+        !WAITING_FOR_OWNER.includes(order.status),
       amount,
     };
   });
@@ -376,6 +429,7 @@ export async function dashboardSummary(
   const statusCounts = DASHBOARD_STATUSES.map((status) => ({
     status,
     count: rows.filter((row) => row.status === status).length,
+    overdue: rows.filter((row) => row.status === status && row.overdue).length,
   }));
   const awaitingSince = awaitingOrders
     .map((order) => sentAt.get(order.id) ?? null)
@@ -408,6 +462,7 @@ export async function dashboardSummary(
 
   return {
     businessDate,
+    generatedAt: now,
     statusCounts,
     carsIn: rows.length,
     checkInsByDay: dates.map((date) => ({ date, count: checkInsOn.get(date) ?? 0 })),

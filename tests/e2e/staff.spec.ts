@@ -22,7 +22,8 @@ test("advisor: Today, search, duplicate warning, vehicle, two plate changes with
   await expect(page.locator("html")).toHaveAttribute("dir", "ltr");
   // Today is the workshop dashboard for advisors, without money (OD-50: revenue and amounts are partner/manager).
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Workshop overview");
-  await expect(page.locator(".kpi")).toHaveCount(3);
+  await expect(page.locator(".flow-stage")).toHaveCount(6);
+  await expect(page.locator(".revenue")).toHaveCount(0);
   await expect(page.locator("main")).not.toContainText("Revenue");
   await expect(page.locator("main")).not.toContainText("AED");
   await expect(page.locator(".orders-table th")).not.toContainText(["Amount"]);

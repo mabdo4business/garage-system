@@ -178,8 +178,11 @@ test("a balance blocks the advisor; the partner releases with a reason; a repeat
 
   // The partners' dashboard shows it until it is paid.
   await partner.goto("/en");
+  // Most urgent first; with many items it may sit under "Show more".
+  const more = partner.locator(".attention-more summary");
+  if (await more.isVisible()) await more.click();
   await expect(
-    partner.locator(".attention").filter({ hasText: "Released with balance" }).first(),
+    partner.locator(".attention-row").filter({ hasText: "Released with balance" }).first(),
   ).toBeVisible();
   // Paying the rest after the handover closes the repair order.
   await advisor.goto(`/en/repair-orders/${ro}`);

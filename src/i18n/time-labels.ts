@@ -20,3 +20,31 @@ export function formatWhen(instant: Date, locale: Locale, businessDate: string):
     ? formatDubaiTime(instant, locale)
     : formatDubaiDateTime(instant, locale);
 }
+
+/**
+ * A promised time against now (UI-R4): "Overdue by 3 h", "Due in 40 min" within a day, otherwise the time (or date
+ * and time). `overdue` says which, for colour; the words carry it too.
+ */
+export function formatDue(
+  promisedAt: Date,
+  now: Date,
+  locale: Locale,
+  businessDate: string,
+): { label: string; overdue: boolean } {
+  const seconds = (promisedAt.getTime() - now.getTime()) / 1000;
+  // Within the minute either side: never "Overdue by 0 min".
+  if (Math.abs(seconds) < 60) return { label: t(locale, "dashboard.due.now"), overdue: seconds < 0 };
+  if (seconds < 0) {
+    return {
+      label: t(locale, "dashboard.due.overdue", { time: formatDuration(locale, -seconds) }),
+      overdue: true,
+    };
+  }
+  if (seconds < 24 * 3600) {
+    return {
+      label: t(locale, "dashboard.due.in", { time: formatDuration(locale, seconds) }),
+      overdue: false,
+    };
+  }
+  return { label: formatWhen(promisedAt, locale, businessDate), overdue: false };
+}

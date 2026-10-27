@@ -7,7 +7,12 @@ import { dubaiDate, formatDubaiTime } from "../../../i18n/format";
 import { requirePageSession } from "../server-support";
 import { hasPermission } from "../../../server/auth/permissions";
 import { getDb } from "../../../server/db/client";
-import { dashboardModeFor, dashboardSummary } from "../../../server/reporting/dashboard";
+import {
+  DASHBOARD_STATUSES,
+  dashboardModeFor,
+  dashboardSummary,
+  type DashboardStatus,
+} from "../../../server/reporting/dashboard";
 import { NoTaxProfileBanner } from "./catalogue/shared";
 import { DashboardView } from "./dashboard-view";
 
@@ -17,8 +22,15 @@ export const dynamic = "force-dynamic";
  * Today. Front-office roles (dashboard.read) get the workshop dashboard (OD-50), with money for dashboard.money
  * holders only; technicians go straight to My jobs; everyone else gets the business date and their shortcuts.
  */
-export default async function TodayPage({ params }: { params: Promise<{ locale: string }> }) {
+export default async function TodayPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ locale: string }>;
+  searchParams: Promise<{ stage?: string | string[] }>;
+}) {
   const { locale } = await params;
+  const { stage } = await searchParams;
   if (!isLocale(locale)) notFound();
   const session = await requirePageSession(locale);
   const db = getDb();
@@ -30,18 +42,27 @@ export default async function TodayPage({ params }: { params: Promise<{ locale: 
   if (mode === "dashboard") {
     const now = new Date();
     const summary = await dashboardSummary(db, { money, now });
+    const chosen = (DASHBOARD_STATUSES as readonly string[]).includes(String(stage))
+      ? (stage as DashboardStatus)
+      : null;
     return (
       <>
-        <div className="dashboard-toolbar wide">
-          <LiveRefresh locale={locale} renderedAt={formatDubaiTime(now, locale)} />
-          {hasPermission(session.roles, "repair_order.check_in") ? (
-            <ButtonLink href={`/${locale}/search`} variant="primary">
-              {t(locale, "dashboard.newCheckIn")}
-            </ButtonLink>
-          ) : null}
-        </div>
         {banner}
-        <DashboardView summary={summary} locale={locale} />
+        <DashboardView
+          summary={summary}
+          locale={locale}
+          stage={chosen}
+          actions={
+            <>
+              <LiveRefresh locale={locale} renderedAt={formatDubaiTime(now, locale)} />
+              {hasPermission(session.roles, "repair_order.check_in") ? (
+                <ButtonLink href={`/${locale}/search`} variant="primary">
+                  {t(locale, "dashboard.newCheckIn")}
+                </ButtonLink>
+              ) : null}
+            </>
+          }
+        />
       </>
     );
   }

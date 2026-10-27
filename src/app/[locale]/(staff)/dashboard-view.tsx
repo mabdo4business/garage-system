@@ -1,19 +1,27 @@
-import type { CSSProperties } from "react";
-import { BarChart, Donut, ProgressBar, Sparkline } from "../../../components/dashboard/charts";
+import type { CSSProperties, ReactNode } from "react";
+import { BarChart, ProgressBar } from "../../../components/dashboard/charts";
 import { CountUp, CountUpMoney } from "../../../components/dashboard/motion";
 import { JOB_STATUS_TONE, PlateBadge, REPAIR_ORDER_TONE, StatusChip } from "../../../components/ui";
 import { t, type Locale, type MessageKey } from "../../../i18n";
-import { formatDuration, formatWhen } from "../../../i18n/time-labels";
+import { formatDue, formatDuration, formatWhen } from "../../../i18n/time-labels";
 import { formatAed, formatAmountCompact, formatBusinessDay } from "../../../i18n/format";
 import { Money } from "../../../server/core/money";
-import type { Attention, DashboardSummary } from "../../../server/reporting/dashboard";
+import type {
+  Attention,
+  BayRow,
+  DashboardStatus,
+  DashboardSummary,
+} from "../../../server/reporting/dashboard";
+import { OrdersPanel, type OrderItem } from "./orders-panel";
 
 /**
- * The workshop dashboard (redesign reference docs/design/Main.dc.html, OD-50) from real figures. Money appears
- * only when `summary.money` is set, which the page does for `dashboard.money` holders only.
+ * Today, the workshop dashboard (UI-R4; data and permissions as OD-50). One screen answers three questions in
+ * order: where are the cars (the workshop flow strip), what needs someone now (Needs attention, most urgent first),
+ * and who is working on what (bays). The repair orders list below filters by stage, overdue and search. Money
+ * appears only when `summary.money` is set, which the page does for `dashboard.money` holders only.
  */
 
-const delay = (seconds: number) => ({ animationDelay: `${seconds.toFixed(2)}s` }) as CSSProperties;
+const ATTENTION_FIRST = 5;
 
 function initials(name: string | null): string {
   if (!name) return "—";
@@ -30,408 +38,502 @@ function initials(name: string | null): string {
 }
 
 const aed = (amount: string, locale: Locale) => <bdi dir="ltr">{formatAed(Money.parse(amount), locale)}</bdi>;
+/** An amount inside a sentence, isolated left-to-right (FSI … PDI). */
+const inlineAed = (amount: string, locale: Locale) => `⁨${formatAed(Money.parse(amount), locale)}⁩`;
 
-function AttentionCard({
-  item,
+// --------------------------------------------------------------------------- workshop flow
+
+function FlowStrip({
+  summary,
   locale,
-  businessDate,
+  stage,
 }: {
-  item: Attention;
+  summary: DashboardSummary;
   locale: Locale;
-  businessDate: string;
+  stage: DashboardStatus | null;
 }) {
+  const total = summary.carsIn;
+  return (
+    <section className="flow" aria-labelledby="flow-title">
+      <div className="flow-head">
+        <h2 id="flow-title">{t(locale, "dashboard.flow.title")}</h2>
+        <p className="flow-total">
+          <span className="flow-total-figure">
+            <CountUp value={total} />
+          </span>{" "}
+          {t(locale, "dashboard.carsIn")}
+        </p>
+      </div>
+      {/* The proportion of cars at each stage; the stages below carry the words and counts. */}
+      <div className="flow-track" aria-hidden="true">
+        {summary.statusCounts
+          .filter(({ count }) => count > 0)
+          .map(({ status, count }) => (
+            <span
+              key={status}
+              className="flow-track-part"
+              style={
+                {
+                  flexGrow: count,
+                  background: `var(--status-${REPAIR_ORDER_TONE[status]}-solid)`,
+                } as CSSProperties
+              }
+            />
+          ))}
+      </div>
+      <ol className="flow-stages">
+        {summary.statusCounts.map(({ status, count, overdue }) => (
+          <li key={status}>
+            <a
+              href={`/${locale}?stage=${status}#orders`}
+              className="flow-stage"
+              data-empty={count === 0 ? "true" : undefined}
+              aria-current={stage === status ? "true" : undefined}
+              style={{ "--stage": `var(--status-${REPAIR_ORDER_TONE[status]}-solid)` } as CSSProperties}
+            >
+              <span className="flow-stage-name">
+                {t(locale, `repairOrder.status.${status}` as MessageKey)}
+              </span>
+              <span className="flow-stage-count">{count}</span>
+              <span className={overdue > 0 ? "flow-stage-note is-late" : "flow-stage-note"}>
+                {overdue > 0
+                  ? t(locale, "dashboard.flow.overdue", { n: String(overdue) })
+                  : count === 0
+                    ? t(locale, "dashboard.flow.none")
+                    : status === "ready"
+                      ? t(locale, "dashboard.flow.toHandOver")
+                      : t(locale, "dashboard.flow.onTime")}
+              </span>
+            </a>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
+// --------------------------------------------------------------------------- revenue (money holders only)
+
+function RevenueCard({ summary, locale }: { summary: DashboardSummary; locale: Locale }) {
+  const money = summary.money!;
+  const max = money.revenueByDay.reduce((m, day) => {
+    const fils = Money.parse(day.total).fils;
+    return fils > m ? fils : m;
+  }, 0n);
+  const dayLabel = (date: string) =>
+    date === summary.businessDate ? t(locale, "dashboard.today") : formatBusinessDay(date, locale, "short");
+  return (
+    <section className="revenue" aria-labelledby="revenue-title">
+      <h2 id="revenue-title">{t(locale, "dashboard.revenue.today")}</h2>
+      <p className="revenue-figure">
+        <CountUpMoney amount={money.today} locale={locale} />
+      </p>
+      <p className="muted revenue-note">
+        {t(locale, "dashboard.kpi.invoicesToday", { n: String(money.invoicesToday) })}
+      </p>
+      <div className="revenue-week">
+        <span>{t(locale, "dashboard.revenue.week")}</span>
+        <strong>{aed(money.week, locale)}</strong>
+      </div>
+      <BarChart
+        label={t(locale, "dashboard.revenue.title")}
+        bars={money.revenueByDay.map((day) => {
+          const fils = Money.parse(day.total).fils;
+          return {
+            key: day.date,
+            label: dayLabel(day.date),
+            value: fils === 0n ? "" : formatAmountCompact(Money.parse(day.total), locale),
+            exact: formatAed(Money.parse(day.total), locale),
+            // Display share only (bar height), not an amount.
+            ratio: max > 0n ? Number((fils * 1000n) / max) / 1000 : 0,
+            highlight: day.date === summary.businessDate,
+          };
+        })}
+      />
+    </section>
+  );
+}
+
+// --------------------------------------------------------------------------- needs attention
+
+function attentionParts(item: Attention, locale: Locale, businessDate: string) {
   const base = `/${locale}`;
   switch (item.kind) {
     case "awaiting_decision":
-      return (
-        <li className="attention attention-approval lift">
-          <span className="attention-kind">{t(locale, "dashboard.attention.awaitingDecision")}</span>
-          <strong>{t(locale, "dashboard.attention.doNotStart", { number: item.number })}</strong>
-          {item.since ? (
-            <span className="muted">
-              {t(locale, "dashboard.attention.sentAt", {
-                time: formatWhen(item.since, locale, businessDate),
-              })}
-            </span>
-          ) : null}
-          <a href={`${base}/repair-orders/${item.repairOrderId}`}>{t(locale, "dashboard.openRepairOrder")}</a>
-        </li>
-      );
+      return {
+        tone: "approval",
+        word: t(locale, "dashboard.attention.awaitingDecision"),
+        title: t(locale, "dashboard.attention.doNotStart", { number: item.number }),
+        detail: item.since
+          ? t(locale, "dashboard.attention.sentAt", { time: formatWhen(item.since, locale, businessDate) })
+          : null,
+        href: `${base}/repair-orders/${item.repairOrderId}`,
+      };
     case "paused":
-      return (
-        <li className="attention attention-approval lift">
-          <span className="attention-kind">{t(locale, "dashboard.attention.paused")}</span>
-          <strong dir="auto">{item.title}</strong>
-          <span className="muted">
-            <bdi dir="ltr">{item.number}</bdi>
-            {item.reason ? (
-              <>
-                {" · "}
-                <bdi>{item.reason}</bdi>
-              </>
-            ) : null}
-          </span>
-          <a href={`${base}/jobs/${item.jobId}`}>{t(locale, "dashboard.openJob")}</a>
-        </li>
-      );
+      return {
+        tone: "approval",
+        word: t(locale, "dashboard.attention.paused"),
+        title: item.title,
+        detail: [item.number, item.reason].filter(Boolean).join(t(locale, "common.listSeparator")),
+        href: `${base}/jobs/${item.jobId}`,
+      };
     case "waiting_parts":
-      return (
-        <li className="attention attention-parts lift">
-          <span className="attention-kind">{t(locale, "dashboard.attention.waitingParts")}</span>
-          <strong dir="auto">{item.title}</strong>
-          <span className="muted">
-            <bdi dir="ltr">{item.number}</bdi>
-          </span>
-          <a href={`${base}/jobs/${item.jobId}`}>{t(locale, "dashboard.openJob")}</a>
-        </li>
-      );
+      return {
+        tone: "parts",
+        word: t(locale, "dashboard.attention.waitingParts"),
+        title: item.title,
+        detail: item.number,
+        href: `${base}/jobs/${item.jobId}`,
+      };
     case "ready_unpaid":
-      return (
-        <li className="attention attention-ready lift">
-          <span className="attention-kind">{t(locale, "dashboard.attention.readyUnpaid")}</span>
-          <strong>
-            {item.balance
-              ? t(locale, "dashboard.attention.balanceDue", {
-                  // Isolated left-to-right inside the sentence (FSI … PDI), like every amount on the page.
-                  amount: `\u2068${formatAed(Money.parse(item.balance), locale)}\u2069`,
-                })
-              : t(locale, "dashboard.attention.notPaid")}
-          </strong>
-          <span className="muted">
-            <bdi dir="ltr">{item.number}</bdi>
-            {item.invoiceNumber ? (
-              <>
-                {" · "}
-                <bdi dir="ltr">{item.invoiceNumber}</bdi>
-              </>
-            ) : null}
-          </span>
-          <a href={`${base}/repair-orders/${item.repairOrderId}`}>{t(locale, "dashboard.openRepairOrder")}</a>
-        </li>
-      );
     case "released_unpaid":
-      return (
-        <li className="attention attention-approval lift">
-          <span className="attention-kind">{t(locale, "dashboard.attention.releasedUnpaid")}</span>
-          <strong>
-            {item.balance
-              ? t(locale, "dashboard.attention.balanceDue", {
-                  amount: `\u2068${formatAed(Money.parse(item.balance), locale)}\u2069`,
-                })
-              : t(locale, "dashboard.attention.notPaid")}
-          </strong>
-          <span className="muted">
-            <bdi dir="ltr">{item.number}</bdi>
-          </span>
-          <a href={`${base}/repair-orders/${item.repairOrderId}`}>{t(locale, "dashboard.openRepairOrder")}</a>
-        </li>
-      );
+      return {
+        tone: item.kind === "ready_unpaid" ? "ready" : "danger",
+        word: t(
+          locale,
+          item.kind === "ready_unpaid"
+            ? "dashboard.attention.readyUnpaid"
+            : "dashboard.attention.releasedUnpaid",
+        ),
+        title: item.balance
+          ? t(locale, "dashboard.attention.balanceDue", { amount: inlineAed(item.balance, locale) })
+          : t(locale, "dashboard.attention.notPaid"),
+        detail: [item.number, item.kind === "ready_unpaid" ? item.invoiceNumber : null]
+          .filter(Boolean)
+          .join(t(locale, "common.listSeparator")),
+        href: `${base}/repair-orders/${item.repairOrderId}`,
+      };
   }
 }
 
-export function DashboardView({ summary, locale }: { summary: DashboardSummary; locale: Locale }) {
-  const money = summary.money;
+function AttentionRow({
+  item,
+  summary,
+  locale,
+}: {
+  item: Attention;
+  summary: DashboardSummary;
+  locale: Locale;
+}) {
+  const parts = attentionParts(item, locale, summary.businessDate);
+  const waited = item.since ? (summary.generatedAt.getTime() - item.since.getTime()) / 1000 : null;
+  return (
+    <li className={`attention-row tone-${parts.tone}`}>
+      <span className="attention-word">{parts.word}</span>
+      <span className="attention-text">
+        <strong>
+          <bdi>{parts.title}</bdi>
+        </strong>
+        {parts.detail ? (
+          <span className="muted">
+            <bdi>{parts.detail}</bdi>
+          </span>
+        ) : null}
+      </span>
+      {waited !== null ? (
+        <span className="attention-age">
+          {t(locale, "dashboard.attention.for", { time: formatDuration(locale, waited) })}
+        </span>
+      ) : (
+        <span className="attention-age" />
+      )}
+      <a className="btn btn-secondary attention-open" href={parts.href}>
+        {t(locale, "dashboard.open")}
+        <span className="visually-hidden">
+          {" "}
+          {parts.word} {parts.title}
+        </span>
+      </a>
+    </li>
+  );
+}
+
+function AttentionPanel({ summary, locale }: { summary: DashboardSummary; locale: Locale }) {
+  const items = summary.attention;
+  const first = items.slice(0, ATTENTION_FIRST);
+  const rest = items.slice(ATTENTION_FIRST);
+  return (
+    <section className="panel attention-panel" aria-labelledby="attention-title">
+      <div className="panel-head">
+        <h2 id="attention-title">{t(locale, "dashboard.attention.title")}</h2>
+        {items.length > 0 ? (
+          <span className="count-badge">
+            {t(locale, "dashboard.attention.open", { n: String(items.length) })}
+          </span>
+        ) : null}
+      </div>
+      {items.length === 0 ? (
+        <p className="muted">{t(locale, "dashboard.attention.empty")}</p>
+      ) : (
+        <>
+          <ul className="attention-rows">
+            {first.map((item, i) => (
+              <AttentionRow key={`${item.kind}-${i}`} item={item} summary={summary} locale={locale} />
+            ))}
+          </ul>
+          {rest.length > 0 ? (
+            <details className="attention-more">
+              <summary>{t(locale, "dashboard.attention.showMore", { n: String(rest.length) })}</summary>
+              <ul className="attention-rows">
+                {rest.map((item, i) => (
+                  <AttentionRow
+                    key={`${item.kind}-more-${i}`}
+                    item={item}
+                    summary={summary}
+                    locale={locale}
+                  />
+                ))}
+              </ul>
+            </details>
+          ) : null}
+        </>
+      )}
+    </section>
+  );
+}
+
+// --------------------------------------------------------------------------- bays
+
+function BayJob({ job, locale, delay }: { job: BayRow; locale: Locale; delay: number }) {
+  const tone = JOB_STATUS_TONE[job.status];
+  const over = job.bookedSeconds !== null && job.workedSeconds > job.bookedSeconds;
+  return (
+    <li className="bay-job-row">
+      <span className="avatar" aria-hidden="true">
+        {initials(job.assigneeName)}
+      </span>
+      <span className="bay-job-main">
+        <a href={`/${locale}/jobs/${job.jobId}`}>
+          <strong dir="auto">{job.title}</strong>
+        </a>
+        <span className="muted">
+          <bdi>{job.assigneeName ?? t(locale, "workshop.unassigned")}</bdi>
+          {t(locale, "common.listSeparator")}
+          <bdi dir="auto">{job.vehicle}</bdi>
+        </span>
+        <span className="bay-job-status">
+          <StatusChip status={tone}>{t(locale, `job.status.${job.status}` as MessageKey)}</StatusChip>
+          <span className={over ? "bay-time is-over" : "bay-time"}>
+            {job.bookedSeconds
+              ? t(locale, "dashboard.bays.workedOf", {
+                  worked: formatDuration(locale, job.workedSeconds),
+                  booked: formatDuration(locale, job.bookedSeconds),
+                })
+              : t(locale, "dashboard.bays.worked", { worked: formatDuration(locale, job.workedSeconds) })}
+          </span>
+        </span>
+        <ProgressBar
+          tone={over ? "approval" : tone}
+          share={job.bookedSeconds ? job.workedSeconds / job.bookedSeconds : 0}
+          delay={delay}
+        />
+        {job.reason ? (
+          <span className="muted bay-reason" dir="auto">
+            {job.reason}
+          </span>
+        ) : null}
+      </span>
+    </li>
+  );
+}
+
+function BaysPanel({ summary, locale }: { summary: DashboardSummary; locale: Locale }) {
+  // One tile per bay, jobs grouped; jobs without a bay last.
+  const groups = new Map<string | null, BayRow[]>();
+  for (const job of summary.bays) groups.set(job.bay, [...(groups.get(job.bay) ?? []), job]);
+  const tiles = [...groups.entries()].sort(([a], [b]) =>
+    a === null ? 1 : b === null ? -1 : a.localeCompare(b, "en", { numeric: true }),
+  );
+  let index = 0;
+  return (
+    <section className="panel bays-panel" aria-labelledby="bays-title">
+      <div className="panel-head">
+        <h2 id="bays-title">{t(locale, "dashboard.bays.title")}</h2>
+        <span className="panel-meta">
+          {t(locale, "dashboard.bays.active", { n: String(summary.bays.length) })}
+        </span>
+      </div>
+      {tiles.length === 0 ? (
+        <p className="muted">{t(locale, "dashboard.bays.empty")}</p>
+      ) : (
+        <div className="bay-tiles">
+          {tiles.map(([bay, jobs]) => (
+            <article key={bay ?? "none"} className="bay-tile">
+              <h3>{bay ? t(locale, "dashboard.bays.bay", { bay }) : t(locale, "dashboard.bays.noBay")}</h3>
+              <ul>
+                {jobs.map((job) => (
+                  <BayJob key={job.jobId} job={job} locale={locale} delay={0.3 + 0.06 * index++} />
+                ))}
+              </ul>
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+// --------------------------------------------------------------------------- repair orders
+
+function ordersOf(summary: DashboardSummary, locale: Locale): { items: OrderItem[]; head: ReactNode } {
+  const money = summary.money !== null;
+  const separator = t(locale, "common.listSeparator");
+  const head = (
+    <thead>
+      <tr>
+        <th scope="col">{t(locale, "dashboard.orders.order")}</th>
+        <th scope="col">{t(locale, "dashboard.orders.car")}</th>
+        <th scope="col">{t(locale, "dashboard.orders.status")}</th>
+        <th scope="col" className="col-tech">
+          {t(locale, "dashboard.orders.technician")}
+        </th>
+        <th scope="col">{t(locale, "dashboard.orders.promised")}</th>
+        {money ? (
+          <th scope="col" className="num">
+            {t(locale, "dashboard.orders.amount")}
+          </th>
+        ) : null}
+      </tr>
+    </thead>
+  );
+  const items = summary.orders.map((order) => {
+    // A Ready car is done: its promised time is shown as a time, never as overdue.
+    const due = !order.promisedAt
+      ? null
+      : order.status === "ready"
+        ? { label: formatWhen(order.promisedAt, locale, summary.businessDate), overdue: false }
+        : formatDue(order.promisedAt, summary.generatedAt, locale, summary.businessDate);
+    const statusWord = t(locale, `repairOrder.status.${order.status}` as MessageKey);
+    const plate = order.plate ? `${order.plate.code} ${order.plate.number}` : "";
+    return {
+      id: order.id,
+      status: order.status,
+      overdue: order.overdue,
+      href: `/${locale}/repair-orders/${order.id}`,
+      haystack: [order.number, plate, order.vehicle, ...order.services, ...order.technicians, statusWord]
+        .join(" ")
+        .toLowerCase(),
+      row: (
+        <>
+          <td>
+            <span className="order-id">
+              <a className="row-number" href={`/${locale}/repair-orders/${order.id}`}>
+                <strong>
+                  <bdi dir="ltr">{order.number}</bdi>
+                </strong>
+              </a>
+              {order.plate ? <PlateBadge locale={locale} plate={order.plate} /> : null}
+            </span>
+          </td>
+          <td>
+            <span className="stack">
+              <strong>
+                <bdi dir="auto">{order.vehicle}</bdi>
+              </strong>
+              {order.services.length ? (
+                <span className="muted clamp" dir="auto">
+                  {order.services.join(separator)}
+                </span>
+              ) : null}
+            </span>
+          </td>
+          <td>
+            <StatusChip status={REPAIR_ORDER_TONE[order.status]}>{statusWord}</StatusChip>
+          </td>
+          <td className="col-tech">
+            {order.technicians.length ? (
+              <span className="avatars" title={order.technicians.join(separator)}>
+                {order.technicians.slice(0, 3).map((name) => (
+                  <span key={name} className="avatar avatar-sm" aria-hidden="true">
+                    {initials(name)}
+                  </span>
+                ))}
+                <span className="visually-hidden">{order.technicians.join(separator)}</span>
+              </span>
+            ) : (
+              <span className="muted">—</span>
+            )}
+          </td>
+          <td className={due?.overdue ? "due is-late" : "due"}>{due ? <bdi>{due.label}</bdi> : "—"}</td>
+          {money ? <td className="num">{order.amount ? aed(order.amount, locale) : "—"}</td> : null}
+        </>
+      ),
+    };
+  });
+  return { items, head };
+}
+
+// --------------------------------------------------------------------------- page
+
+export function DashboardView({
+  summary,
+  locale,
+  stage = null,
+  actions,
+}: {
+  summary: DashboardSummary;
+  locale: Locale;
+  /** A stage chosen from the flow strip (`?stage=`), filtering the repair orders. */
+  stage?: DashboardStatus | null;
+  /** Live badge and New check-in, placed in the header. */
+  actions?: ReactNode;
+}) {
   const other: Locale = locale === "ar" ? "en" : "ar";
-  const checkInsToday = summary.checkInsByDay.at(-1)?.count ?? 0;
-  const statusLabel = (status: string) => t(locale, `repairOrder.status.${status}` as MessageKey);
-  const dayLabel = (date: string) =>
-    date === summary.businessDate ? t(locale, "dashboard.today") : formatBusinessDay(date, locale, "short");
-  const maxRevenue = money
-    ? money.revenueByDay.reduce((max, day) => {
-        const fils = Money.parse(day.total).fils;
-        return fils > max ? fils : max;
-      }, 0n)
-    : 0n;
+  const { items, head } = ordersOf(summary, locale);
+  const stageName = Object.fromEntries(
+    summary.statusCounts.map(({ status }) => [
+      status,
+      t(locale, `repairOrder.status.${status}` as MessageKey),
+    ]),
+  );
 
   return (
-    <div className="dashboard wide">
-      <div className="dashboard-head rise">
+    <div className="dashboard today wide">
+      <header className="today-head">
         <div className="titles">
-          <span className="eyebrow">{formatBusinessDay(summary.businessDate, locale, "long")}</span>
+          <p className="today-date">{formatBusinessDay(summary.businessDate, locale, "long")}</p>
           <h1>{t(locale, "dashboard.title")}</h1>
           <span className="other-language" lang={other} dir={other === "ar" ? "rtl" : "ltr"}>
             {t(other, "dashboard.title")}
           </span>
         </div>
+        {actions ? <div className="today-actions">{actions}</div> : null}
+      </header>
+
+      <div className={summary.money ? "today-top with-money" : "today-top"}>
+        <FlowStrip summary={summary} locale={locale} stage={stage} />
+        {summary.money ? <RevenueCard summary={summary} locale={locale} /> : null}
       </div>
 
-      <section className="kpis" aria-label={t(locale, "dashboard.kpis")}>
-        <article className="kpi rise lift" style={delay(0)}>
-          <h2>{t(locale, "dashboard.kpi.carsIn")}</h2>
-          <div className="kpi-figure">
-            <span className="kpi-value">
-              <CountUp value={summary.carsIn} />
-            </span>
-            <Sparkline
-              tone="progress"
-              values={summary.checkInsByDay.map((day) => day.count)}
-              label={t(locale, "dashboard.kpi.checkInsTrend", {
-                values: summary.checkInsByDay.map((day) => `${dayLabel(day.date)} ${day.count}`).join(", "),
-              })}
-            />
-          </div>
-          <p className="kpi-note">
-            {t(locale, "dashboard.kpi.checkedInToday", { n: String(checkInsToday) })}
-          </p>
-        </article>
-        <article className="kpi rise lift" style={delay(0.08)}>
-          <h2>{t(locale, "dashboard.kpi.awaitingApproval")}</h2>
-          <div className="kpi-figure">
-            <span className="kpi-value">
-              <CountUp value={summary.awaitingApproval} />
-            </span>
-          </div>
-          <p className="kpi-note">
-            {summary.oldestAwaitingSince
-              ? t(locale, "dashboard.kpi.oldestSent", {
-                  time: formatWhen(summary.oldestAwaitingSince, locale, summary.businessDate),
-                })
-              : t(locale, "dashboard.kpi.noneWaiting")}
-          </p>
-        </article>
-        <article className="kpi rise lift" style={delay(0.16)}>
-          <h2>{t(locale, "dashboard.kpi.ready")}</h2>
-          <div className="kpi-figure">
-            <span className="kpi-value">
-              <CountUp value={summary.ready} />
-            </span>
-          </div>
-          <p className="kpi-note">
-            {t(locale, "dashboard.kpi.readyInvoiced", { n: String(summary.readyInvoiced) })}
-          </p>
-        </article>
-        {money ? (
-          <article className="kpi rise lift" style={delay(0.24)}>
-            <h2>{t(locale, "dashboard.kpi.revenueToday")}</h2>
-            <div className="kpi-figure">
-              <span className="kpi-value kpi-money">
-                <CountUpMoney amount={money.today} locale={locale} />
-              </span>
-            </div>
-            <p className="kpi-note">
-              {t(locale, "dashboard.kpi.invoicesToday", { n: String(money.invoicesToday) })}
-            </p>
-          </article>
-        ) : null}
-      </section>
-
-      <div className="dashboard-row">
-        {money ? (
-          <section className="panel panel-wide rise" style={delay(0.25)} aria-labelledby="revenue-title">
-            <div className="panel-head">
-              <div>
-                <h2 id="revenue-title">{t(locale, "dashboard.revenue.title")}</h2>
-                <p className="muted">{t(locale, "dashboard.revenue.subtitle")}</p>
-              </div>
-              <span className="panel-figure">{aed(money.week, locale)}</span>
-            </div>
-            <BarChart
-              label={t(locale, "dashboard.revenue.title")}
-              bars={money.revenueByDay.map((day) => {
-                const fils = Money.parse(day.total).fils;
-                return {
-                  key: day.date,
-                  label: dayLabel(day.date),
-                  value: formatAmountCompact(Money.parse(day.total), locale),
-                  exact: formatAed(Money.parse(day.total), locale),
-                  // Display share only (bar height), not an amount.
-                  ratio: maxRevenue > 0n ? Number((fils * 1000n) / maxRevenue) / 1000 : 0,
-                  highlight: day.date === summary.businessDate,
-                };
-              })}
-            />
-          </section>
-        ) : null}
-
-        <section className="panel rise" style={delay(0.35)} aria-labelledby="status-title">
-          <h2 id="status-title">{t(locale, "dashboard.byStatus")}</h2>
-          <Donut
-            label={t(locale, "dashboard.byStatus")}
-            segments={summary.statusCounts.map(({ status, count }) => ({
-              key: status,
-              label: statusLabel(status),
-              count,
-              tone: REPAIR_ORDER_TONE[status],
-            }))}
-            center={
-              <>
-                <span className="donut-total">
-                  <CountUp value={summary.carsIn} />
-                </span>
-                <span className="muted">{t(locale, "dashboard.carsIn")}</span>
-              </>
-            }
-          />
-        </section>
+      <div className="today-grid">
+        <AttentionPanel summary={summary} locale={locale} />
+        <BaysPanel summary={summary} locale={locale} />
       </div>
 
-      <div className="dashboard-row">
-        <section className="panel panel-wide rise" style={delay(0.45)} aria-labelledby="bays-title">
-          <div className="panel-head">
-            <h2 id="bays-title">{t(locale, "dashboard.bays.title")}</h2>
-            <span className="panel-meta">
-              {t(locale, "dashboard.bays.active", { n: String(summary.bays.length) })}
-            </span>
-          </div>
-          {summary.bays.length === 0 ? (
-            <p className="muted">{t(locale, "dashboard.bays.empty")}</p>
-          ) : (
-            <ul className="bay-list">
-              {summary.bays.map((bay, i) => {
-                const tone = JOB_STATUS_TONE[bay.status];
-                return (
-                  <li key={bay.jobId}>
-                    <span className="bay-label">
-                      {bay.bay
-                        ? t(locale, "dashboard.bays.bay", { bay: bay.bay })
-                        : t(locale, "dashboard.bays.noBay")}
-                    </span>
-                    <span className="avatar" aria-hidden="true">
-                      {initials(bay.assigneeName)}
-                    </span>
-                    <span className="bay-job">
-                      <a href={`/${locale}/jobs/${bay.jobId}`}>
-                        <strong dir="auto">{bay.title}</strong>
-                      </a>
-                      <span className="muted">
-                        <bdi>{bay.assigneeName ?? t(locale, "workshop.unassigned")}</bdi>
-                        {" · "}
-                        <bdi dir="auto">{bay.vehicle}</bdi>
-                      </span>
-                    </span>
-                    <span className="bay-progress">
-                      <span className="bay-progress-head">
-                        <StatusChip status={tone}>
-                          {t(locale, `job.status.${bay.status}` as MessageKey)}
-                        </StatusChip>
-                        <span>
-                          {bay.bookedSeconds
-                            ? t(locale, "dashboard.bays.workedOf", {
-                                worked: formatDuration(locale, bay.workedSeconds),
-                                booked: formatDuration(locale, bay.bookedSeconds),
-                              })
-                            : t(locale, "dashboard.bays.worked", {
-                                worked: formatDuration(locale, bay.workedSeconds),
-                              })}
-                        </span>
-                      </span>
-                      <ProgressBar
-                        tone={tone}
-                        share={bay.bookedSeconds ? bay.workedSeconds / bay.bookedSeconds : 0}
-                        delay={0.5 + 0.08 * i}
-                      />
-                      {bay.reason ? (
-                        <span className="muted" dir="auto">
-                          {bay.reason}
-                        </span>
-                      ) : null}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </section>
-
-        <section className="panel rise" style={delay(0.55)} aria-labelledby="attention-title">
-          <div className="panel-head">
-            <h2 id="attention-title">{t(locale, "dashboard.attention.title")}</h2>
-            {summary.attention.length > 0 ? (
-              <span className="count-badge blink">
-                {t(locale, "dashboard.attention.open", { n: String(summary.attention.length) })}
-              </span>
-            ) : null}
-          </div>
-          {summary.attention.length === 0 ? (
-            <p className="muted">{t(locale, "dashboard.attention.empty")}</p>
-          ) : (
-            <ul className="attention-list">
-              {summary.attention.map((item, i) => (
-                <AttentionCard
-                  key={`${item.kind}-${i}`}
-                  item={item}
-                  locale={locale}
-                  businessDate={summary.businessDate}
-                />
-              ))}
-            </ul>
-          )}
-        </section>
-      </div>
-
-      <section className="panel rise" style={delay(0.65)} aria-labelledby="orders-title">
+      <section className="panel orders-panel" id="orders" aria-labelledby="orders-title">
         <div className="panel-head">
           <h2 id="orders-title">{t(locale, "dashboard.orders.title")}</h2>
-          <a href={`/${locale}/workshop`}>{t(locale, "dashboard.orders.board")}</a>
+          <a href={`/${locale}/workshop`}>{t(locale, "dashboard.orders.boardLink")}</a>
         </div>
-        {summary.orders.length === 0 ? (
+        {items.length === 0 ? (
           <p className="muted">{t(locale, "dashboard.orders.empty")}</p>
         ) : (
-          <div className="table-scroll">
-            <table className="data-table orders-table">
-              <thead>
-                <tr>
-                  <th scope="col">{t(locale, "dashboard.orders.order")}</th>
-                  <th scope="col">{t(locale, "dashboard.orders.plate")}</th>
-                  <th scope="col">{t(locale, "dashboard.orders.car")}</th>
-                  <th scope="col">{t(locale, "dashboard.orders.status")}</th>
-                  <th scope="col">{t(locale, "dashboard.orders.technician")}</th>
-                  <th scope="col">{t(locale, "dashboard.orders.promised")}</th>
-                  {money ? (
-                    <th scope="col" className="num">
-                      {t(locale, "dashboard.orders.amount")}
-                    </th>
-                  ) : null}
-                </tr>
-              </thead>
-              <tbody>
-                {summary.orders.map((order) => (
-                  <tr key={order.id}>
-                    <td>
-                      <a href={`/${locale}/repair-orders/${order.id}`}>
-                        <strong>
-                          <bdi dir="ltr">{order.number}</bdi>
-                        </strong>
-                      </a>
-                    </td>
-                    <td>{order.plate ? <PlateBadge locale={locale} plate={order.plate} /> : "—"}</td>
-                    <td>
-                      <span className="stack">
-                        <strong>
-                          <bdi dir="auto">{order.vehicle}</bdi>
-                        </strong>
-                        {order.services.length ? (
-                          <span className="muted" dir="auto">
-                            {order.services.join(t(locale, "common.listSeparator"))}
-                          </span>
-                        ) : null}
-                      </span>
-                    </td>
-                    <td>
-                      <StatusChip status={REPAIR_ORDER_TONE[order.status]}>
-                        {statusLabel(order.status)}
-                      </StatusChip>
-                    </td>
-                    <td>
-                      {order.technicians.length ? (
-                        <bdi>{order.technicians.join(t(locale, "common.listSeparator"))}</bdi>
-                      ) : (
-                        "—"
-                      )}
-                    </td>
-                    <td className="num">
-                      {order.promisedAt ? (
-                        <bdi dir="ltr">{formatWhen(order.promisedAt, locale, summary.businessDate)}</bdi>
-                      ) : (
-                        "—"
-                      )}
-                    </td>
-                    {money ? <td className="num">{order.amount ? aed(order.amount, locale) : "—"}</td> : null}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <OrdersPanel
+            items={items}
+            head={head}
+            initialStage={stage}
+            labels={{
+              group: t(locale, "dashboard.orders.filters"),
+              all: t(locale, "dashboard.orders.filterAll"),
+              overdue: t(locale, "dashboard.orders.filterOverdue"),
+              search: t(locale, "dashboard.orders.search"),
+              clearStage: t(locale, "dashboard.orders.clearStage"),
+              stageName,
+              noMatch: t(locale, "dashboard.orders.noMatch"),
+              showAll: t(locale, "dashboard.orders.showAll"),
+              showFewer: t(locale, "dashboard.orders.showFewer"),
+            }}
+          />
         )}
       </section>
     </div>
