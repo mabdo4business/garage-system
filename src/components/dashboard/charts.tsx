@@ -1,40 +1,11 @@
-import type { CSSProperties, ReactNode } from "react";
+import type { CSSProperties } from "react";
 import type { StatusTone } from "../ui";
 
 /**
  * Small charts for the dashboard, drawn on the server as SVG/HTML. Animations are CSS only (components.css:
- * draw, grow, fill, donut) and stop under prefers-reduced-motion. Every chart carries its numbers as text too
+ * grow, fill) and stop under prefers-reduced-motion. Every chart carries its numbers as text too
  * (labels, legend or an accessible title), so nothing is read from colour alone.
  */
-
-/** A 7-point trend line. `label` names the series and lists its values for screen readers and on hover. */
-export function Sparkline({ values, label, tone }: { values: number[]; label: string; tone: StatusTone }) {
-  const width = 120;
-  const height = 36;
-  const max = Math.max(1, ...values);
-  const step = values.length > 1 ? (width - 4) / (values.length - 1) : 0;
-  const d = values
-    .map(
-      (value, i) =>
-        `${i === 0 ? "M" : "L"}${(2 + i * step).toFixed(1)} ${(height - 4 - (value / max) * (height - 8)).toFixed(1)}`,
-    )
-    .join(" ");
-  return (
-    <svg className="sparkline" width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="img">
-      <title>{label}</title>
-      <path
-        className="draw"
-        d={d}
-        pathLength={1}
-        fill="none"
-        stroke={`var(--status-${tone}-solid)`}
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
 
 export interface Bar {
   key: string;
@@ -75,78 +46,6 @@ export function BarChart({ bars, label }: { bars: Bar[]; label: string }) {
         ))}
       </ol>
     </figure>
-  );
-}
-
-export interface DonutSegment {
-  key: string;
-  label: string;
-  count: number;
-  tone: StatusTone;
-}
-
-/**
- * Parts of a whole by status, with a legend that names every status and its count (the legend is the table
- * view). Segments are separated by a small gap so neighbouring colours never touch.
- */
-export function Donut({
-  segments,
-  label,
-  center,
-}: {
-  segments: DonutSegment[];
-  label: string;
-  center: ReactNode;
-}) {
-  const total = segments.reduce((sum, segment) => sum + segment.count, 0);
-  const gap = total > 0 && segments.filter((segment) => segment.count > 0).length > 1 ? 0.8 : 0;
-  let start = 0;
-  return (
-    <div className="donut">
-      <div className="donut-ring">
-        <svg width="160" height="160" viewBox="0 0 140 140" role="img" aria-label={label}>
-          <circle cx="70" cy="70" r="54" fill="none" stroke="var(--track)" strokeWidth="18" />
-          {total > 0
-            ? segments.map((segment) => {
-                const share = (segment.count / total) * 100;
-                const offset = start;
-                start += share;
-                if (segment.count === 0) return null;
-                return (
-                  <circle
-                    key={segment.key}
-                    className="donut-segment"
-                    cx="70"
-                    cy="70"
-                    r="54"
-                    fill="none"
-                    pathLength={100}
-                    stroke={`var(--status-${segment.tone}-solid)`}
-                    strokeWidth="18"
-                    strokeDasharray={`${Math.max(share - gap, 0.5).toFixed(2)} 100`}
-                    strokeDashoffset={(-offset).toFixed(2)}
-                    transform="rotate(-90 70 70)"
-                  />
-                );
-              })
-            : null}
-        </svg>
-        <div className="donut-center">{center}</div>
-      </div>
-      <ul className="donut-legend">
-        {segments.map((segment) => (
-          <li key={segment.key}>
-            <span
-              className="swatch"
-              style={{ background: `var(--status-${segment.tone}-solid)` }}
-              aria-hidden="true"
-            />
-            <span className="legend-label">{segment.label}</span>
-            <span className="legend-count num">{segment.count}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
   );
 }
 

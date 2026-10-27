@@ -4,11 +4,17 @@ import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { DashboardView } from "../src/app/[locale]/(staff)/dashboard-view";
+import { formatDue } from "../src/i18n/time-labels";
 import { seedDemo, type DemoResult } from "../scripts/demo-scenario";
 import { t } from "../src/i18n";
 import { hasPermission, ROLES } from "../src/server/auth/permissions";
 import { LocalDiskStorage } from "../src/server/media/storage";
-import { dashboardModeFor, dashboardSummary } from "../src/server/reporting/dashboard";
+import {
+  dashboardModeFor,
+  dashboardSummary,
+  sortAttention,
+  type Attention,
+} from "../src/server/reporting/dashboard";
 import { workedSeconds } from "../src/server/workshop/queries";
 import { createTestDatabase, type TestDatabase } from "./helpers/db";
 import { TEST_PASSWORD } from "./helpers/users";
@@ -16,6 +22,7 @@ import { TEST_PASSWORD } from "./helpers/users";
 /**
  * Redesign — the workshop dashboard (OD-50): real figures from the demo scenario (every workshop stage, created
  * through the real commands), money only for partners and the manager, and the design tokens' contrast (OD-49).
+ * UI-R4: the workshop flow strip, Needs attention most urgent first, overdue repair orders and the stage filter.
  */
 
 describe("S23 — workshop dashboard", () => {
@@ -35,7 +42,7 @@ describe("S23 — workshop dashboard", () => {
 
   it("counts open repair orders by status, in board order, from the live rows", async () => {
     const summary = await dashboardSummary(db.app, { money: true });
-    expect(summary.statusCounts).toEqual([
+    expect(summary.statusCounts.map(({ status, count }) => ({ status, count }))).toEqual([
       { status: "checked_in", count: 2 },
       { status: "diagnosing", count: 1 },
       { status: "awaiting_approval", count: 1 },
@@ -198,6 +205,111 @@ describe("S23 — workshop dashboard", () => {
       .executeTakeFirstOrThrow();
     expect(summary.oldestAwaitingSince).toEqual(sent.sent_at);
   });
+
+  // --- UI-R4 -----------------------------------------------------------------------------------
+
+  it("Needs attention is ordered most urgent first, oldest first; paused and parts jobs say since when", async () => {
+    const summary = await dashboardSummary(db.app, { money: true });
+    const order = ["awaiting_decision", "released_unpaid", "ready_unpaid", "paused", "waiting_parts"];
+    const ranks = summary.attention.map((item) => order.indexOf(item.kind));
+    expect(ranks).toEqual([...ranks].sort((a, b) => a - b));
+    for (const item of summary.attention) {
+      if (item.kind === "paused" || item.kind === "waiting_parts" || item.kind === "awaiting_decision") {
+        expect(item.since).toBeInstanceOf(Date);
+      }
+    }
+  });
+
+  it("attention order (T-38): decision, released, ready with balance, paused, parts; oldest first within a kind", () => {
+    const at = (hour: number) => new Date(Date.UTC(2026, 9, 27, hour));
+    const items: Attention[] = [
+      { kind: "waiting_parts", jobId: "p1", number: "RO-9", title: "Parts", since: at(1) },
+      { kind: "paused", jobId: "j-new", number: "RO-5", title: "Newer pause", reason: null, since: at(9) },
+      {
+        kind: "ready_unpaid",
+        since: null,
+        repairOrderId: "r1",
+        number: "RO-3",
+        invoiceNumber: null,
+        balance: null,
+      },
+      { kind: "paused", jobId: "j-old", number: "RO-4", title: "Older pause", reason: null, since: at(2) },
+      { kind: "released_unpaid", since: null, repairOrderId: "x1", number: "RO-2", balance: null },
+      { kind: "awaiting_decision", repairOrderId: "a2", number: "RO-7", since: at(8) },
+      { kind: "awaiting_decision", repairOrderId: "a1", number: "RO-1", since: at(3) },
+    ];
+    expect(sortAttention(items).map((item) => item.number)).toEqual([
+      "RO-1",
+      "RO-7",
+      "RO-2",
+      "RO-3",
+      "RO-4",
+      "RO-5",
+      "RO-9",
+    ]);
+  });
+
+  it("overdue: past the promised time and not yet Ready; counted per stage", async () => {
+    const now = new Date(Date.now() + 30 * 86_400_000);
+    const summary = await dashboardSummary(db.app, { money: false, now });
+    expect(summary.generatedAt).toEqual(now);
+    for (const row of summary.orders) {
+      expect(row.overdue).toBe(row.promisedAt !== null && row.status !== "ready");
+    }
+    expect(summary.orders.some((row) => row.overdue)).toBe(true);
+    for (const { status, overdue } of summary.statusCounts) {
+      expect(overdue).toBe(summary.orders.filter((row) => row.status === status && row.overdue).length);
+    }
+    // Today, nothing in the demo is late (promised times are hours ahead).
+    const today = await dashboardSummary(db.app, { money: false });
+    expect(today.orders.filter((row) => row.overdue)).toEqual([]);
+  });
+
+  it("due labels: overdue by, due in, or the time beyond a day", () => {
+    const now = new Date(Date.UTC(2026, 9, 27, 10, 0));
+    const at = (minutes: number) => new Date(now.getTime() + minutes * 60_000);
+    expect(formatDue(at(-185), now, "en", "2026-10-27")).toEqual({
+      label: "Overdue by 3 h 5 min",
+      overdue: true,
+    });
+    expect(formatDue(at(40), now, "en", "2026-10-27")).toEqual({ label: "Due in 40 min", overdue: false });
+    // Within the minute: "Due now", never "Overdue by 0 min".
+    expect(formatDue(new Date(now.getTime() - 30_000), now, "en", "2026-10-27")).toEqual({
+      label: "Due now",
+      overdue: true,
+    });
+    expect(formatDue(new Date(now.getTime() + 30_000), now, "en", "2026-10-27").label).toBe("Due now");
+    expect(formatDue(at(40), now, "ar", "2026-10-27").label).toContain("40");
+    expect(formatDue(at(3 * 24 * 60), now, "en", "2026-10-27").overdue).toBe(false);
+  });
+
+  it.each(["en", "ar"] as const)(
+    "renders the flow strip (%s): every stage a link that filters the list, Ready never shown late",
+    async (locale) => {
+      const late = await dashboardSummary(db.app, {
+        money: false,
+        now: new Date(Date.now() + 30 * 86_400_000),
+      });
+      const html = renderToStaticMarkup(<DashboardView summary={late} locale={locale} />);
+      for (const { status } of late.statusCounts)
+        expect(html).toContain(`href="/${locale}?stage=${status}#orders"`);
+      expect(html).toContain(t(locale, "dashboard.flow.title"));
+      const readyRow = late.orders.find((row) => row.status === "ready")!;
+      const ordersHtml = html.slice(html.indexOf('id="orders"'));
+      expect(ordersHtml).toContain("is-late"); // others are overdue in 30 days
+      expect(ordersHtml).toContain(readyRow.number);
+      const readyHtml = ordersHtml.slice(ordersHtml.lastIndexOf("<tr", ordersHtml.indexOf(readyRow.number)));
+      const readyCells = readyHtml.slice(0, readyHtml.indexOf("</tr>"));
+      expect(readyCells).not.toContain("is-late");
+
+      // A stage from the strip filters the list on first render (no JavaScript needed).
+      const filtered = renderToStaticMarkup(<DashboardView summary={late} locale={locale} stage="ready" />);
+      const rows = filtered.slice(filtered.indexOf('id="orders"'));
+      expect(rows).toContain(readyRow.number);
+      const other = late.orders.find((row) => row.status === "in_progress")!;
+      expect(rows).not.toContain(`>${other.number}<`);
+    },
+  );
 
   it("Today per role: dashboard (money only for partner and manager), My jobs for technicians, else shortcuts", () => {
     expect(Object.fromEntries(ROLES.map((role) => [role, dashboardModeFor([role])]))).toEqual({
