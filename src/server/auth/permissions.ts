@@ -92,6 +92,12 @@ export const PERMISSIONS = {
   // I1-09b: the business profile printed on invoices is partner-entered (OD-42), like tax settings (T-15).
   "business_profile.manage": ["partner"],
 
+  // I1-10: payments at the counter (PRD v0.2 §D2: ADV) and the handover (B1 Ready → Delivered: ADV). Reading payments
+  // goes with invoice.read. Releasing with a balance due is partners only (AC2-27, OD-53).
+  "payment.record": ["partner", "manager", "service_advisor"],
+  "repair_order.deliver": ["partner", "manager", "service_advisor"],
+  "repair_order.release_with_balance": ["partner"],
+
   // Redesign (OD-50): the workshop dashboard for front-office roles; its money figures (revenue, amounts) for
   // partners and the manager only until the per-user report toggle T1 (I5-01).
   "dashboard.read": ["partner", "manager", "service_advisor"],

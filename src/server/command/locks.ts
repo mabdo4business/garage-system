@@ -6,6 +6,9 @@ import type { DB } from "../db/schema";
  * Canonical lock order — Pre-Implementation Review P0-03, with vehicle added ahead (decision T-04):
  *   vehicle(s) ↑ → repair order → invoice(s) ↑ → revision lines ↑ → stock balances ↑ → number sequence (last)
  *
+ * Invoices are insert-only, so the app role cannot row-lock them: balance changes (payments, and in I3 credit notes,
+ * refunds, reversals) are serialised by the repair-order lock (T-36). Do not grant UPDATE on invoice to lock it.
+ *
  * Ranks are fixed. Within one kind, ids are locked in ascending order. Acquiring a lower-ranked
  * kind after a higher-ranked one, or a smaller id after a larger one of the same kind, throws
  * LockOrderViolationError: that is a programming error and must fail loudly in tests.

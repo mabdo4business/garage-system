@@ -2731,3 +2731,40 @@ button.bay-tick:hover {
     stroke-dasharray: none;
   }
 }
+
+/* ---------------------------------------------------------------- Payments and handover (I1-10) */
+
+.settlement {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.settlement .board-locked {
+  min-block-size: var(--touch);
+  font-size: var(--text-sm);
+}
+
+.payment-list li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-4);
+  padding-block: var(--space-2);
+  border-block-end: 1px solid var(--border-soft);
+}
+
+.handover {
+  display: grid;
+  gap: var(--space-3);
+  padding-block-start: var(--space-4);
+  border-block-start: 1px solid var(--border);
+}
+
+.handover h3 {
+  margin: 0;
+}
+
+.handover .board-stop {
+  margin: 0;
+  font-size: var(--text-sm);
+}

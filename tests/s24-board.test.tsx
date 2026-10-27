@@ -32,7 +32,14 @@ describe("S24 — workshop board", () => {
   let demo: DemoResult;
   let board: BoardRepairOrder[];
   const now = new Date();
-  const all: BoardPermissions = { editEstimate: true, recordApproval: true, requestQc: true, decideQc: true };
+  const all: BoardPermissions = {
+    editEstimate: true,
+    recordApproval: true,
+    requestQc: true,
+    decideQc: true,
+    takePayment: true,
+    deliver: true,
+  };
 
   beforeAll(async () => {
     db = await createTestDatabase();
@@ -52,7 +59,10 @@ describe("S24 — workshop board", () => {
       board.map((row) => row.id),
     );
     return new Map<string, BoardInvoice>(
-      rows.map((row) => [row.repairOrderId, { number: row.number, total: money ? row.total : null }]),
+      rows.map((row) => [
+        row.repairOrderId,
+        { number: row.number, paid: row.balance === "0.00", balance: money ? row.balance : null },
+      ]),
     );
   }
   function render(
@@ -145,7 +155,7 @@ describe("S24 — workshop board", () => {
     const invoice = (await invoicesForRepairOrders(db.app, [demo.repairOrders.ready!]))[0]!;
     const ready = cardOf(withMoney, demo.repairOrders.ready!);
     expect(ready).toContain("Deliver — balance due");
-    expect(ready).toContain(invoice.total);
+    expect(ready).toContain(invoice.balance);
     expect(ready).toContain(t("en", "board.deliver.why"));
     expect(cardOf(without, demo.repairOrders.ready!)).toContain(t("en", "board.deliver.notPaid"));
     // No amount anywhere on the board without money; prices never appear on cards (AC-07.3).
@@ -153,6 +163,27 @@ describe("S24 — workshop board", () => {
     expect(without).not.toContain(invoice.total);
     expect(withMoney.replace(ready, "")).not.toMatch(/AED/);
     for (const amount of ["180.00", "270.00", "360.00"]) expect(without).not.toContain(amount);
+  });
+
+  it("I1-10: an unpaid Ready card offers Take payment; a paid one Hand over, with Deliver no longer locked", async () => {
+    const ready = order("ready");
+    const unpaid = new Map([[ready.id, { number: "INV-1", paid: false, balance: "180.00" }]]);
+    const paid = new Map([[ready.id, { number: "INV-1", paid: true, balance: "0.00" }]]);
+    const unpaidHtml = render("en", { money: true, rows: [ready], map: unpaid });
+    expect(unpaidHtml).toContain(t("en", "board.action.takePayment"));
+    expect(unpaidHtml).toContain("board-locked");
+    expect(unpaidHtml).not.toContain(t("en", "board.action.handOver"));
+    // Without payment.record (e.g. the accountant) only the invoice link.
+    expect(
+      render("en", { money: false, rows: [ready], map: unpaid, can: { ...all, takePayment: false } }),
+    ).not.toContain(t("en", "board.action.takePayment"));
+    const paidHtml = render("en", { money: true, rows: [ready], map: paid });
+    expect(paidHtml).toContain(t("en", "board.action.handOver"));
+    expect(paidHtml).toContain(`/repair-orders/${ready.id}#payments`);
+    expect(paidHtml).not.toContain("board-locked");
+    expect(
+      render("en", { money: true, rows: [ready], map: paid, can: { ...all, deliver: false } }),
+    ).not.toContain(t("en", "board.action.handOver"));
   });
 
   it("every status shows as a word; waiting for parts is a job chip in the purple pair", () => {
@@ -168,21 +199,37 @@ describe("S24 — workshop board", () => {
     expect(access.partner).toEqual({
       money: true,
       canAssign: true,
-      can: { editEstimate: true, recordApproval: true, requestQc: true, decideQc: true },
+      can: {
+        editEstimate: true,
+        recordApproval: true,
+        requestQc: true,
+        decideQc: true,
+        takePayment: true,
+        deliver: true,
+      },
     });
     expect(access.manager).toEqual(access.partner);
     expect(access.service_advisor).toEqual({
       money: false,
       canAssign: false,
-      can: { editEstimate: true, recordApproval: true, requestQc: false, decideQc: false },
+      can: {
+        editEstimate: true,
+        recordApproval: true,
+        requestQc: false,
+        decideQc: false,
+        takePayment: true,
+        deliver: true,
+      },
     });
+    // I1-10: the accountant reads invoices but takes no payment and hands over no car.
+    expect(access.accountant!.can).toMatchObject({ takePayment: false, deliver: false });
     // The page applies the same access to the invoices it passes in (OD-50).
     const rows = await invoicesForRepairOrders(db.app, [demo.repairOrders.ready!]);
     expect([...boardInvoicesFor(access.service_advisor!, rows).values()]).toEqual([
-      { number: rows[0]!.number, total: null },
+      { number: rows[0]!.number, paid: false, balance: null },
     ]);
     expect([...boardInvoicesFor(access.manager!, rows).values()]).toEqual([
-      { number: rows[0]!.number, total: rows[0]!.total },
+      { number: rows[0]!.number, paid: false, balance: rows[0]!.balance },
     ]);
   });
 

@@ -128,6 +128,13 @@ const ERROR_KEYS: Record<string, MessageKey> = {
   parts_not_issued: "error.partsNotIssued",
   no_business_profile: "error.noBusinessProfile",
   profile_changed: "error.profileChanged",
+  // I1-10 payments and delivery
+  no_invoice: "error.noInvoice",
+  not_payable: "error.notPayable",
+  amount_exceeds_balance: "error.amountExceedsBalance",
+  possible_duplicate: "error.possibleDuplicate",
+  not_ready: "error.notReady",
+  balance_due: "error.balanceDue",
 };
 
 /**
@@ -140,7 +147,14 @@ export function errorFrom(error: unknown): FormError {
   if (!key) throw error;
   const fieldName = error.details?.field;
   const version = error.details?.version;
-  const params = typeof version === "string" ? { version } : undefined;
+  // AC2-21 / AC2-27: the balance due the message names.
+  const balance = error.details?.balance;
+  const params: Record<string, string> | undefined =
+    typeof version === "string"
+      ? { version }
+      : typeof balance === "string"
+        ? { balance: `\u2068${balance}\u2069` }
+        : undefined;
   return {
     key,
     ...(typeof fieldName === "string" ? { field: fieldName } : {}),

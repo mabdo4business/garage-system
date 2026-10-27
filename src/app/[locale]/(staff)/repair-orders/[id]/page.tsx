@@ -16,6 +16,7 @@ import { qcView } from "../../../../../server/quality/queries";
 import { ActionForm } from "../../../action-form";
 import { requestQcAction } from "./qc/actions";
 import { InvoiceCard } from "./invoice/invoice-card";
+import { SettlementCard } from "./payments/settlement-card";
 import { randomUUID } from "node:crypto";
 
 export const dynamic = "force-dynamic";
@@ -210,6 +211,20 @@ export default async function RepairOrderPage({
           repairOrderId={ro.id}
           canIssue={hasPermission(session.roles, "invoice.issue")}
           qcPassed={latestQc?.status === "passed"}
+        />
+      ) : null}
+
+      {hasPermission(session.roles, "invoice.read") ? (
+        <SettlementCard
+          locale={locale}
+          repairOrderId={ro.id}
+          status={ro.status}
+          roles={session.roles}
+          qc={
+            latestQc?.status === "passed"
+              ? { oldParts: latestQc.oldParts, odometerOutKm: latestQc.odometerOutKm }
+              : null
+          }
         />
       ) : null}
 

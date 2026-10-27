@@ -26,9 +26,9 @@ Status values: `not started` · `in progress` · `done (unmerged)` · `done` · 
 
 ## Current position
 
-- **Wave:** 1 · **Increment:** 1 · **Active story:** none; I1-01 to I1-09 and I1-11 are in `qa` (PRs #1–#5)
+- **Wave:** 1 · **Increment:** 1 · **Active story:** none; I1-10 (payments & delivery) done, unmerged, on `story/I1-10-payments-delivery` (branched from `qa` after PR #6) — Increment 1 complete once merged; I1-01 to I1-09 and I1-11 are in `qa` (PRs #1–#5)
 - **Redesign:** UI-R1 (tokens, shell, dashboard), UI-R2 (workshop board) and UI-R3 (technician bay screen) done, in `qa` (PR #5)
-- **Next story:** I1-10 (payments & delivery), the last story of Increment 1. I1-09a and I1-09b reached `qa` inside PR #5 (from `ui/redesign`)
+- **Next story:** Increment 2 after I1-10 is merged: I2-01 (estimate versions) needs no open decision; I2-04/I2-05/I2-07/I2-08 wait for D-5, D-6, D-7, D-11, B-09, D-30. Increment 1 exit check first: a full repair order through the UI in Arabic and English
 - **Next decision needed:** check I1-10's needs before starting (v0.2 EP-10, v0.2.1 §3.8); V-2 must still confirm invoice content, titles and rounding (OD-42, OD-45) before real invoices
 
 ### Housekeeping before more feature work
@@ -106,7 +106,7 @@ tests pass.
 | I1-09 | Invoice | L | I1-07, I1-08 | done | `story/I1-09b-printed-invoice` | 2026-10-26 | Split into I1-09a and I1-09b (I1-09b's branch includes I1-09a). Carries AC2-19; snapshot tax code, category (treatment), rate, registration status and TRN per line (needs a code+category+rate lookup); refuse invoicing without a tax profile; registration evidence attachment (spec §4.4) still deferred |
 | I1-09a | Invoice issue | M | I1-07, I1-08 | done | `story/I1-09-invoice` | 2026-10-26 | Migration 0017; drafts from done, authorized lines (T-29), issue under repair order → revision line → number series locks with the cap (AC21-02, AC21-04) and P0-06 for stock and non-stock parts (AT-12, B-08), tax per line on the invoice date (AC2-19, OD-41), gap-free INV numbers (AC2-17, OD-40), immutable invoices with a customer/vehicle snapshot (AC2-18, T-32), WIP → COGS (T-28), Ready on issue (B1), late parts to done lines (T-30); decisions OD-40–OD-44, T-28–T-32, OQ-2 open; 295 tests + 28 e2e |
 | I1-09b | Printed invoice | M | I1-09a, OD-42 | done | `story/I1-09b-printed-invoice` | 2026-10-26 | Migration 0018; partner-entered business profile kept as versions, the invoice records the one in force at issue (OD-46), no invoice without it (OD-47); bilingual A4 print view from `customerInvoice` only (rule 9, OD-48), "Tax Invoice / فاتورة ضريبية" or "Invoice / فاتورة" with TRN and VAT columns only when registered (AC2-19, OD-42), changed-tax lines and rounding footnote (OD-45, closes OQ-2); tablet menu now wraps; decisions OD-45–OD-48, T-33; 307 tests + 28 e2e; no warranty terms until D-15 (OD-43) |
-| I1-10 | Payments & delivery | M | I1-09 | not started | | | The dashboard's "Ready · balance due" (UI-R1, `src/server/reporting/dashboard.ts`) uses the invoice total because no payments exist yet: switch it to the invoice balance; the board's locked Deliver (OD-50) unlocks here |
+| I1-10 | Payments & delivery | M | I1-09 | done (unmerged) | `story/I1-10-payments-delivery` | 2026-10-27 | Migration 0019; payments (cash, card with approval code, transfer with reference — OD-51; no rounding, OD-52) insert-only, one per key (AC2-20, AT-03/04), same-amount confirmation, no overpayment also when racing (AC2-21), card numbers refused (AC2-22); handover with keys and belongings (OD-54), balance due blocks it unless a partner releases with a reason (AC2-27, OD-53) — audited, outbox alert, Needs attention for partners and the manager, weekly list query; Delivered → Closed at balance 0 (B1); board Take payment / Hand over and real balances on the dashboard (lifts the OD-50 lock); T-36; 360 tests (21 new in s26, 1 in s24) + 36 e2e (2 new) |
 
 ### Redesign (owner request, 2026-10-27)
 
@@ -132,7 +132,7 @@ Decisions first: D-5, D-6, D-7, D-11, B-09, D-30.
 | I2-06 | Authorized contact change | S | I2-03 | not started | | | |
 | I2-07 | Diagnostic & declined path | M | I2-01, D-11 | not started | | | |
 | I2-08 | Customer-supplied parts | S | D-6 | not started | | | Only if D-6 = yes |
-| I2-09 | Staff-initiated sharing + worker | S | I2-03 | not started | | | Track C1 |
+| I2-09 | Staff-initiated sharing + worker | S | I2-03 | not started | | | Track C1. The worker needs a handler for `alert.release_override` (I1-10, AC2-27): queued since I1-10, sent once messaging exists (I6-06) |
 
 ### Increment 3 — Money corrections
 
@@ -141,7 +141,7 @@ Decisions first: B-01, B-02, B-03, D-33, T-1, T-2.
 | ID | Story | Size | Needs | Status | Branch | Updated | Notes |
 |---|---|---|---|---|---|---|---|
 | I3-01 | Funds invariant | M | I1-10 | not started | | | |
-| I3-02 | Credit notes | M | I3-01 | not started | | | `invoice_guard` (0017) refuses any second invoice per repair order; relax it to "at most one not fully credited" (PRD v0.2 §D1) so AC21-03 replacement invoices work |
+| I3-02 | Credit notes | M | I3-01 | not started | | | `invoice_guard` (0017) refuses any second invoice per repair order; relax it to "at most one not fully credited" (PRD v0.2 §D1) so AC21-03 replacement invoices work. Then redefine `repair_order_balance()` (0019, refuses several invoices) and `invoice_balance()` with credits and refunds, and take the repair-order lock in every balance-changing command (T-36) |
 | I3-03 | Refunds | M | I3-02, B-01, B-02 | not started | | | |
 | I3-04 | Credit applications | M | I3-02, D-33, B-03 | not started | | | |
 | I3-05 | Payment reversals | S | I3-01 | not started | | | |
@@ -294,3 +294,4 @@ versioned customer API built on P-01's sign-in.
 | 2026-10-27 | UI-R2 (workshop board) committed (done, unmerged); T-34 recorded |
 | 2026-10-27 | UI-R3 (technician bay screen) committed (done, unmerged); T-35 recorded; redesign complete pending the owner's review |
 | 2026-10-27 | PR #5 merged: I1-09 (I1-09a, I1-09b) and the redesign UI-R1 to UI-R3 done (in `qa`) |
+| 2026-10-27 | I1-10 committed (done, unmerged) after integrity review fixes; OD-51–OD-54 (D-13 closed as OD-52), T-36 recorded |

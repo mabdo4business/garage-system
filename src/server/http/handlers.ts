@@ -62,6 +62,7 @@ import { partsForOpenJobs, stockList } from "../inventory/queries";
 import { failQc, passQc, requestQc } from "../quality/commands";
 import { qcView } from "../quality/queries";
 import { createInvoiceDraft, discardInvoiceDraft, issueInvoice } from "../billing/invoice";
+import { deliverVehicle, recordPayment, settlementOf } from "../billing/payments";
 import { invoiceView, repairOrderBilling } from "../billing/queries";
 import {
   businessProfileHistory,
@@ -145,6 +146,12 @@ const STATUS_BY_CODE: Record<string, number> = {
   parts_not_issued: 409,
   no_business_profile: 409,
   profile_changed: 409,
+  no_invoice: 409,
+  not_payable: 409,
+  amount_exceeds_balance: 409,
+  possible_duplicate: 409,
+  not_ready: 409,
+  balance_due: 409,
   try_again: 503,
 };
 
@@ -212,10 +219,13 @@ function errorResponse(error: unknown): Response {
     const reason = error.details?.reason;
     // OQ-1: the open repair order's number is what the client must confirm, so it travels too.
     const open = error.code === "open_repair_order_exists" ? error.details?.openRepairOrder : undefined;
+    // AC2-21 / AC2-27: the balance due the message names.
+    const balance = error.details?.balance;
     const details = {
       ...(typeof field === "string" ? { field } : {}),
       ...(typeof reason === "string" ? { reason } : {}),
       ...(typeof open === "string" ? { openRepairOrder: open } : {}),
+      ...(typeof balance === "string" ? { balance } : {}),
     };
     return json(status, {
       error: error.code,
@@ -1299,6 +1309,76 @@ export function createHandlers(db: Kysely<DB>, storage: MediaStorage = getMediaS
         if (hasPermission(session.roles, "stock.read")) return json(200, view);
         const { cogs: _cogs, ...withoutCost } = view;
         return json(200, withoutCost);
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    // ------------------------------------------------------------------ I1-10 payments and delivery
+
+    /** GET /api/repair-orders/:id/payments — invoice total, payments, balance due and the handover. */
+    async getSettlement(request: Request, repairOrderId: string): Promise<Response> {
+      try {
+        await authorize(db, await currentSession(request), "invoice.read", {
+          entityType: "repair_order",
+          entityId: repairOrderId,
+        });
+        const settlement = await settlementOf(db, repairOrderId);
+        if (!settlement) return json(404, { error: "not_found" });
+        return json(200, settlement);
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    /** POST /api/invoices/:id/payments — { amount, method, reference?, confirmDuplicate?, idempotencyKey }. */
+    async recordPayment(request: Request, invoiceId: string): Promise<Response> {
+      try {
+        if (!sameOrigin(request)) return json(403, { error: "forbidden" });
+        const session = await authorize(db, await currentSession(request), "payment.record", {
+          entityType: "invoice",
+          entityId: invoiceId,
+        });
+        const body = await readBody(request);
+        const outcome = await recordPayment(
+          db,
+          session,
+          invoiceId,
+          {
+            amount: body.amount,
+            method: body.method,
+            reference: body.reference,
+            confirmDuplicate: body.confirmDuplicate,
+          },
+          toStr(body.idempotencyKey),
+        );
+        return json(outcome.replayed ? 200 : 201, outcome.result);
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    /** POST /api/repair-orders/:id/deliver — { keysReturned, belongingsReturned, overrideReason?, idempotencyKey }. */
+    async deliverVehicle(request: Request, repairOrderId: string): Promise<Response> {
+      try {
+        if (!sameOrigin(request)) return json(403, { error: "forbidden" });
+        const session = await authorize(db, await currentSession(request), "repair_order.deliver", {
+          entityType: "repair_order",
+          entityId: repairOrderId,
+        });
+        const body = await readBody(request);
+        const outcome = await deliverVehicle(
+          db,
+          session,
+          repairOrderId,
+          {
+            keysReturned: body.keysReturned,
+            belongingsReturned: body.belongingsReturned,
+            overrideReason: body.overrideReason,
+          },
+          toStr(body.idempotencyKey),
+        );
+        return json(outcome.replayed ? 200 : 201, outcome.result);
       } catch (error) {
         return errorResponse(error);
       }

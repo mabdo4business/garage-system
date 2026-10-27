@@ -132,7 +132,17 @@ export async function seedDemo(
   });
 
   let n = 0;
-  const runBase = Math.floor(Date.now() / 1000) % 1_000_000;
+  // Each run starts past every customer already there, so runs seconds apart (tests seed several times) never reuse a
+  // plate or mobile.
+  const existing = Number(
+    (
+      await db
+        .selectFrom("customer")
+        .select((eb) => eb.fn.countAll<string>().as("n"))
+        .executeTakeFirstOrThrow()
+    ).n,
+  );
+  const runBase = Math.floor(Date.now() / 1000) + existing;
   const cars = [
     ["Toyota", "Camry", 2021],
     ["Nissan", "Patrol", 2019],
