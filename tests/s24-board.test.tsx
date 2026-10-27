@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { seedDemo, type DemoResult } from "../scripts/demo-scenario";
 import {
+  boardFilterFacts,
   BoardView,
   type BoardInvoice,
   type BoardPermissions,
@@ -15,6 +16,7 @@ import { invoicesForRepairOrders } from "../src/server/billing/queries";
 import { LocalDiskStorage } from "../src/server/media/storage";
 import { ROLES } from "../src/server/auth/permissions";
 import { qcBlockerOf } from "../src/server/quality/queries";
+import { ASSIGNABLE_JOB_STATUSES } from "../src/server/workshop/commands";
 import { boardAccessFor, boardInvoicesFor } from "../src/server/workshop/board-access";
 import { workshopBoard, type BoardRepairOrder } from "../src/server/workshop/queries";
 import { createTestDatabase, type TestDatabase } from "./helpers/db";
@@ -92,6 +94,11 @@ describe("S24 — workshop board", () => {
     const end = html.indexOf("data-card=", start + 10);
     return html.slice(start, end < 0 ? undefined : end);
   };
+  /** What the card itself shows, without opening its side panel (UI-R5, T-39: rules are never behind a click). */
+  const faceOf = (html: string, id: string) => {
+    const card = cardOf(html, id);
+    return card.slice(0, card.indexOf("<dialog"));
+  };
 
   it("the board query: when the estimate was sent, and what blocks QC (shared with the QC screen)", () => {
     expect(order("awaiting").decisionSentAt).toBeInstanceOf(Date);
@@ -122,9 +129,9 @@ describe("S24 — workshop board", () => {
   it('"do not start" only on an order awaiting the customer; a partly decided order says some jobs wait', () => {
     const html = render("en", { money: false });
     const stop = t("en", "board.doNotStart");
-    expect(cardOf(html, demo.repairOrders.awaiting!)).toContain(stop);
-    expect(cardOf(html, demo.repairOrders.awaiting!)).toContain("/estimate/approve");
-    const partly = cardOf(html, demo.repairOrders.partly!);
+    expect(faceOf(html, demo.repairOrders.awaiting!)).toContain(stop);
+    expect(faceOf(html, demo.repairOrders.awaiting!)).toContain("/estimate/approve");
+    const partly = faceOf(html, demo.repairOrders.partly!);
     expect(partly).not.toContain(stop);
     expect(partly).toContain(t("en", "board.flag.someJobsAwaiting").replace("'", "&#x27;")); // as React escapes it
     expect(partly).toContain(t("en", "qc.blocker.decision_pending"));
@@ -133,18 +140,20 @@ describe("S24 — workshop board", () => {
 
   it("QC in one step only when nothing blocks it and the viewer may request it; otherwise the reason", () => {
     const working = order("working");
-    expect(cardOf(render("en", { money: false }), working.id)).toContain(
+    expect(faceOf(render("en", { money: false }), working.id)).toContain(
       t("en", "qc.blocker.work_not_finished"),
     );
     expect(cardOf(render("en", { money: false }), working.id)).not.toContain("REQUEST-QC-FORM");
     const finished = { ...working, qcBlocker: null };
-    expect(render("en", { money: false, rows: [finished] })).toContain("REQUEST-QC-FORM");
+    expect(faceOf(render("en", { money: false, rows: [finished] }), finished.id)).toContain(
+      "REQUEST-QC-FORM",
+    );
     // Advisors may not request QC (OD-36): they see why nothing is offered.
     const advisorView = render("en", { money: false, rows: [finished], can: { ...all, requestQc: false } });
     expect(advisorView).not.toContain("REQUEST-QC-FORM");
     expect(advisorView).toContain(t("en", "board.action.qcRequestedByWorkshop"));
     // A disabled button never submits.
-    expect(cardOf(render("en", { money: false }), working.id)).toMatch(
+    expect(faceOf(render("en", { money: false }), working.id)).toMatch(
       /<button type="button" class="board-locked" disabled="">/,
     );
   });
@@ -154,10 +163,11 @@ describe("S24 — workshop board", () => {
     const without = render("en", { money: false, map: await invoices(false) });
     const invoice = (await invoicesForRepairOrders(db.app, [demo.repairOrders.ready!]))[0]!;
     const ready = cardOf(withMoney, demo.repairOrders.ready!);
-    expect(ready).toContain("Deliver — balance due");
-    expect(ready).toContain(invoice.balance);
-    expect(ready).toContain(t("en", "board.deliver.why"));
-    expect(cardOf(without, demo.repairOrders.ready!)).toContain(t("en", "board.deliver.notPaid"));
+    const readyFace = faceOf(withMoney, demo.repairOrders.ready!);
+    expect(readyFace).toContain("Deliver — balance due");
+    expect(readyFace).toContain(invoice.balance);
+    expect(readyFace).toContain(t("en", "board.deliver.why"));
+    expect(faceOf(without, demo.repairOrders.ready!)).toContain(t("en", "board.deliver.notPaid"));
     // No amount anywhere on the board without money; prices never appear on cards (AC-07.3).
     expect(without).not.toMatch(/AED|د\.إ/);
     expect(without).not.toContain(invoice.total);
@@ -282,5 +292,73 @@ describe("S24 — workshop board", () => {
     const html = render("en", { money: false });
     expect(html).toContain('role="status" aria-live="polite"');
     for (const row of board) expect(html).toContain(`data-card="${row.id}"`);
+  });
+
+  // --- UI-R5 -------------------------------------------------------------------------------------
+
+  it("each card has its side panel: every job in full there (once), with the assign form and a way to the order", () => {
+    const html = renderToStaticMarkup(
+      <BoardView
+        locale="en"
+        board={board}
+        invoices={new Map()}
+        can={all}
+        now={now}
+        businessDate="2026-10-27"
+        renderAssign={(job) => <span>ASSIGN-{job.id}</span>}
+      />,
+    );
+    expect(html.split('<dialog class="board-panel"').length - 1).toBe(board.length);
+    for (const row of board) {
+      const cardHtml = cardOf(html, row.id);
+      const panel = cardHtml.slice(cardHtml.indexOf("<dialog"));
+      expect(panel).toContain(`href="/en/repair-orders/${row.id}"`);
+      for (const job of row.jobs) {
+        expect(html.split(`data-job="${job.id}"`).length - 1).toBe(1);
+        expect(panel).toContain(`data-job="${job.id}"`);
+      }
+      // The compact card shows at most three jobs, then counts the rest.
+      const compact = cardHtml.slice(0, cardHtml.indexOf("<dialog"));
+      expect(compact.split('class="board-card-job"').length - 1).toBe(Math.min(row.jobs.length, 3));
+      if (row.jobs.length > 3) expect(compact).toContain(`+${row.jobs.length - 3} more`);
+    }
+  });
+
+  it("filters look at plate, order, car, jobs, technicians and status words; overdue only as the card says", () => {
+    const later = new Date(Date.now() + 30 * 86_400_000);
+    for (const row of board) {
+      const facts = boardFilterFacts(row, later, ["Column word", "Own status"]);
+      expect(facts.haystack).toContain("column word");
+      expect(facts.haystack).toContain("own status");
+      expect(facts.haystack).toContain(row.number.toLowerCase());
+      if (row.plate) expect(facts.haystack).toContain(row.plate.number);
+      for (const job of row.jobs) expect(facts.haystack).toContain(job.title.toLowerCase());
+      expect(facts.technicians).toEqual([
+        ...new Set(row.jobs.map((job) => job.assigneeName).filter((name) => name !== null)),
+      ]);
+      expect(facts.overdue).toBe(
+        row.promisedAt !== null &&
+          row.status !== "ready" &&
+          row.status !== "release_check" &&
+          !(row.status === "awaiting_approval" && row.decisionSentAt !== null),
+      );
+      // The facts go to the browser: nothing but what every board viewer sees, never an amount.
+      expect(facts.haystack).not.toMatch(/aed|د\.إ|\d+\.\d{2}/);
+    }
+    expect(board.some((row) => boardFilterFacts(row, later, []).overdue)).toBe(true);
+    // Today nothing in the demo is late (promised times are hours ahead).
+    expect(board.filter((row) => boardFilterFacts(row, now, []).overdue)).toEqual([]);
+    // Past due: late unless waiting for its owner, or awaiting the customer (the card shows when the estimate was sent).
+    const past = new Date(now.getTime() - 3_600_000);
+    const facts = (key: string, status?: BoardRepairOrder["status"]) =>
+      boardFilterFacts({ ...order(key), promisedAt: past, ...(status ? { status } : {}) }, now, []).overdue;
+    expect(facts("working")).toBe(true);
+    expect(facts("ready")).toBe(false);
+    expect(facts("working", "release_check")).toBe(false);
+    expect(facts("awaiting")).toBe(false);
+    const working = order("working");
+    expect(boardFilterFacts(working, now, []).unassigned).toBe(
+      working.jobs.some((job) => !job.assigneeId && ASSIGNABLE_JOB_STATUSES.includes(job.status)),
+    );
   });
 });

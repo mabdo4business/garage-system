@@ -60,6 +60,21 @@ test("manager assigns on the board; the technician runs the job in Arabic, witho
     .filter({ has: manager.getByRole("heading", { name: /In progress/ }) });
   const job = column.locator(`li[data-job="${jobId}"]`);
   await expect(job).toContainText("Approved");
+  // UI-R5 filters: "Jobs not assigned" keeps this card (its job has nobody yet), also after a full reload.
+  await manager.locator("select.board-tech").selectOption({ label: "Jobs not assigned" });
+  await expect(manager.locator(`[data-card="${ro}"]`)).toBeVisible();
+  await manager.reload();
+  await expect(manager.locator("select.board-tech")).toHaveValue("__unassigned__");
+  await expect(manager.locator(`[data-card="${ro}"]`)).toBeVisible();
+  await expect(manager.locator(".board-showing")).toContainText("Showing");
+  await manager.getByRole("button", { name: "Clear filters" }).click();
+  // UI-R5: the card is compact; assigning happens in its side panel. Search finds the card first.
+  await manager
+    .getByPlaceholder("Find a plate, order, car or job")
+    .fill(await column.locator(`[data-card="${ro}"] .board-card-number`).innerText());
+  await expect(manager.locator("[data-card]")).toHaveCount(1);
+  await manager.locator(`[data-card="${ro}"]`).click();
+  await expect(manager.locator(`[data-card="${ro}"] dialog`)).toBeVisible();
   await job.locator("summary", { hasText: "Assign" }).click();
   await job.locator("select[name=assigneeId]").selectOption({ label: "Tariq Technician · Technician" });
   await job.locator("input[name=bay]").fill("Bay 3");
@@ -67,6 +82,12 @@ test("manager assigns on the board; the technician runs the job in Arabic, witho
   // The assignee line, not the open form (whose options also name Tariq).
   await expect(manager.locator(`li[data-job="${jobId}"] .board-job-who`)).toContainText("Tariq Technician");
   await expect(manager.locator(`li[data-job="${jobId}"]`)).toContainText("Bay 3");
+  // Esc closes the panel. The search is remembered in this browser; clear it so the rest of the flow sees every card.
+  await manager.keyboard.press("Escape");
+  await expect(manager.locator("dialog[open]")).toHaveCount(0);
+  await manager.getByRole("button", { name: "Clear filters" }).click();
+  await expect(manager.getByPlaceholder("Find a plate, order, car or job")).toHaveValue("");
+  await expect(manager.getByRole("button", { name: "Clear filters" })).toHaveCount(0);
 
   // Technician, in Arabic.
   const tech = await pageFor(browser, "technician", "ar");
@@ -105,7 +126,7 @@ test("manager assigns on the board; the technician runs the job in Arabic, witho
 
   // UI-R2: all work done, so the board offers QC in one step; the card moves, pops, and a toast says so.
   const card = manager.locator(`[data-card="${ro}"]`);
-  await card.getByRole("button", { name: "Send to quality check →" }).click();
+  await card.getByRole("button", { name: "Send to quality check" }).click();
   const qcColumn = manager
     .locator(".board-column")
     .filter({ has: manager.getByRole("heading", { name: /Quality check/ }) });

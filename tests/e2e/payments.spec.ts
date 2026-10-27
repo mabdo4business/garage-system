@@ -125,9 +125,7 @@ test("advisor takes cash and card, hands the car over, and the repair order clos
 
   // Board: the Ready card now offers the handover.
   await advisor.goto("/en/workshop");
-  await expect(
-    advisor.locator(`[data-card="${ro}"]`).getByRole("link", { name: "Hand over →" }),
-  ).toBeVisible();
+  await expect(advisor.locator(`[data-card="${ro}"]`).getByRole("link", { name: "Hand over" })).toBeVisible();
   await advisor.goto(`/en/repair-orders/${ro}`);
   const handover = paymentsCard(advisor);
   await handover.getByLabel("Keys handed back").check();
