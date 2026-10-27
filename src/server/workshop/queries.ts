@@ -1,6 +1,14 @@
 import type { Kysely } from "kysely";
 import { isUuid } from "../core/ids";
-import type { DB, Emirate, FindingSeverity, JobExecutionStatus, RepairOrderStatus } from "../db/schema";
+import { Qty } from "../core/money";
+import type {
+  ApprovalMethod,
+  DB,
+  Emirate,
+  FindingSeverity,
+  JobExecutionStatus,
+  RepairOrderStatus,
+} from "../db/schema";
 import { authorizedScope } from "../estimate/approval";
 import { qcBlockerOf, type QcBlocker } from "../quality/queries";
 
@@ -234,7 +242,35 @@ export interface JobCard {
     outcome: "done" | "not_performed" | null;
     reason: string | null;
   }[];
+  /** Approved labour hours of the job in seconds (UI-R3 timer); null without a labour line. */
+  bookedSeconds: number | null;
+  /** The latest approval of a still-approved revision of this job (AC2-01): how and when, nothing about amounts. */
+  approval: { method: ApprovalMethod; recordedAt: Date } | null;
   history: { from: string; to: string; reason: string | null; actorName: string | null; at: Date }[];
+}
+
+/** Seconds a job spent In progress, from its status events (oldest first), up to `now`. */
+export function workedSeconds(events: { to: string; at: Date }[], now: Date): number {
+  let total = 0;
+  let since: Date | null = null;
+  for (const event of events) {
+    if (event.to === "in_progress") {
+      since ??= event.at;
+    } else if (since) {
+      total += event.at.getTime() - since.getTime();
+      since = null;
+    }
+  }
+  if (since) total += now.getTime() - since.getTime();
+  return Math.max(0, Math.floor(total / 1000));
+}
+
+/** Labour hours (3 decimals) in whole seconds, rounded down (milli-hours × 3.6). Null when there are none. */
+export function bookedSecondsOf(lines: { unit: string | null; qty: string }[]): number | null {
+  const hours = lines
+    .filter((line) => line.unit === "hour")
+    .reduce((sum, line) => sum.add(Qty.parse(line.qty)), Qty.ZERO);
+  return hours.isZero() ? null : Number((hours.milli * 3600n) / 1000n);
 }
 
 export async function jobCard(db: Kysely<DB>, jobId: string): Promise<JobCard | null> {
@@ -320,6 +356,19 @@ export async function jobCard(db: Kysely<DB>, jobId: string): Promise<JobCard | 
     .where("job_status_event.job_id", "=", jobId)
     .orderBy("job_status_event.occurred_at")
     .execute();
+  const approval = await db
+    .selectFrom("revision_decision")
+    .innerJoin("job_revision", "job_revision.id", "revision_decision.revision_id")
+    .innerJoin("approval_event", "approval_event.id", "revision_decision.approval_event_id")
+    .select(["approval_event.method", "approval_event.recorded_at"])
+    .where("job_revision.job_id", "=", jobId)
+    .where("revision_decision.decision", "=", "approved")
+    // Only revisions still approved: the same source as authorizedScope, so a withdrawn or lapsed revision (I2-01)
+    // never shows as the approval for today's work.
+    .where("job_revision.status", "=", "approved")
+    .orderBy("approval_event.recorded_at", "desc")
+    .orderBy("approval_event.id", "desc")
+    .executeTakeFirst();
 
   return {
     id: row.id,
@@ -364,6 +413,8 @@ export async function jobCard(db: Kysely<DB>, jobId: string): Promise<JobCard | 
       outcome: line.outcome,
       reason: line.reason,
     })),
+    bookedSeconds: bookedSecondsOf(lines),
+    approval: approval ? { method: approval.method, recordedAt: approval.recorded_at } : null,
     history: history.map((event) => ({
       from: event.from_status,
       to: event.to_status,

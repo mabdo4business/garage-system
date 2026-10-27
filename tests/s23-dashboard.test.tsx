@@ -8,7 +8,8 @@ import { seedDemo, type DemoResult } from "../scripts/demo-scenario";
 import { t } from "../src/i18n";
 import { hasPermission, ROLES } from "../src/server/auth/permissions";
 import { LocalDiskStorage } from "../src/server/media/storage";
-import { dashboardModeFor, dashboardSummary, workedSeconds } from "../src/server/reporting/dashboard";
+import { dashboardModeFor, dashboardSummary } from "../src/server/reporting/dashboard";
+import { workedSeconds } from "../src/server/workshop/queries";
 import { createTestDatabase, type TestDatabase } from "./helpers/db";
 import { TEST_PASSWORD } from "./helpers/users";
 

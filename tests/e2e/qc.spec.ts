@@ -94,7 +94,7 @@ test("technician requests QC; manager fails it and the job is redone; then QC pa
 
   // The technician sees the job back with the reason, redoes it, requests again.
   await tech.goto(`/en/jobs/${jobId}`);
-  await expect(tech.locator(".page-header")).toContainText("Approved");
+  await expect(tech.locator(".bay-status")).toContainText("Approved");
   await expect(tech.locator("main")).toContainText("Brake squeal on the road test");
   await doTheWork(tech, jobId, lineId);
   await tech.goto(`/en/jobs/${jobId}`);

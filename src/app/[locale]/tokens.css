@@ -177,6 +177,65 @@
   }
 }
 
+/* The technician bay screen is always dark (docs/design/Bay.dc.html, UI-R3): the same dark tokens, scoped to it.
+   Keep in step with the dark theme above (tests/s25-bay.test.tsx compares them). */
+.bay {
+  --bg: #0b1220;
+  --surface: #16213a;
+  --surface-sunken: #0f1a30;
+  --surface-hover: #1c2a47;
+  --fg: #f1f5f9;
+  --fg-soft: #cbd5e1;
+  --muted: #a3aec0;
+  --border: #26334d;
+  --border-soft: #1e2a42;
+  --border-strong: #6b7a94;
+  --link: #93c5fd;
+  --link-hover: #bfdbfe;
+  --focus: #93c5fd;
+  --primary-bg: var(--accent-on-dark);
+  --primary-bg-hover: #fdba74;
+  --primary-fg: #0b1220;
+  --danger-fg: #ffb4a8;
+  --success-fg: #8fd6a4;
+  --danger-bg: #3a1d1a;
+  --danger-border: #6b302a;
+  --warning-fg: #fdc9a0;
+  --warning-bg: #3a2412;
+  --warning-border: #6b4320;
+  --plate-bg: #f1f5f9;
+  --plate-border: #f1f5f9;
+  --plate-fg: #0b1220;
+  --nav-bg: #070c16;
+  --nav-card-bg: #0f1a30;
+  --track: #26334d;
+  --shadow-lift: 0 14px 30px rgb(0 0 0 / 35%);
+  --shadow-toast: 0 16px 40px rgb(0 0 0 / 50%);
+
+  --status-checked-bg: #263244;
+  --status-checked-ink: #d5dee9;
+  --status-checked-solid: #8090a8;
+  --status-diagnosing-bg: #4a1730;
+  --status-diagnosing-ink: #f9c6dc;
+  --status-diagnosing-solid: #ec4899;
+  --status-approval-bg: #4a2510;
+  --status-approval-ink: #fdc9a0;
+  --status-approval-solid: #ea580c;
+  --status-progress-bg: #14304d;
+  --status-progress-ink: #bfdbfe;
+  --status-progress-solid: #3b82f6;
+  --status-parts-bg: #2e1d4a;
+  --status-parts-ink: #ddd0f5;
+  --status-parts-solid: #8b5cf6;
+  --status-qc-bg: #0e3b36;
+  --status-qc-ink: #a7e8dc;
+  --status-qc-solid: #0d9488;
+  --status-ready-bg: #173a1c;
+  --status-ready-ink: #bbe7b0;
+  --status-ready-solid: #65a30d;
+  color-scheme: dark;
+}
+
 /* Tablets in the bay and at check-in: larger body text (deck: 18 px minimum). */
 @media (max-width: 1024px) and (pointer: coarse) {
   :root {

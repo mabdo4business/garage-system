@@ -1,7 +1,8 @@
 import { sql, type Kysely } from "kysely";
 import { hasPermission } from "../auth/permissions";
-import { Money, Qty } from "../core/money";
+import { Money } from "../core/money";
 import type { DB, Emirate, JobExecutionStatus, RepairOrderStatus } from "../db/schema";
+import { bookedSecondsOf, workedSeconds } from "../workshop/queries";
 
 /**
  * The workshop dashboard (redesign, OD-50): read-only figures from the live tables, never sample data. Money
@@ -112,22 +113,6 @@ export function dashboardModeFor(roles: readonly string[]): { mode: DashboardMod
     return { mode: "dashboard", money: hasPermission(roles, "dashboard.money") };
   }
   return { mode: hasPermission(roles, "workshop.my_jobs") ? "my_jobs" : "shortcuts", money: false };
-}
-
-/** Seconds a job spent In progress, from its status events (oldest first), up to `now`. */
-export function workedSeconds(events: { to: string; at: Date }[], now: Date): number {
-  let total = 0;
-  let since: Date | null = null;
-  for (const event of events) {
-    if (event.to === "in_progress") {
-      since ??= event.at;
-    } else if (since) {
-      total += event.at.getTime() - since.getTime();
-      since = null;
-    }
-  }
-  if (since) total += now.getTime() - since.getTime();
-  return Math.max(0, Math.floor(total / 1000));
 }
 
 export async function dashboardSummary(
@@ -257,9 +242,6 @@ export async function dashboardSummary(
   const bays: BayRow[] = jobs
     .filter((job) => ACTIVE_JOB.includes(job.execution_status))
     .map((job) => {
-      const hours = authorized
-        .filter((line) => line.job_id === job.id && line.unit === "hour")
-        .reduce((sum, line) => sum.add(Qty.parse(line.qty)), Qty.ZERO);
       return {
         jobId: job.id,
         bay: job.bay,
@@ -274,8 +256,7 @@ export async function dashboardSummary(
             .map((event) => ({ to: event.to_status, at: event.occurred_at })),
           now,
         ),
-        // Hours are kept to the thousandth (3 decimals): milli-hours × 3.6 = seconds.
-        bookedSeconds: hours.isZero() ? null : Number((hours.milli * 3600n) / 1000n),
+        bookedSeconds: bookedSecondsOf(authorized.filter((line) => line.job_id === job.id)),
         reason: job.execution_status === "paused" ? job.execution_reason : null,
       };
     })

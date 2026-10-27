@@ -27,7 +27,7 @@ Status values: `not started` · `in progress` · `done (unmerged)` · `done` · 
 ## Current position
 
 - **Wave:** 1 · **Increment:** 1 · **Active story:** none; I1-01 to I1-08 and I1-11 are in `qa` (PRs #1–#4)
-- **Redesign:** UI-R1 (tokens, shell, dashboard) and UI-R2 (workshop board) done, unmerged, on `ui/redesign` (branched from `story/I1-09b-printed-invoice`); UI-R3 (bay screen) waits for the owner's review of the board
+- **Redesign:** UI-R1 (tokens, shell, dashboard), UI-R2 (workshop board) and UI-R3 (technician bay screen) done, unmerged, on `ui/redesign` (branched from `story/I1-09b-printed-invoice`); waiting for the owner's review
 - **Next story:** I1-10 (payments & delivery). I1-09a and I1-09b are done, unmerged, on `story/I1-09b-printed-invoice` (branched from `story/I1-09-invoice`); merging that branch brings both
 - **Next decision needed:** check I1-10's needs before starting (v0.2 EP-10, v0.2.1 §3.8); V-2 must still confirm invoice content, titles and rounding (OD-42, OD-45) before real invoices
 
@@ -114,7 +114,7 @@ Visual redesign from the owners' references (`docs/design/`): tokens, fonts and 
 |---|---|---|---|---|---|---|---|
 | UI-R1 | Tokens, fonts, sidebar + workshop dashboard | M | I1-09 | done (unmerged) | `ui/redesign` | 2026-10-27 | Palette/status pairs/fonts as tokens (contrast tested), dark sidebar with icons and business name; dashboard from real figures (KPIs, 7-day revenue, status donut, bays, needs attention, open repair orders), money for partner/manager only; count-up, sparklines, bars, donut, progress; reduced motion; `npm run db:demo` sample data; branched from I1-09b |
 | UI-R2 | Workshop board | M | UI-R1 | done (unmerged) | `ui/redesign` | 2026-10-27 | Dark header, six status columns with counts, cards with plate, time (sent / promised / overdue / on site), "do not start" while awaiting the customer, job chips (waiting parts in purple) and assignment; next step per card (request QC in one step, otherwise a link), Deliver locked with its reason (OD-50); card pop and toast on status change, live refresh; T-34 |
-| UI-R3 | Technician bay screen | M | UI-R1 | not started | | | Dark tablet screen, task ring and ticks (kept until Done, OD-50), timer from job history, no prices |
+| UI-R3 | Technician bay screen | M | UI-R1 | done (unmerged) | `ui/redesign` | 2026-10-27 | Job card as a dark tablet screen (tokens scoped to `.bay`): bay, technician, clock; plate, car, status word; task ring; time in progress from the job history against approved labour; tick or "not performed" with a reason, kept in the form until Done (OD-50); Done locked saying what is missing (OD-31); advisor note with how and when the customer approved, "do not start" without one (AC2-01); up next; no prices (AC2-30); T-35 |
 
 ### Increment 2 — Approvals that hold up
 
@@ -290,3 +290,4 @@ versioned customer API built on P-01's sign-in.
 | 2026-10-26 | I1-09b committed (done, unmerged) after integrity review fixes; OQ-2 closed as OD-45; OD-46–OD-48, T-33 recorded; I1-09 complete |
 | 2026-10-27 | Redesign started on owner request (UI-R1–R3); UI-R1 committed (done, unmerged); OD-49, OD-50 recorded |
 | 2026-10-27 | UI-R2 (workshop board) committed (done, unmerged); T-34 recorded |
+| 2026-10-27 | UI-R3 (technician bay screen) committed (done, unmerged); T-35 recorded; redesign complete pending the owner's review |
