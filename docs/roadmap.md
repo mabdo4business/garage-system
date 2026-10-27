@@ -28,7 +28,7 @@ Status values: `not started` · `in progress` · `done (unmerged)` · `done` · 
 
 - **Wave:** 1 · **Increment:** 1 · **Active story:** none; every Increment 1 story is in `qa` (PRs #1–#7)
 - **Redesign:** UI-R1 (tokens, shell, dashboard), UI-R2 (workshop board) and UI-R3 (technician bay screen) done, in `qa` (PR #5)
-- **Next story:** Increment 1 exit check first — one repair order end to end through the UI in Arabic and English (the stories' specs cover each step separately; there is no single end-to-end run yet). Then Increment 2: I2-01 (estimate versions) needs no open decision; I2-04/I2-05/I2-07/I2-08 wait for D-5, D-6, D-7, D-11, B-09, D-30
+- **Next story:** Increment 2. I2-01 (estimate versions) needs no open decision; I2-04/I2-05/I2-07/I2-08 wait for D-5, D-6, D-7, D-11, B-09, D-30. Increment 1 exit test (`tests/e2e/exit-increment-1.spec.ts`) passes, unmerged, on `test/I1-exit-e2e`
 - **Next decision needed:** check I1-10's needs before starting (v0.2 EP-10, v0.2.1 §3.8); V-2 must still confirm invoice content, titles and rounding (OD-42, OD-45) before real invoices
 
 ### Housekeeping before more feature work
@@ -86,7 +86,7 @@ Scope, spec references and tests per story: `docs/implementation-plan.md` Part 3
 |---|---|---|---|---|---|
 | I0 | Foundations (roles, auth, audit, idempotency, numbering, outbox, i18n) | done | `feature/increment-0` | 2026-10-15 | 80 tests; merged to `qa` (PR #1) |
 
-### Increment 1 — Walking skeleton · stories done; exit check pending
+### Increment 1 — Walking skeleton · complete (exit test passing; merge `test/I1-exit-e2e`)
 
 Decisions first: B-08. Exit: a full repair order runs through the UI in Arabic and English; P0-06 guard active; all I1
 tests pass.
@@ -297,3 +297,4 @@ versioned customer API built on P-01's sign-in.
 | 2026-10-27 | PR #5 merged: I1-09 (I1-09a, I1-09b) and the redesign UI-R1 to UI-R3 done (in `qa`) |
 | 2026-10-27 | I1-10 committed (done, unmerged) after integrity review fixes; OD-51–OD-54 (D-13 closed as OD-52), T-36 recorded |
 | 2026-10-27 | PR #7 merged: I1-10 done (in `qa`); all Increment 1 stories done — exit check pending |
+| 2026-10-27 | Increment 1 exit test added: one repair order from check-in to handover through the staff screens, in Arabic and English, desktop and tablet; P0-06 refuses the invoice until the part is issued |
