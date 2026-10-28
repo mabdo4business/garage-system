@@ -36,6 +36,7 @@ export default async function WorkshopPage({ params }: { params: Promise<{ local
       now={now}
       businessDate={dubaiDate(now)}
       can={access.can}
+      viewerId={session.userId}
       live={<LiveRefresh locale={locale} renderedAt={formatDubaiTime(now, locale)} />}
       renderRequestQc={(order) => (
         <ActionForm

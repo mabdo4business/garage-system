@@ -161,6 +161,8 @@ for (const locale of ["ar", "en"] as const) {
     // ---------------------------------------------------------------- 6. manager assigns the job on the board
     await manager.goto(`/${locale}/workshop`);
     const boardJob = manager.locator("li.board-job").filter({ hasText: findingTitle });
+    // UI-R5: the job's assign form is in its card's side panel.
+    await manager.locator("[data-card]").filter({ has: boardJob }).locator(".board-card-details").click();
     await boardJob.locator("summary", { hasText: tr("workshop.assign") }).click();
     await boardJob
       .locator("select[name=assigneeId]")

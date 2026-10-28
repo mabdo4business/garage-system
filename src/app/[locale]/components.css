@@ -1885,12 +1885,6 @@ textarea.internal {
   box-shadow: 0 0 0 2px var(--surface);
 }
 
-.avatar-sm {
-  inline-size: 28px;
-  block-size: 28px;
-  font-size: 0.6875rem;
-}
-
 .orders-table td.due {
   color: var(--fg-soft);
   font-size: var(--text-sm);
@@ -1969,7 +1963,11 @@ textarea.internal {
 
 .board-page {
   display: grid;
-  gap: var(--space-card);
+  /* minmax(0, …): the columns scroll inside .board-scroll instead of widening the page. */
+  grid-template-columns: minmax(0, 1fr);
+  /* …and the page itself may be narrower than its board, as a grid item of .shell-content. */
+  min-inline-size: 0;
+  gap: var(--space-4);
 }
 
 .board-hero {
@@ -1977,7 +1975,7 @@ textarea.internal {
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-4);
-  padding: var(--space-card) var(--space-5);
+  padding: var(--space-3) var(--space-5);
   border-radius: var(--radius-xl);
   background: var(--nav-bg);
   color: var(--nav-fg-strong);
@@ -2000,7 +1998,7 @@ textarea.internal {
 .board-back {
   display: inline-flex;
   align-items: center;
-  min-block-size: 44px;
+  min-block-size: 40px;
   padding-inline: 14px;
   border-radius: var(--radius-md);
   background: var(--nav-hover-bg);
@@ -2032,26 +2030,40 @@ textarea.internal {
 }
 
 .board-scroll {
+  /* The containing block for visually hidden labels in cards, so they scroll (and clip) with the board
+     instead of widening the page. */
+  position: relative;
   overflow-x: auto;
   padding-block-end: var(--space-2);
 }
 
+/* All six columns side by side from about 1280 px; narrower, they scroll sideways one column at a time. */
 .board {
   display: grid;
-  grid-template-columns: repeat(6, minmax(240px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(6, minmax(168px, 1fr));
+  gap: 10px;
   align-items: start;
-  min-inline-size: 1490px;
+}
+
+@media (max-width: 1279px) {
+  .board-scroll {
+    scroll-snap-type: x mandatory;
+  }
+
+  .board {
+    grid-template-columns: repeat(6, 264px);
+  }
+
+  .board-column {
+    scroll-snap-align: start;
+  }
 }
 
 .board-column {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
   min-inline-size: 0;
-  gap: 10px;
-  align-content: start;
-  min-block-size: 480px;
-  padding: var(--space-3);
+  padding: var(--space-2);
   border-radius: var(--radius-xl);
   background: var(--surface-sunken);
 }
@@ -2060,8 +2072,21 @@ textarea.internal {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  padding: var(--space-1) var(--space-1) 6px;
+  padding: var(--space-1) var(--space-1) var(--space-2);
   font-size: var(--text-sm);
+}
+
+/* Each column scrolls on its own under its header, so a long In progress never pushes the page. */
+.board-column-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-2);
+  align-content: start;
+  max-block-size: calc(100dvh - 250px);
+  min-block-size: 160px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 2px;
 }
 
 .board-column .dot {
@@ -2097,19 +2122,20 @@ textarea.internal {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   min-inline-size: 0;
-  gap: 10px;
-  padding: 14px;
+  gap: var(--space-2);
+  padding: var(--space-3);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--surface);
+  cursor: pointer;
   transition:
-    transform 0.2s ease,
-    box-shadow 0.2s ease;
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .board-card:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-lift);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-card);
 }
 
 .board-card.pop {
@@ -2141,20 +2167,100 @@ textarea.internal {
 }
 
 .board-card-title {
-  display: grid;
-  gap: 2px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 2px var(--space-2);
 }
 
 .board-card-title strong {
-  font-size: 0.9375rem;
+  font-size: var(--text-sm);
   font-weight: 800;
 }
 
-.board-card-title a {
-  justify-self: start;
+.board-card-number {
   color: var(--fg-soft);
   font-size: var(--text-xs);
   font-weight: 700;
+}
+
+/* One line per job: status word, title, who. */
+.board-card-jobs {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.board-card-jobs li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 4px 6px;
+  min-inline-size: 0;
+}
+
+.board-card-jobs li .avatar {
+  justify-self: end;
+}
+
+.board-card-jobs .chip {
+  flex-shrink: 0;
+  padding-inline: 6px;
+  font-size: 0.6875rem;
+}
+
+.board-card-job {
+  grid-column: 1 / -1;
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.avatar-xs {
+  inline-size: 22px;
+  block-size: 22px;
+  font-size: 9px;
+}
+
+.avatar-none {
+  border: 1.5px dashed var(--border-strong);
+  background: transparent;
+  color: var(--muted);
+}
+
+.board-card-more {
+  display: block;
+  font-size: var(--text-xs);
+}
+
+/* Plates fit narrow cards. */
+.board-card .plate .emirate {
+  padding-inline: 6px;
+  font-size: 0.625rem;
+}
+
+.board-card .plate .number {
+  padding-inline: 6px;
+  font-size: 0.8125rem;
+}
+
+.board-card-details {
+  justify-self: end;
+  min-block-size: 40px;
+  padding-inline: var(--space-2);
+  border: 0;
+  background: transparent;
+  color: var(--link);
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  cursor: pointer;
 }
 
 .board-stop {
@@ -2252,12 +2358,12 @@ textarea.internal {
   align-items: center;
   justify-content: center;
   inline-size: 100%;
-  min-block-size: 44px;
+  min-block-size: 40px;
   padding-inline: var(--space-3);
   border: 0;
   border-radius: var(--radius-md);
   font: inherit;
-  font-size: 0.8125rem;
+  font-size: var(--text-xs);
   font-weight: 700;
   text-align: center;
   white-space: normal;
@@ -2304,6 +2410,160 @@ textarea.internal {
   background: var(--surface);
   border: 1px solid var(--border-strong);
   color: var(--link);
+}
+
+/* Filters above the columns. */
+.board-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.board-search {
+  flex: 1 1 260px;
+  max-inline-size: 420px;
+  min-block-size: 40px;
+}
+
+.board-tech {
+  min-block-size: 40px;
+  max-inline-size: 240px;
+}
+
+.board-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-block-size: 40px;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.board-showing {
+  color: var(--fg-soft);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.board-clear {
+  min-block-size: 40px;
+}
+
+/* The card's side panel: a sheet along the end edge (the right in English, the left in Arabic). */
+.board-panel {
+  inset-block: 0;
+  inset-inline: auto 0;
+  inline-size: min(440px, 100vw);
+  max-inline-size: 100vw;
+  block-size: 100dvh;
+  max-block-size: 100dvh;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-inline-start: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--fg);
+  box-shadow: var(--shadow-toast);
+  cursor: auto;
+}
+
+.board-panel[open] {
+  animation: sheet-in 0.25s var(--ease-out) both;
+}
+
+.board-panel::backdrop {
+  background: rgb(11 18 32 / 45%);
+}
+
+@keyframes sheet-in {
+  from {
+    opacity: 0;
+    translate: 24px 0;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+
+[dir="rtl"] .board-panel[open] {
+  animation-name: sheet-in-rtl;
+}
+
+@keyframes sheet-in-rtl {
+  from {
+    opacity: 0;
+    translate: -24px 0;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+
+.board-panel-inner {
+  position: relative;
+  display: grid;
+  gap: var(--space-5);
+  align-content: start;
+  min-block-size: 100%;
+  padding: var(--space-5);
+}
+
+.board-panel-close {
+  position: absolute;
+  inset-block-start: var(--space-3);
+  inset-inline-end: var(--space-3);
+  inline-size: var(--touch);
+  block-size: var(--touch);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--surface-sunken);
+  color: var(--fg);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.board-panel-head {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-2);
+  padding-inline-end: calc(var(--touch) + var(--space-2));
+}
+
+.board-panel-head h2 {
+  font-size: var(--text-xl);
+}
+
+.board-panel-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.board-panel-section {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.board-panel-section h3 {
+  color: var(--fg-soft);
+  font-size: var(--text-sm);
+}
+
+.board-panel-note {
+  font-size: var(--text-sm);
+}
+
+.board-panel-links {
+  display: grid;
+  gap: var(--space-2);
 }
 
 .toast-region {
