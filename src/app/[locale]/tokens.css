@@ -75,7 +75,8 @@
   --status-ready-ink: #2e5e1f;
   --status-ready-solid: #16a34a;
 
-  /* Type: next/font sets --font-jakarta, --font-jetbrains, --font-plex-arabic on <html> */
+  /* Type: next/font sets --font-jakarta, --font-jetbrains, --font-plex-arabic-script and -latin on <html> */
+  --font-plex-arabic: var(--font-plex-arabic-script), var(--font-plex-arabic-latin);
   --font-heading: var(--font-jakarta), var(--font-plex-arabic), system-ui, sans-serif;
   --font-body: var(--font-jakarta), var(--font-plex-arabic), system-ui, sans-serif;
   --font-mono: var(--font-jetbrains), ui-monospace, monospace;
