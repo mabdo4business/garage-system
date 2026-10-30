@@ -221,7 +221,14 @@ describe("S28 — customer links", () => {
   const create = (ro: string, who = people.advisor!) => createCustomerLink(db.app, who, ro);
   const open = (token: string, requester = visitor()) => openCustomerLink(db.app, token, requester);
   const html = (page: CustomerLinkPage, token: string, locale: "ar" | "en" = "en") =>
-    renderToStaticMarkup(<LinkPage locale={locale} token={token} page={page} />);
+    renderToStaticMarkup(
+      <LinkPage
+        locale={locale}
+        token={token}
+        page={page}
+        idempotencyKey="00000000-0000-4000-8000-000000000000"
+      />,
+    );
 
   /** Moves a version's expiry (and its link's) into the past, as the owner with the guards off. */
   async function overdue(versionId: string) {

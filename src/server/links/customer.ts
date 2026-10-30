@@ -1,7 +1,7 @@
 import { sql, type Kysely } from "kysely";
 import { runCommand } from "../command/runner";
 import { isUuid } from "../core/ids";
-import type { DB, Emirate, EstimateVersionStatus } from "../db/schema";
+import type { CustomerLinkAccessOutcome, DB, Emirate, EstimateVersionStatus } from "../db/schema";
 import type { EstimateSnapshot, SnapshotContextJob, SnapshotJob } from "../estimate/snapshot";
 import { currentBusinessProfile } from "../settings/business-profile";
 import { hashLinkToken } from "./token";
@@ -60,7 +60,7 @@ const WINDOW = sql<Date>`now() - interval '10 minutes'`;
 /** Repair-order statuses past which an approval link no longer opens (§6.4: cancelled; delivered and closed too). */
 const ENDED_ORDER = ["delivered", "closed", "cancelled"];
 
-async function limits(db: Kysely<DB>): Promise<{ invalidPerIp: number; requestsPerLink: number }> {
+export async function limits(db: Kysely<DB>): Promise<{ invalidPerIp: number; requestsPerLink: number }> {
   const rows = await db
     .selectFrom("app_setting")
     .select(["key", "value"])
@@ -78,7 +78,7 @@ async function limits(db: Kysely<DB>): Promise<{ invalidPerIp: number; requestsP
 }
 
 /** AC2-05: more than the configured number of invalid attempts from this IP in 10 minutes blocks it for a while. */
-async function ipBlocked(db: Kysely<DB>, ip: string, max: number): Promise<boolean> {
+export async function ipBlocked(db: Kysely<DB>, ip: string, max: number): Promise<boolean> {
   const row = await db
     .selectFrom("customer_link_access")
     .select((eb) => eb.fn.countAll<string>().as("n"))
@@ -89,7 +89,7 @@ async function ipBlocked(db: Kysely<DB>, ip: string, max: number): Promise<boole
   return Number.parseInt(row.n, 10) > max;
 }
 
-async function linkBusy(db: Kysely<DB>, linkId: string, max: number): Promise<boolean> {
+export async function linkBusy(db: Kysely<DB>, linkId: string, max: number): Promise<boolean> {
   const row = await db
     .selectFrom("customer_link_access")
     .select((eb) => eb.fn.countAll<string>().as("n"))
@@ -100,11 +100,11 @@ async function linkBusy(db: Kysely<DB>, linkId: string, max: number): Promise<bo
 }
 
 /** Records the request (insert-only) and audits it. Blocked requests are not recorded, so a flood writes nothing. */
-async function recordAccess(
+export async function recordAccess(
   db: Kysely<DB>,
   requester: LinkRequester,
   linkId: string | null,
-  outcome: "opened" | "invalid",
+  outcome: CustomerLinkAccessOutcome,
 ): Promise<void> {
   await runCommand(db, { name: "link.record_access", actor: { kind: "anonymous" } }, async (ctx) => {
     const access = await ctx.tx
@@ -120,7 +120,7 @@ async function recordAccess(
     // The IP stays in the access record only: that copy can be purged once V-1 sets retention (P1-09); the
     // audit log, which never changes, points to it instead.
     await ctx.audit({
-      action: outcome === "opened" ? "link.opened" : "link.invalid",
+      action: `link.${outcome}`,
       entityType: "customer_link",
       entityId: linkId ?? "(unknown)",
       details: { accessId: access.id },
@@ -129,15 +129,20 @@ async function recordAccess(
   });
 }
 
-interface ResolvedLink {
+export interface ResolvedLink {
   linkId: string;
   versionId: string;
   repairOrderId: string;
   state: "invalid" | "updated" | "open";
+  /**
+   * Invalid only because its version is still Sent past its expiry: nobody has recorded the expiry yet. A
+   * submission through it records the expiry before refusing (AC21-07, T-37); opening the page does not.
+   */
+  due: boolean;
 }
 
 /** Which page a token leads to, from the link and its version as they are now (T-40); no writes. */
-async function resolve(db: Kysely<DB>, token: string): Promise<ResolvedLink | null> {
+export async function resolve(db: Kysely<DB>, token: string): Promise<ResolvedLink | null> {
   const hash = hashLinkToken(token);
   if (!hash) return null;
   const row = await db
@@ -164,10 +169,14 @@ async function resolve(db: Kysely<DB>, token: string): Promise<ResolvedLink | nu
     .where("customer_link.token_hash", "=", hash)
     .executeTakeFirst();
   if (!row) return null;
-  const base = { linkId: row.id, versionId: row.estimate_version_id, repairOrderId: row.repair_order_id };
-  if (row.revoked_at || row.past_expiry || ENDED_ORDER.includes(row.ro_status)) {
-    return { ...base, state: "invalid" };
-  }
+  const ended = row.revoked_at !== null || ENDED_ORDER.includes(row.ro_status);
+  const base = {
+    linkId: row.id,
+    versionId: row.estimate_version_id,
+    repairOrderId: row.repair_order_id,
+    due: !ended && row.past_expiry && row.status === "sent",
+  };
+  if (ended || row.past_expiry) return { ...base, state: "invalid" };
   if (row.status === "withdrawn" || row.superseded) return { ...base, state: "updated" };
   if (row.status === "sent" || row.status === "closed") return { ...base, state: "open" };
   return { ...base, state: "invalid" }; // expired (or anything a link should never point at)

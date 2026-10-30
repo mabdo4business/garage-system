@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
@@ -27,11 +28,16 @@ export async function generateMetadata({
 
 export default async function CustomerLinkRoute({
   params,
+  searchParams,
 }: {
   params: Promise<{ locale: string; token: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { locale, token } = await params;
+  const { done } = await searchParams;
   if (!isLocale(locale)) notFound();
   const page = await openCustomerLink(getDb(), token, requesterFrom(await headers()));
-  return <LinkPage locale={locale} token={token} page={page} />;
+  return (
+    <LinkPage locale={locale} token={token} page={page} idempotencyKey={randomUUID()} done={done === "1"} />
+  );
 }

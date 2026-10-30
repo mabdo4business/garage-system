@@ -538,6 +538,10 @@ export interface ApprovalEventTable {
   recorded_by: string | null;
   recorded_at: Generated<Date>;
   business_date: ColumnType<string, string | undefined, never>;
+  /** I2-03b: a link approval's link, IP and browser (§6.4 evidence); null for every other method. */
+  customer_link_id: string | null;
+  ip: string | null;
+  user_agent: string | null;
 }
 
 export interface RevisionDecisionTable {
@@ -776,7 +780,7 @@ export interface VehicleDeliveryTable {
 // I2-03a: customer links (PRD v0.2 §6.4). Only the token's SHA-256 is stored.
 export type CustomerLinkPurpose = "estimate_approval";
 export type CustomerLinkRevokeReason = "manual" | "replaced";
-export type CustomerLinkAccessOutcome = "opened" | "invalid";
+export type CustomerLinkAccessOutcome = "opened" | "invalid" | "submitted";
 
 export interface CustomerLinkTable {
   id: Generated<string>;

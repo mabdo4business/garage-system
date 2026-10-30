@@ -1035,7 +1035,14 @@ textarea.internal {
 
 .estimate-document {
   display: grid;
+  /* One column that never grows past its container: a wide table scrolls inside its card instead. */
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-4);
+}
+
+/* Totals: a long label ('VAT included at 5%', longer in Arabic) wraps beside its amount instead of widening the card. */
+.estimate-totals {
+  grid-template-columns: minmax(0, 1fr) auto;
 }
 
 .approval-form .approval-choice {
@@ -1107,6 +1114,7 @@ textarea.internal {
 
 .link-page {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-4);
   max-inline-size: 760px;
   margin-inline: auto;

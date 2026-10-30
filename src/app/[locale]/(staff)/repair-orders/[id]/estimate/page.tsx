@@ -250,6 +250,14 @@ export default async function EstimatePage({ params }: { params: Promise<{ local
           <p className="muted">
             {t(locale, "estimate.contentHash")}: <bdi dir="ltr">{view.contentHash?.slice(0, 12)}</bdi>
           </p>
+          {view.linkDecisions.map((decision) => (
+            <p key={decision.recordedAt.toISOString()} data-testid="decided-by-link">
+              {t(locale, "estimate.decidedByLink", {
+                name: `⁨${decision.approverName}⁩`,
+                time: formatDubaiDateTime(decision.recordedAt, locale),
+              })}
+            </p>
+          ))}
           {view.overdue ? <p className="muted">{t(locale, "estimate.overdue")}</p> : null}
           {view.status === "sent" && hasPermission(session.roles, "estimate.send") ? (
             <details className="disclosure">
