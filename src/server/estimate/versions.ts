@@ -433,8 +433,9 @@ export async function reproposeJob(
 // --------------------------------------------------------------------------- scheduler
 
 /**
- * Expires every overdue sent version, each in its own transaction (§3.1 SYS). Called by the background worker
- * once it exists (I2-09); until then expiry happens when someone acts on the version. Returns the versions expired.
+ * Expires every overdue sent version, each in its own transaction (§3.1 SYS). Run every minute by the background
+ * worker (I2-09, src/server/worker); anyone acting on an overdue version still expires it first. Returns the versions
+ * expired.
  */
 export async function expireDueEstimates(db: Kysely<DB>): Promise<string[]> {
   const due = await db

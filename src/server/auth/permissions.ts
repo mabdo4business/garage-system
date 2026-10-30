@@ -75,6 +75,8 @@ export const PERMISSIONS = {
   // I2-03a: a customer link to the sent estimate; revoking it by hand (PRD v0.2 §6.4 "manual by ADV").
   "customer_link.create": ["partner", "manager", "service_advisor"],
   "customer_link.revoke": ["partner", "manager", "service_advisor"],
+  // I2-09: preparing customer messages and confirming they were sent from the staff device (OD-70).
+  "message.share": ["partner", "manager", "service_advisor"],
 
   // I1-06: the workshop board (no prices), assigning jobs (US-07.2, OD-26) and the assignee's own jobs. Managers
   // and partners can be assignees (OD-27), so they have "My jobs" too.

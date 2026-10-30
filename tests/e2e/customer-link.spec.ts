@@ -49,7 +49,7 @@ async function sentEstimateWithLink(browser: Browser, withAc = false) {
   // The advisor makes the link; its address is shown once.
   await advisor.goto(`/en/repair-orders/${ro}/estimate`);
   await advisor.getByRole("button", { name: "Create link" }).click();
-  const address = advisor.getByTestId("customer-link-url").locator("input");
+  const address = advisor.getByTestId("customer-link-address");
   await expect(address).toHaveValue(/\/c\/[A-Za-z0-9_-]{43}$/);
   return { advisor, ro, url: await address.inputValue() };
 }
@@ -222,4 +222,27 @@ test("changing the contact in person: the signature pad fits its box, and a sign
   await advisor.getByRole("button", { name: "Change contact" }).click();
   await expect(advisor.getByTestId("contact-history")).toContainText("in person, signed by");
   await expect(advisor.getByTestId("contact-history")).toContainText("Sara Driver");
+});
+
+test("creating the link prepares the WhatsApp message; the advisor sends it and confirms (I2-09)", async ({
+  browser,
+}) => {
+  test.setTimeout(120_000);
+  const { advisor, url } = await sentEstimateWithLink(browser);
+  const share = advisor.getByTestId("message-share");
+  await expect(share).toBeVisible();
+  // The text holds the very link just created; WhatsApp opens to the contact's number with it filled in.
+  await expect(share.locator(".message-text")).toContainText(url);
+  const whatsapp = await advisor.getByTestId("share-whatsapp").getAttribute("href");
+  expect(whatsapp).toMatch(/^https:\/\/wa\.me\/\d{9,15}\?text=/);
+  expect(decodeURIComponent(whatsapp!.split("?text=")[1]!)).toContain(url);
+
+  // Switching language shows the Arabic text with the Arabic link.
+  await share.getByRole("button", { name: "العربية" }).click();
+  await expect(share.locator(".message-text")).toHaveAttribute("dir", "rtl");
+  await expect(share.locator(".message-text")).toContainText(url.replace("/en/c/", "/ar/c/"));
+
+  await share.getByRole("button", { name: "I sent it" }).click();
+  await expect(share).toContainText("Marked as sent.");
+  await expect(share.getByRole("button", { name: "I sent it" })).toHaveCount(0);
 });

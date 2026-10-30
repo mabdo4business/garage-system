@@ -19,6 +19,8 @@ import { InvoiceCard } from "./invoice/invoice-card";
 import { SettlementCard } from "./payments/settlement-card";
 import { randomUUID } from "node:crypto";
 import { ContactChangeForm } from "./contact-change-form";
+import { ReadyMessageCard } from "./ready-message-card";
+import { latestMessage } from "../../../../../server/messages/queries";
 import {
   CONTACT_CHANGE_OPEN,
   contactHistory,
@@ -63,6 +65,24 @@ export default async function RepairOrderPage({
     ro.contactMobile !== null;
   const owner = canChangeContact ? await ownerForContactChange(getDb(), ro.customerId, locale) : null;
   const contactChanges = await contactHistory(getDb(), id);
+  // I2-09 (OD-71): while the car is Ready, the message telling the customer, and what happened to the last one.
+  const lastReady =
+    ro.status === "ready" && hasPermission(session.roles, "message.share")
+      ? await latestMessage(getDb(), id, "vehicle_ready")
+      : undefined;
+  const readyMessage =
+    lastReady === undefined
+      ? null
+      : {
+          status: !lastReady
+            ? null
+            : lastReady.sharedAt
+              ? t(locale, "share.lastSent", {
+                  time: formatDubaiDateTime(lastReady.sharedAt, locale),
+                  name: `\u2068${lastReady.sharedByName ?? ""}\u2069`,
+                })
+              : t(locale, "share.unsent", { time: formatDubaiDateTime(lastReady.preparedAt, locale) }),
+        };
 
   return (
     <>
@@ -274,6 +294,10 @@ export default async function RepairOrderPage({
           canIssue={hasPermission(session.roles, "invoice.issue")}
           qcPassed={latestQc?.status === "passed"}
         />
+      ) : null}
+
+      {readyMessage ? (
+        <ReadyMessageCard locale={locale} repairOrderId={ro.id} status={readyMessage.status} />
       ) : null}
 
       {hasPermission(session.roles, "invoice.read") ? (

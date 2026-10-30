@@ -104,6 +104,7 @@ const ERROR_KEYS: Record<string, MessageKey> = {
   tax_rate_changed: "error.taxRateChanged",
   estimate_not_sent: "error.estimateNotSent",
   estimate_expired: "error.estimateExpired",
+  public_url_missing: "share.error.noPublicUrl",
   estimate_changed: "error.estimateChanged",
   revision_not_pending: "error.revisionNotPending",
   // I2-01 estimate versions

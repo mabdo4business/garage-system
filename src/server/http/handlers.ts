@@ -82,7 +82,9 @@ import {
 } from "../vehicle/service";
 import { isLocale, DEFAULT_LOCALE } from "../../i18n";
 import { createCustomerLink, revokeCustomerLink } from "../links/commands";
+import { publicOrigin } from "../links/origin";
 import { changeContact } from "../repair-order/contact";
+import { markMessageShared, prepareReadyMessage } from "../messages/commands";
 import { customerLinkPhoto, requesterFrom } from "../links/customer";
 
 /**
@@ -163,6 +165,8 @@ const STATUS_BY_CODE: Record<string, number> = {
   not_ready: 409,
   balance_due: 409,
   contact_changed: 409,
+  public_url_missing: 409,
+  message_superseded: 409,
   repair_order_closed: 409,
   try_again: 503,
 };
@@ -1669,6 +1673,39 @@ export function createHandlers(db: Kysely<DB>, storage: MediaStorage = getMediaS
       }
     },
 
+    // ------------------------------------------------------------------ I2-09 staff-initiated sharing
+
+    /** POST /api/repair-orders/:id/messages/ready — prepares "your car is ready for collection" (OD-71). */
+    async prepareReadyMessage(request: Request, repairOrderId: string): Promise<Response> {
+      try {
+        if (!sameOrigin(request)) return json(403, { error: "forbidden" });
+        const session = await authorize(db, await currentSession(request), "message.share", {
+          entityType: "repair_order",
+          entityId: repairOrderId,
+        });
+        const outcome = await prepareReadyMessage(db, session, repairOrderId);
+        return json(201, outcome.result);
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    /** POST /api/customer-messages/:id/shared — { language }: "I sent it" (OD-70). */
+    async markMessageShared(request: Request, messageId: string): Promise<Response> {
+      try {
+        if (!sameOrigin(request)) return json(403, { error: "forbidden" });
+        const session = await authorize(db, await currentSession(request), "message.share", {
+          entityType: "customer_message",
+          entityId: messageId,
+        });
+        const body = await readBody(request);
+        const outcome = await markMessageShared(db, session, messageId, body.language);
+        return json(200, outcome.result);
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
     // ------------------------------------------------------------------ I2-03a customer links
 
     /**
@@ -1682,7 +1719,9 @@ export function createHandlers(db: Kysely<DB>, storage: MediaStorage = getMediaS
           entityType: "repair_order",
           entityId: repairOrderId,
         });
-        const outcome = await createCustomerLink(db, session, repairOrderId);
+        const outcome = await createCustomerLink(db, session, repairOrderId, {
+          baseUrl: publicOrigin(new URL(request.url).origin),
+        });
         return json(201, outcome.result, { "cache-control": "no-store" });
       } catch (error) {
         return errorResponse(error);

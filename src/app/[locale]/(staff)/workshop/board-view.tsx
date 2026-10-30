@@ -200,9 +200,16 @@ export function BoardView({
 
   function flagsOf(order: BoardRepairOrder): ReactNode {
     const someWaiting = order.flags.awaitingDecision && order.status !== "awaiting_approval";
-    if (!order.flags.paused && !order.flags.anotherOpen && !someWaiting) return null;
+    if (!order.flags.paused && !order.flags.anotherOpen && !someWaiting && !order.customerNotInformed)
+      return null;
     return (
       <p className="board-flags">
+        {order.customerNotInformed ? (
+          // AC2-28: a message was prepared but nobody confirmed sending it.
+          <span data-flag="not-informed">
+            <StatusChip tone="warning">{t(locale, "share.notInformed")}</StatusChip>
+          </span>
+        ) : null}
         {someWaiting ? (
           <StatusChip status="approval">{t(locale, "board.flag.someJobsAwaiting")}</StatusChip>
         ) : null}

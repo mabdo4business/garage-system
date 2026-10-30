@@ -805,6 +805,24 @@ export interface CustomerLinkAccessTable {
   at: Generated<Date>;
 }
 
+// I2-09: messages prepared for the customer and confirmed sent (AC2-28); the link appears only as "[link]".
+export type CustomerMessageKind = "estimate_link" | "vehicle_ready";
+
+export interface CustomerMessageTable {
+  id: Generated<string>;
+  repair_order_id: string;
+  kind: CustomerMessageKind;
+  customer_link_id: string | null;
+  language: "ar" | "en";
+  body_ar: string;
+  body_en: string;
+  recipient_mobile: string;
+  prepared_by: string;
+  prepared_at: Generated<Date>;
+  shared_at: Timestamp | null;
+  shared_by: string | null;
+}
+
 // I2-06: authorized contact changes (F-10), insert-only; inserting one applies it and revokes the links.
 export interface ContactChangeTable {
   id: Generated<string>;
@@ -888,5 +906,6 @@ export interface DB {
   customer_link: CustomerLinkTable;
   customer_link_access: CustomerLinkAccessTable;
   contact_change: ContactChangeTable;
+  customer_message: CustomerMessageTable;
   schema_migration: SchemaMigrationTable;
 }

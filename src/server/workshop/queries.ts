@@ -10,6 +10,7 @@ import type {
   RepairOrderStatus,
 } from "../db/schema";
 import { authorizedScope } from "../estimate/approval";
+import { notInformed } from "../messages/queries";
 import { qcBlockerOf, type QcBlocker } from "../quality/queries";
 
 /**
@@ -54,6 +55,8 @@ export interface BoardRepairOrder {
   qcBlocker: QcBlocker | null;
   jobs: BoardJob[];
   flags: { awaitingDecision: boolean; paused: boolean; workDone: boolean; anotherOpen: boolean };
+  /** AC2-28 (OD-71): a message was prepared for the customer but not confirmed sent within 15 minutes. */
+  customerNotInformed: boolean;
 }
 
 /** US-07.1: every open repair order with its jobs, assignee, bay, promised time and flags. */
@@ -124,6 +127,7 @@ export async function workshopBoard(db: Kysely<DB>): Promise<BoardRepairOrder[]>
         .execute()
     ).map((row) => row.repair_order_id),
   );
+  const uninformed = await notInformed(db, ids);
   const vehicles = new Map<string, number>();
   for (const order of orders) vehicles.set(order.vehicle_id, (vehicles.get(order.vehicle_id) ?? 0) + 1);
 
@@ -143,6 +147,7 @@ export async function workshopBoard(db: Kysely<DB>): Promise<BoardRepairOrder[]>
       promisedAt: order.promised_at,
       checkedInAt: order.checked_in_at,
       decisionSentAt: awaiting.get(order.id) ?? null,
+      customerNotInformed: uninformed.has(order.id),
       qcBlocker:
         order.status === "in_progress"
           ? qcBlockerOf(

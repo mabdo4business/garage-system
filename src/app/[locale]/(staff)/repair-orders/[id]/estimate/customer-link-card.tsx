@@ -6,6 +6,7 @@ import { t, type Locale } from "../../../../../../i18n";
 import { FormErrorMessage } from "../../../../form-error";
 import { EMPTY_FORM_STATE } from "../../../../form-state";
 import { createLinkAction, revokeLinkAction, type LinkFormState } from "./link-actions";
+import { MessageShare } from "../../../message-share";
 
 /** Arabic counts take one, two, 3–10 and 11+ forms; English uses the same text for the last two. */
 function openedKey(count: number) {
@@ -60,7 +61,13 @@ export function CustomerLinkCard({
           <p>
             <strong>{t(locale, "link.card.created")}</strong> {t(locale, "link.card.onlyOnce")}
           </p>
-          <input readOnly value={url} dir="ltr" aria-label={t(locale, "link.card.address")} />
+          <input
+            readOnly
+            value={url}
+            dir="ltr"
+            aria-label={t(locale, "link.card.address")}
+            data-testid="customer-link-address"
+          />
           <Button
             type="button"
             variant="secondary"
@@ -70,6 +77,7 @@ export function CustomerLinkCard({
           >
             {copied ? t(locale, "link.card.copied") : t(locale, "link.card.copy")}
           </Button>
+          {created.message ? <MessageShare locale={locale} message={created.message} /> : null}
         </div>
       ) : live ? (
         <dl className="detail-list" data-testid="customer-link-live">

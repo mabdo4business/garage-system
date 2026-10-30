@@ -3376,3 +3376,26 @@ button.bay-tick:hover {
   margin: 0;
   font-size: var(--text-sm);
 }
+
+/* ---------------------------------------------------------------- Customer messages (I2-09) */
+
+.message-share {
+  display: grid;
+  gap: var(--space-3);
+  margin-block-start: var(--space-3);
+}
+
+.message-share h3 {
+  margin: 0;
+}
+
+.message-text {
+  margin: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  font-family: var(--font-body);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

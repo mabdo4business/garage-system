@@ -23,6 +23,11 @@ export type OutboxHandler = (message: OutboxMessage) => Promise<void>;
 
 export interface ProcessOutboxOptions {
   handlers: Record<string, OutboxHandler>;
+  /**
+   * Only these topics are taken (default: every topic). The worker passes the topics it has handlers for, so a
+   * message whose handler does not exist yet waits untouched — no attempts, no backoff — until one is added.
+   */
+  topics?: readonly string[];
   /** Maximum messages per call. Default 50. */
   limit?: number;
   /** Delay before retrying a failed message. Default: 2^attempts seconds, capped at 5 minutes. */
@@ -57,6 +62,10 @@ export async function processOutbox(
         .where("available_at", "<=", sql<Date>`now()`);
       if (attempted.length > 0) {
         query = query.where("id", "not in", attempted);
+      }
+      if (options.topics) {
+        if (options.topics.length === 0) return "empty" as const;
+        query = query.where("topic", "in", [...options.topics]);
       }
       const row = await query
         .orderBy("created_at")
