@@ -97,6 +97,8 @@ export interface EstimateView {
   sentAt: Date | null;
   expiresAt: Date | null;
   contentHash: string | null;
+  /** I2-03b: decisions the customer gave through the link on this version (typed name, when). */
+  linkDecisions: { approverName: string; recordedAt: Date }[];
   jobs: EstimateJobView[];
   urgentFindings: UrgentFindingStatus[];
   /** Active non-urgent findings without a job, offered as optional jobs. */
@@ -279,6 +281,13 @@ export async function estimateView(db: Kysely<DB>, repairOrderId: string): Promi
     urgentFindings,
     otherFindings,
     totals: totalsJson(sumLines(allAmounts)),
+    linkDecisions: await db
+      .selectFrom("approval_event")
+      .select(["approver_name as approverName", "recorded_at as recordedAt"])
+      .where("estimate_version_id", "=", version.id)
+      .where("method", "=", "link")
+      .orderBy("recorded_at")
+      .execute(),
   };
 }
 

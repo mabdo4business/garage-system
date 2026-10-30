@@ -14,8 +14,12 @@ import { sumLines } from "./pricing";
  * of fields so new internal columns never leak by default.
  */
 
-/** 2 (I2-01): adds `earlierApproved`, the work approved in earlier versions, shown as context only. */
-export const SNAPSHOT_SCHEMA = 2;
+/**
+ * 2 (I2-01): adds `earlierApproved`, the work approved in earlier versions, shown as context only.
+ * 3 (I2-03a): adds `finding` per job — what the customer is shown about the inspection finding a job comes from
+ * (customer note, fault codes per OD-63, the photos marked for the customer, OD-11), so the hash covers it too.
+ */
+export const SNAPSHOT_SCHEMA = 3;
 
 export interface SnapshotLine {
   lineId: string;
@@ -41,8 +45,17 @@ export interface SnapshotJob {
   title: string;
   /** "urgent" / "soon" / "ok" when the job comes from an inspection finding. */
   findingSeverity: string | null;
+  /** Since schema 3: the customer-facing part of that finding (never its internal note); null for typed jobs. */
+  finding?: SnapshotFinding | null;
   lines: SnapshotLine[];
   total: string;
+}
+
+export interface SnapshotFinding {
+  customerNote: string | null;
+  faultCodes: string[];
+  /** Finding photos marked "show to customer" when the version was sent. */
+  photoIds: string[];
 }
 
 /**
@@ -125,7 +138,10 @@ export async function buildSnapshot(
     .select([
       "repair_job.id",
       "repair_job.title",
+      "repair_job.finding_id",
       "finding.severity",
+      "finding.customer_note",
+      "finding.fault_codes",
       "job_revision.id as revision_id",
       "job_revision.kind",
     ])
@@ -134,6 +150,20 @@ export async function buildSnapshot(
     .orderBy("repair_job.created_at")
     .orderBy("repair_job.id")
     .execute();
+  const findingIds = jobs.flatMap((job) => (job.finding_id ? [job.finding_id] : []));
+  const photos =
+    findingIds.length === 0
+      ? []
+      : await db
+          .selectFrom("media_asset")
+          .select(["id", "finding_id"])
+          .where("finding_id", "in", findingIds)
+          .where("visibility", "=", "customer")
+          .where("discarded_at", "is", null)
+          .where("excluded_at", "is", null)
+          .orderBy("uploaded_at")
+          .orderBy("id")
+          .execute();
   const lines =
     jobs.length === 0
       ? []
@@ -216,6 +246,15 @@ export async function buildSnapshot(
         revisionKind: job.kind,
         title: job.title,
         findingSeverity: job.severity,
+        finding: job.finding_id
+          ? {
+              customerNote: job.customer_note,
+              faultCodes: job.fault_codes ?? [],
+              photoIds: photos
+                .filter((photo) => photo.finding_id === job.finding_id)
+                .map((photo) => photo.id),
+            }
+          : null,
         total: own.reduce((sum, line) => sum.add(Money.parse(line.line_total)), Money.ZERO).toString(),
         lines: own.map((line) => ({
           lineId: line.id,

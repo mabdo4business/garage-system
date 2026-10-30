@@ -1,5 +1,5 @@
 import { sql, type Kysely } from "kysely";
-import { runCommand, type CommandOutcome } from "../command/runner";
+import { runCommand, type CommandContext, type CommandOutcome } from "../command/runner";
 import { ConflictError, NotFoundError, ValidationError } from "../core/errors";
 import { isUuid } from "../core/ids";
 import { taxCodeRateOn, taxProfileOn } from "../catalog/tax";
@@ -233,15 +233,15 @@ export interface InPersonApprovalInput {
   signature: Uint8Array;
 }
 
-type ApprovalResult =
+export type ApprovalResult =
   { kind: "expired"; approvalEventId: null } | { kind: "recorded"; approvalEventId: string };
 
-interface Decision {
+export interface Decision {
   revisionId: string;
   decision: "approved" | "declined";
 }
 
-function parseDecisions(value: unknown): Decision[] {
+export function parseDecisions(value: unknown): Decision[] {
   if (!Array.isArray(value) || value.length === 0) {
     throw new ValidationError("Choose approve or decline for at least one job", { field: "decisions" });
   }
@@ -330,150 +330,196 @@ export async function recordInPersonApproval(
   };
   const outcome = await runCommand(db, options, async (ctx): Promise<ApprovalResult> => {
     await ctx.locks.acquire("repair_order", [repairOrderId]);
-    // §5 / AC21-07: an overdue version expires now, scheduler or not. The expiry must commit, so the refusal is
-    // returned as a result and thrown after the transaction.
-    const expired = await expireIfDue(ctx, repairOrderId, "submission");
-    if (expired?.versionId === versionId) return { kind: "expired", approvalEventId: null } as ApprovalResult;
-    const version = await ctx.tx
-      .selectFrom("estimate_version")
-      .select(["status", "content_hash", "expires_at", "terms_ar_id", "terms_en_id"])
-      .where("id", "=", versionId)
-      .executeTakeFirstOrThrow();
-    if (version.status === "expired") {
-      throw new ConflictError("estimate_expired", "This estimate has expired");
-    }
-    if (version.status === "draft") {
-      throw new ConflictError("estimate_not_sent", "This estimate is not awaiting a decision", {
-        status: version.status,
-      });
-    }
-    if (version.status !== "sent") {
-      // AC21-05: withdrawn (or fully decided) before this submission got the lock.
-      throw new ConflictError("estimate_updated", "This estimate has been updated", {
-        status: version.status,
-      });
-    }
-    if (version.content_hash !== contentHash) {
-      throw new ConflictError("estimate_changed", "The estimate shown is not the one that was sent");
-    }
-
-    const pending = await ctx.tx
-      .selectFrom("job_revision")
-      .innerJoin("repair_job", "repair_job.id", "job_revision.job_id")
-      .leftJoin("finding", "finding.id", "repair_job.finding_id")
-      .select(["job_revision.id", "job_revision.job_id", "repair_job.title", "finding.severity"])
-      .where("job_revision.proposed_in_version_id", "=", versionId)
-      .where("job_revision.status", "=", "pending")
-      .execute();
-    const byRevision = new Map(pending.map((row) => [row.id, row]));
-    if (decisions.some((d) => !byRevision.has(d.revisionId))) {
-      throw new ConflictError("revision_not_pending", "A job was already decided or is not in this estimate");
-    }
-
-    const ro = await ctx.tx
-      .selectFrom("repair_order")
-      .select(["status", "contact_name", "contact_mobile"])
-      .where("id", "=", repairOrderId)
-      .executeTakeFirstOrThrow();
-    if (ro.status !== "awaiting_approval" && ro.status !== "in_progress") {
-      throw new ConflictError("estimate_closed", `Repair order is ${ro.status}`, { status: ro.status });
-    }
-    const event = await ctx.tx
-      .insertInto("approval_event")
-      .values({
-        estimate_version_id: versionId,
-        method: "in_person_signature",
-        verification_level: "in_person",
-        approver_name: approverName,
-        signature_sha256: image.sha256,
-        signature_storage_key: storageKey,
-        signature_content_type: image.contentType,
-        contact_name: ro.contact_name,
-        contact_mobile: ro.contact_mobile,
-        displayed_language: language,
-        terms_ar_id: version.terms_ar_id,
-        terms_en_id: version.terms_en_id,
-        content_hash: contentHash,
-        idempotency_key: idempotencyKey,
-        recorded_by: staff.userId,
-      })
-      .returning("id")
-      .executeTakeFirstOrThrow();
-
-    const recorded = [];
-    for (const { revisionId, decision } of decisions) {
-      const revision = byRevision.get(revisionId)!;
-      const urgentAckPending = decision === "declined" && revision.severity === "urgent";
-      await ctx.tx
-        .insertInto("revision_decision")
-        .values({
-          approval_event_id: event.id,
-          revision_id: revisionId,
-          decision,
-          urgent_ack_pending: urgentAckPending,
-        })
-        .execute();
-      await ctx.tx
-        .updateTable("job_revision")
-        .set({ status: decision })
-        .where("id", "=", revisionId)
-        .execute();
-      if (decision === "approved") {
-        // v0.2.1 §3.3: Not authorized → Authorized when the job's first revision is approved.
-        await ctx.tx
-          .updateTable("repair_job")
-          .set({ execution_status: "authorized", updated_by: staff.userId })
-          .where("id", "=", revision.job_id)
-          .where("execution_status", "=", "not_authorized")
-          .execute();
-      }
-      recorded.push({ jobId: revision.job_id, revisionId, decision, urgentAckPending });
-    }
-
-    const stillPending = pending.length - decisions.length;
-    if (stillPending === 0) {
-      await ctx.tx
-        .updateTable("estimate_version")
-        .set({ status: "closed" })
-        .where("id", "=", versionId)
-        .execute();
-    }
-    await ctx.audit({
-      action: "estimate.approval_recorded",
-      entityType: "approval_event",
-      entityId: event.id,
-      after: {
-        versionId,
-        method: "in_person_signature",
-        approverName,
-        language,
-        contentHash,
-        decisions: recorded,
-        versionClosed: stillPending === 0,
-      },
+    return recordDecisions(ctx, repairOrderId, versionId, decisions, {
+      method: "in_person_signature",
+      verificationLevel: "in_person",
+      approverName,
+      language,
+      contentHash,
+      idempotencyKey,
+      recordedBy: staff.userId,
+      signature: { sha256: image.sha256, storageKey, contentType: image.contentType },
+      link: null,
     });
-
-    // v0.2 §5: Awaiting approval → In progress when a job is approved (T-22).
-    if (ro.status === "awaiting_approval" && decisions.some((d) => d.decision === "approved")) {
-      await ctx.tx
-        .updateTable("repair_order")
-        .set({ status: "in_progress" })
-        .where("id", "=", repairOrderId)
-        .execute();
-      await ctx.audit({
-        action: "ro.work_authorized",
-        entityType: "repair_order",
-        entityId: repairOrderId,
-        before: { status: "awaiting_approval" },
-        after: { status: "in_progress" },
-      });
-    }
-    return { kind: "recorded", approvalEventId: event.id } as ApprovalResult;
   });
   if (outcome.result.kind === "expired") {
     throw new ConflictError("estimate_expired", "This estimate has expired");
   }
   return { ...outcome, result: { approvalEventId: outcome.result.approvalEventId, repairOrderId } };
+}
+
+/** How a decision reached the garage: what the approval event records besides the decisions (§6.4, OD-20). */
+export interface DecisionEvidence {
+  method: "in_person_signature" | "link";
+  verificationLevel: "in_person" | "possession";
+  approverName: string;
+  language: "ar" | "en";
+  contentHash: string;
+  idempotencyKey: string;
+  /** The staff member present in person; null through a link. */
+  recordedBy: string | null;
+  signature: {
+    sha256: string;
+    storageKey: string;
+    contentType: "image/png" | "image/jpeg" | "image/webp";
+  } | null;
+  link: { linkId: string; ip: string; userAgent: string | null } | null;
+}
+
+/**
+ * Records the customer's decisions on whole jobs, however they were given (in person or through the link): one
+ * ApprovalEvent, one RevisionDecision per job, jobs authorized, the version closed once nothing is pending, and the
+ * repair order moved to In progress on the first approval (T-22). The caller holds the repair-order lock (A.4).
+ * An overdue version is expired here and reported as "expired": the expiry must commit, so the caller refuses
+ * after the transaction (§5, AC21-07).
+ */
+export async function recordDecisions(
+  ctx: CommandContext,
+  repairOrderId: string,
+  versionId: string,
+  decisions: Decision[],
+  evidence: DecisionEvidence,
+): Promise<ApprovalResult> {
+  const { contentHash } = evidence;
+  const expired = await expireIfDue(ctx, repairOrderId, "submission");
+  if (expired?.versionId === versionId) return { kind: "expired", approvalEventId: null } as ApprovalResult;
+  const version = await ctx.tx
+    .selectFrom("estimate_version")
+    .select(["status", "content_hash", "expires_at", "terms_ar_id", "terms_en_id"])
+    .where("id", "=", versionId)
+    .executeTakeFirstOrThrow();
+  if (version.status === "expired") {
+    throw new ConflictError("estimate_expired", "This estimate has expired");
+  }
+  if (version.status === "draft") {
+    throw new ConflictError("estimate_not_sent", "This estimate is not awaiting a decision", {
+      status: version.status,
+    });
+  }
+  if (version.status !== "sent") {
+    // AC21-05: withdrawn (or fully decided) before this submission got the lock.
+    throw new ConflictError("estimate_updated", "This estimate has been updated", {
+      status: version.status,
+    });
+  }
+  if (version.content_hash !== contentHash) {
+    throw new ConflictError("estimate_changed", "The estimate shown is not the one that was sent");
+  }
+
+  const pending = await ctx.tx
+    .selectFrom("job_revision")
+    .innerJoin("repair_job", "repair_job.id", "job_revision.job_id")
+    .leftJoin("finding", "finding.id", "repair_job.finding_id")
+    .select(["job_revision.id", "job_revision.job_id", "repair_job.title", "finding.severity"])
+    .where("job_revision.proposed_in_version_id", "=", versionId)
+    .where("job_revision.status", "=", "pending")
+    .execute();
+  const byRevision = new Map(pending.map((row) => [row.id, row]));
+  if (decisions.some((d) => !byRevision.has(d.revisionId))) {
+    throw new ConflictError("revision_not_pending", "A job was already decided or is not in this estimate");
+  }
+
+  const ro = await ctx.tx
+    .selectFrom("repair_order")
+    .select(["status", "contact_name", "contact_mobile"])
+    .where("id", "=", repairOrderId)
+    .executeTakeFirstOrThrow();
+  if (ro.status !== "awaiting_approval" && ro.status !== "in_progress") {
+    throw new ConflictError("estimate_closed", `Repair order is ${ro.status}`, { status: ro.status });
+  }
+  const event = await ctx.tx
+    .insertInto("approval_event")
+    .values({
+      estimate_version_id: versionId,
+      method: evidence.method,
+      verification_level: evidence.verificationLevel,
+      approver_name: evidence.approverName,
+      signature_sha256: evidence.signature?.sha256 ?? null,
+      signature_storage_key: evidence.signature?.storageKey ?? null,
+      signature_content_type: evidence.signature?.contentType ?? null,
+      // A.4: the authorized contact in effect now.
+      contact_name: ro.contact_name,
+      contact_mobile: ro.contact_mobile,
+      displayed_language: evidence.language,
+      terms_ar_id: version.terms_ar_id,
+      terms_en_id: version.terms_en_id,
+      content_hash: contentHash,
+      idempotency_key: evidence.idempotencyKey,
+      recorded_by: evidence.recordedBy,
+      customer_link_id: evidence.link?.linkId ?? null,
+      ip: evidence.link?.ip ?? null,
+      user_agent: evidence.link?.userAgent ?? null,
+    })
+    .returning("id")
+    .executeTakeFirstOrThrow();
+
+  const recorded = [];
+  for (const { revisionId, decision } of decisions) {
+    const revision = byRevision.get(revisionId)!;
+    const urgentAckPending = decision === "declined" && revision.severity === "urgent";
+    await ctx.tx
+      .insertInto("revision_decision")
+      .values({
+        approval_event_id: event.id,
+        revision_id: revisionId,
+        decision,
+        urgent_ack_pending: urgentAckPending,
+      })
+      .execute();
+    await ctx.tx.updateTable("job_revision").set({ status: decision }).where("id", "=", revisionId).execute();
+    if (decision === "approved") {
+      // v0.2.1 §3.3: Not authorized → Authorized when the job's first revision is approved.
+      await ctx.tx
+        .updateTable("repair_job")
+        .set({ execution_status: "authorized", updated_by: evidence.recordedBy })
+        .where("id", "=", revision.job_id)
+        .where("execution_status", "=", "not_authorized")
+        .execute();
+    }
+    recorded.push({ jobId: revision.job_id, revisionId, decision, urgentAckPending });
+  }
+
+  const stillPending = pending.length - decisions.length;
+  if (stillPending === 0) {
+    await ctx.tx
+      .updateTable("estimate_version")
+      .set({ status: "closed" })
+      .where("id", "=", versionId)
+      .execute();
+  }
+  await ctx.audit({
+    action: "estimate.approval_recorded",
+    entityType: "approval_event",
+    entityId: event.id,
+    after: {
+      versionId,
+      method: evidence.method,
+      approverName: evidence.approverName,
+      language: evidence.language,
+      contentHash,
+      decisions: recorded,
+      versionClosed: stillPending === 0,
+      // The link only: its IP and browser stay on the event itself (P1-09).
+      ...(evidence.link ? { linkId: evidence.link.linkId } : {}),
+    },
+  });
+
+  // v0.2 §5: Awaiting approval → In progress when a job is approved (T-22).
+  if (ro.status === "awaiting_approval" && decisions.some((d) => d.decision === "approved")) {
+    await ctx.tx
+      .updateTable("repair_order")
+      .set({ status: "in_progress" })
+      .where("id", "=", repairOrderId)
+      .execute();
+    await ctx.audit({
+      action: "ro.work_authorized",
+      entityType: "repair_order",
+      entityId: repairOrderId,
+      before: { status: "awaiting_approval" },
+      after: { status: "in_progress" },
+    });
+  }
+  return { kind: "recorded", approvalEventId: event.id } as ApprovalResult;
 }
 
 // --------------------------------------------------------------------------- authorized scope

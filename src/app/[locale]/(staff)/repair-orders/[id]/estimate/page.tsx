@@ -19,6 +19,8 @@ import { getRepairOrder } from "../../../../../../server/repair-order/queries";
 import { requirePagePermission } from "../../../../server-support";
 import { NoTaxProfileBanner } from "../../../catalogue/shared";
 import { StepForm, type StepField } from "./estimate-forms";
+import { CustomerLinkCard } from "./customer-link-card";
+import { customerLinkStatus } from "../../../../../../server/links/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -102,6 +104,7 @@ export default async function EstimatePage({ params }: { params: Promise<{ local
   const ro = await getRepairOrder(db, session.roles, id);
   if (!ro) notFound();
   const view = await estimateView(db, id);
+  const link = view ? await customerLinkStatus(db, id) : null;
 
   const roOpen = ro.status === "checked_in" || ro.status === "diagnosing";
   const draftOpen = (OPEN_FOR_DRAFT as readonly string[]).includes(ro.status);
@@ -247,6 +250,14 @@ export default async function EstimatePage({ params }: { params: Promise<{ local
           <p className="muted">
             {t(locale, "estimate.contentHash")}: <bdi dir="ltr">{view.contentHash?.slice(0, 12)}</bdi>
           </p>
+          {view.linkDecisions.map((decision) => (
+            <p key={decision.recordedAt.toISOString()} data-testid="decided-by-link">
+              {t(locale, "estimate.decidedByLink", {
+                name: `⁨${decision.approverName}⁩`,
+                time: formatDubaiDateTime(decision.recordedAt, locale),
+              })}
+            </p>
+          ))}
           {view.overdue ? <p className="muted">{t(locale, "estimate.overdue")}</p> : null}
           {view.status === "sent" && hasPermission(session.roles, "estimate.send") ? (
             <details className="disclosure">
@@ -279,6 +290,27 @@ export default async function EstimatePage({ params }: { params: Promise<{ local
             </details>
           ) : null}
         </Card>
+      ) : null}
+      {link && (link.canCreate || link.live) ? (
+        <CustomerLinkCard
+          locale={locale}
+          repairOrderId={id}
+          canCreate={link.canCreate && hasPermission(session.roles, "customer_link.create")}
+          canRevoke={hasPermission(session.roles, "customer_link.revoke")}
+          live={
+            link.live
+              ? {
+                  linkId: link.live.linkId,
+                  createdLabel: `${formatDubaiDateTime(link.live.createdAt, locale)}${link.live.createdByName ? ` · ${link.live.createdByName}` : ""}`,
+                  expiresLabel: formatDubaiDateTime(link.live.expiresAt, locale),
+                  opens: link.live.opens,
+                  lastOpenedLabel: link.live.lastOpenedAt
+                    ? formatDubaiDateTime(link.live.lastOpenedAt, locale)
+                    : null,
+                }
+              : null
+          }
+        />
       ) : null}
       {canStartVersion ? (
         <Card title={t(locale, "estimate.newVersion", { no: String(view.versionNo + 1) })}>
