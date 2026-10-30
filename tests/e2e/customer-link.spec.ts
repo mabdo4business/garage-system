@@ -135,3 +135,91 @@ test("the customer approves one job and declines the other through the link, in 
   await expect(advisor.locator("body")).toContainText("In progress");
   await phone.close();
 });
+
+test("changing the authorized contact by callback stops the customer's link (F-10, T-08)", async ({
+  browser,
+}) => {
+  test.setTimeout(120_000);
+  const { advisor, ro, url } = await sentEstimateWithLink(browser);
+
+  const phone = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const customer = await phone.newPage();
+  await customer.goto(url);
+  await expect(customer.getByRole("heading", { level: 1 })).toHaveText("Your car's estimate");
+
+  // The owner calls in: the advisor calls back the owner's number on file and changes the contact.
+  await advisor.goto(`/en/repair-orders/${ro}`);
+  await advisor.getByText("Change authorized contact").click();
+  await advisor.getByLabel("New contact's name").fill("Fleet Manager");
+  await advisor.getByLabel("New contact's mobile").fill("0501112233");
+  await advisor.getByLabel("Relationship to the vehicle").selectOption("company_representative");
+  await advisor.getByLabel("Reason", { exact: true }).fill("Company fleet manager takes over");
+  await advisor.locator("label").filter({ hasText: "The owner:" }).click();
+  await advisor.locator("label").filter({ hasText: "Callback to the number on file" }).click();
+  await expect(advisor.getByTestId("contact-call-number")).toContainText(/\d{6,}/);
+  const dubaiNow = new Date(Date.now() + 4 * 3_600_000 - 60_000).toISOString().slice(0, 16);
+  await advisor.getByLabel("Time of the call").fill(dubaiNow);
+  await advisor.getByLabel("Person spoken to").fill("The owner");
+  await advisor.getByRole("button", { name: "Change contact" }).click();
+
+  await expect(advisor.getByTestId("contact-history")).toContainText("Fleet Manager");
+  await expect(advisor.getByTestId("contact-history")).toContainText("by callback, spoke to");
+
+  await customer.reload();
+  await expect(customer.getByRole("heading", { level: 1 })).toHaveText("This link is no longer valid");
+  await phone.close();
+});
+
+test("changing the contact in person: the signature pad fits its box, and a signature lost by switching is not sent", async ({
+  browser,
+}) => {
+  test.setTimeout(120_000);
+  const { advisor, ro } = await sentEstimateWithLink(browser);
+  await advisor.goto(`/en/repair-orders/${ro}`);
+  await advisor.getByText("Change authorized contact").click();
+  await advisor.getByLabel("New contact's name").fill("Sara Driver");
+  await advisor.getByLabel("New contact's mobile").fill("0504445566");
+  await advisor.getByLabel("Relationship to the vehicle").selectOption("driver");
+  await advisor.getByLabel("Reason", { exact: true }).fill("Owner sends a driver to collect");
+  await advisor.locator("label").filter({ hasText: "The owner:" }).click();
+  await advisor.locator("label").filter({ hasText: "In person — they sign below" }).click();
+  await advisor.getByLabel("Name of the person signing").fill("The owner");
+
+  // The canvas appeared only now; its drawing surface must match its box, or ink lands in the wrong place.
+  const pad = advisor.locator("form.contact-change-form canvas.signature-pad");
+  const sized = await pad.evaluate((canvas: HTMLCanvasElement) => {
+    const ratio = window.devicePixelRatio || 1;
+    return canvas.width === Math.round(canvas.clientWidth * ratio) && canvas.clientWidth > 300;
+  });
+  expect(sized).toBe(true);
+  const sign = async () => {
+    const box = (await pad.boundingBox())!;
+    await advisor.mouse.move(box.x + 20, box.y + 100);
+    await advisor.mouse.down();
+    for (let step = 1; step <= 12; step++) {
+      await advisor.mouse.move(box.x + 20 + step * ((box.width - 40) / 12), box.y + 100 - (step % 2) * 50);
+    }
+    await advisor.mouse.up();
+  };
+  await sign();
+
+  // Switching to callback and back shows a fresh, blank pad: sending now must ask for a signature.
+  await advisor.locator("label").filter({ hasText: "Callback to the number on file" }).click();
+  await advisor.locator("label").filter({ hasText: "In person — they sign below" }).click();
+  await advisor.getByLabel("Name of the person signing").fill("The owner");
+  await advisor.getByRole("button", { name: "Change contact" }).click();
+  await expect(advisor.locator(".alert-danger")).toContainText("Please sign first.");
+
+  await sign();
+  // Ink reached the far end of the pad (nothing cropped at the default 300 px bitmap).
+  const inkAtFarEnd = await pad.evaluate((canvas: HTMLCanvasElement) => {
+    const context = canvas.getContext("2d")!;
+    const x = Math.floor(canvas.width * 0.9);
+    const column = context.getImageData(x - 10, 0, 20, canvas.height).data;
+    return column.some((value, index) => index % 4 === 3 && value > 0);
+  });
+  expect(inkAtFarEnd).toBe(true);
+  await advisor.getByRole("button", { name: "Change contact" }).click();
+  await expect(advisor.getByTestId("contact-history")).toContainText("in person, signed by");
+  await expect(advisor.getByTestId("contact-history")).toContainText("Sara Driver");
+});

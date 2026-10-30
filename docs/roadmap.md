@@ -26,7 +26,7 @@ Status values: `not started` · `in progress` · `done (unmerged)` · `done` · 
 
 ## Current position
 
-- **Wave:** 2 · **Increment:** 2 · **Active story:** none; I2-01 (estimate versions) and I2-03 (customer links, PR #13) are in `qa`. Increment 1 is complete: every story and its exit test are in `qa` (PRs #1–#8), so the Wave 1 gate is passed
+- **Wave:** 2 · **Increment:** 2 · **Active story:** none; I2-06 (authorized contact change) done, unmerged, on `story/I2-06-contact-change`; I2-01 (estimate versions) and I2-03 (customer links, PR #13) are in `qa`. Increment 1 is complete: every story and its exit test are in `qa` (PRs #1–#8), so the Wave 1 gate is passed
 - **Redesign:** UI-R1 (tokens, shell, dashboard), UI-R2 (workshop board) and UI-R3 (technician bay screen) done, in `qa` (PR #5); second pass on owner request: UI-R4 (dashboard) and UI-R5 (board) done, in `qa` (PRs #9, #10)
 - **Next story:** I2-02 (amendments, L: split first), I2-06 (authorized contact change) or I2-09 (sharing + worker), all unblocked; I2-04, I2-05, I2-07 and I2-08 wait for D-5, D-6, D-7, D-11, B-09 and D-30
 - **Next decision needed:** D-6, D-7, D-11, B-09 and D-30 before I2-04 onwards (D-5 decided: OD-60); V-2 must still confirm invoice content, titles and rounding (OD-42, OD-45) before real invoices
@@ -137,9 +137,9 @@ Decisions first: D-5, D-6, D-7, D-11, B-09, D-30.
 | I2-03 | Customer links | L | I2-01 | done | `story/I2-03-customer-links`, `story/I2-03b-link-approval` | 2026-10-30 | Track C1. Split into I2-03a and I2-03b (L). Decisions OD-60–OD-63 (D-5 closed; T-13 confirmed) |
 | I2-03a | Customer link and page | M | I2-01 | done | `story/I2-03-customer-links` | 2026-10-30 | Migration 0021; links with only the token's hash stored, one live per version, expiring and superseded with their version (T-40, T-41); generic invalid page identical for unknown, malformed, revoked, expired and ended-order links (AC2-04); invalid attempts per IP and requests per link limited as settings, client IP from the trusted proxy (AC2-05, T-42); read-only customer page AR/EN with garage name, first name, masked plate, customer note, fault codes and shared photos (snapshot schema 3, OD-63, T-43); staff card to create, replace and revoke; decisions OD-60–OD-63, T-40–T-43; 419 tests (23 new in s28) + 44 e2e (2 new). Production needs a proxy that appends the client address (I5-09) |
 | I2-03b | Approval through the link | M | I2-03a | done | `story/I2-03b-link-approval` | 2026-10-30 | Migration 0022; decision form on the link page (approve, decline or later per job, typed name, OD-60, OD-61), recorded at L1 with link, IP and browser under the repair-order lock (A.4), any amount until I2-04 (OD-62); in-person and link approvals share `recordDecisions`; one decision per form (AC2-03), withdrawn or superseded versions refused (AC2-02, AC21-05), expiry recorded at submission (AC21-07), tampering counted and submissions rate-limited (AC2-05, T-42); staff see "decided through the link"; T-44; 435 tests (16 new in s29) + 46 e2e (2 new). Fixed phone-width overflow in Arabic (estimate totals) |
-| I2-04 | Step-up verification | M | I2-03, B-09, D-30 | not started | | | |
+| I2-04 | Step-up verification | M | I2-03, B-09, D-30 | not started | | | A contact change must void pending ApprovalAttempts in the same transaction: extend `contact_change_apply` (0023, T-45) |
 | I2-05 | Phone approval | S | I2-04, D-7 | not started | | | |
-| I2-06 | Authorized contact change | S | I2-03 | not started | | | |
+| I2-06 | Authorized contact change | S | I2-03 | done (unmerged) | `story/I2-06-contact-change` | 2026-10-31 | Migration 0023; contact changes only by recording one, verified in person (signature) or by callback to the authorizer's number on file (OD-64, OD-65), by advisors, managers and partners (OD-66), with a reason (OD-67); applying it revokes every live link in the same statement (F-10, T-08) and later approvals record the new contact (A.4); stale and no-op changes refused; history on the repair order; signature pad shared with the counter screen and now sized when it appears; T-45; ApprovalAttempts voided with I2-04 |
 | I2-07 | Diagnostic & declined path | M | I2-01, D-11 | not started | | | |
 | I2-08 | Customer-supplied parts | S | D-6 | not started | | | Only if D-6 = yes |
 | I2-09 | Staff-initiated sharing + worker | S | I2-03 | not started | | | Track C1. The worker needs a handler for `alert.release_override` (I1-10, AC2-27): queued since I1-10, sent once messaging exists (I6-06) |
@@ -317,3 +317,4 @@ versioned customer API built on P-01's sign-in.
 | 2026-10-30 | D-5 decided (OD-60); I2-03 split into I2-03a and I2-03b; I2-03a committed (done, unmerged) after integrity review fixes; OD-60–OD-63, T-40–T-43 recorded |
 | 2026-10-30 | I2-03b committed (done, unmerged) after integrity review fixes; I2-03 complete; T-44 recorded |
 | 2026-10-31 | PR #13 merged: I2-03 (I2-03a, I2-03b) done (in `qa`) |
+| 2026-10-31 | I2-06 committed (done, unmerged) after integrity review fixes; OD-64–OD-67, T-45 recorded |

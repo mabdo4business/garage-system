@@ -18,6 +18,12 @@ import { requestQcAction } from "./qc/actions";
 import { InvoiceCard } from "./invoice/invoice-card";
 import { SettlementCard } from "./payments/settlement-card";
 import { randomUUID } from "node:crypto";
+import { ContactChangeForm } from "./contact-change-form";
+import {
+  CONTACT_CHANGE_OPEN,
+  contactHistory,
+  ownerForContactChange,
+} from "../../../../../server/repair-order/contact";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +57,12 @@ export default async function RepairOrderPage({
     year: String(ro.year),
   });
   const none = t(locale, "repairOrder.none");
+  const canChangeContact =
+    hasPermission(session.roles, "repair_order.change_contact") &&
+    CONTACT_CHANGE_OPEN.includes(ro.status) &&
+    ro.contactMobile !== null;
+  const owner = canChangeContact ? await ownerForContactChange(getDb(), ro.customerId, locale) : null;
+  const contactChanges = await contactHistory(getDb(), id);
 
   return (
     <>
@@ -90,6 +102,48 @@ export default async function RepairOrderPage({
             </>
           ) : null}
         </dl>
+        {contactChanges.length > 0 ? (
+          <section className="contact-history" data-testid="contact-history">
+            <h3>{t(locale, "contact.history")}</h3>
+            <ul className="result-list">
+              {contactChanges.map((change) => (
+                <li key={change.id}>
+                  <p>
+                    {t(locale, "contact.historyChange", {
+                      old: `\u2068${change.oldName}\u2069`,
+                      new: `\u2068${change.newName}\u2069`,
+                    })}{" "}
+                    ({t(locale, `checkIn.relationship.${change.newRelationship}`)}):{" "}
+                    <bdi>{change.reason}</bdi>
+                  </p>
+                  <p className="muted">
+                    {t(locale, `contact.authorizedShort.${change.authorizedBy}`)} ·{" "}
+                    {change.verification === "callback"
+                      ? t(locale, "contact.verifiedCallback", { name: `⁨${change.spokenTo ?? ""}⁩` })
+                      : t(locale, "contact.verifiedInPerson", { name: `⁨${change.signerName ?? ""}⁩` })}{" "}
+                    · <bdi>{change.changedByName}</bdi>, {formatDubaiDateTime(change.changedAt, locale)}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+        {canChangeContact && owner && ro.contactName && ro.contactMobile ? (
+          <details className="disclosure">
+            <summary>{t(locale, "contact.change")}</summary>
+            <ContactChangeForm
+              locale={locale}
+              repairOrderId={id}
+              current={{
+                name: ro.contactName,
+                mobile: ro.contactMobile,
+                relationship: ro.contactRelationship ?? "",
+              }}
+              owner={owner}
+              idempotencyKey={randomUUID()}
+            />
+          </details>
+        ) : null}
       </Card>
 
       <Card title={t(locale, "checkIn.section.arrival")}>

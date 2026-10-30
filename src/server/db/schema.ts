@@ -779,7 +779,7 @@ export interface VehicleDeliveryTable {
 
 // I2-03a: customer links (PRD v0.2 §6.4). Only the token's SHA-256 is stored.
 export type CustomerLinkPurpose = "estimate_approval";
-export type CustomerLinkRevokeReason = "manual" | "replaced";
+export type CustomerLinkRevokeReason = "manual" | "replaced" | "contact_changed";
 export type CustomerLinkAccessOutcome = "opened" | "invalid" | "submitted";
 
 export interface CustomerLinkTable {
@@ -803,6 +803,31 @@ export interface CustomerLinkAccessTable {
   ip: string;
   user_agent: string | null;
   at: Generated<Date>;
+}
+
+// I2-06: authorized contact changes (F-10), insert-only; inserting one applies it and revokes the links.
+export interface ContactChangeTable {
+  id: Generated<string>;
+  repair_order_id: string;
+  old_name: string;
+  old_mobile: string;
+  old_relationship: ContactRelationship;
+  new_name: string;
+  new_mobile: string;
+  new_relationship: ContactRelationship;
+  reason: string;
+  authorized_by: "owner" | "current_contact";
+  verification: "in_person" | "callback";
+  signer_name: string | null;
+  signature_sha256: string | null;
+  signature_storage_key: string | null;
+  signature_content_type: "image/png" | "image/jpeg" | "image/webp" | null;
+  called_number: string | null;
+  called_at: Timestamp | null;
+  spoken_to: string | null;
+  idempotency_key: string;
+  changed_by: string;
+  changed_at: Generated<Date>;
 }
 
 export interface DB {
@@ -862,5 +887,6 @@ export interface DB {
   vehicle_delivery: VehicleDeliveryTable;
   customer_link: CustomerLinkTable;
   customer_link_access: CustomerLinkAccessTable;
+  contact_change: ContactChangeTable;
   schema_migration: SchemaMigrationTable;
 }
