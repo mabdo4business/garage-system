@@ -27,13 +27,13 @@ Status values: `not started` · `in progress` · `done (unmerged)` · `done` · 
 ## Current position
 
 - **Wave:** 2 · **Increment:** 2 · **Active story:** none; I2-01 (estimate versions) is in `qa`. Increment 1 is complete: every story and its exit test are in `qa` (PRs #1–#8), so the Wave 1 gate is passed
-- **Redesign:** UI-R1 (tokens, shell, dashboard), UI-R2 (workshop board) and UI-R3 (technician bay screen) done, in `qa` (PR #5); second pass on owner request: UI-R4 (dashboard) and UI-R5 (board) done, unmerged, on `ui/R5-board` (includes UI-R4)
+- **Redesign:** UI-R1 (tokens, shell, dashboard), UI-R2 (workshop board) and UI-R3 (technician bay screen) done, in `qa` (PR #5); second pass on owner request: UI-R4 (dashboard) and UI-R5 (board) done, in `qa` (PRs #9, #10)
 - **Next story:** I2-02 (amendments, L: split first) or I2-03 (customer links), both unblocked by I2-01; I2-06 and I2-09 follow I2-03. I2-04, I2-05, I2-07 and I2-08 wait for D-5, D-6, D-7, D-11, B-09 and D-30
 - **Next decision needed:** D-5, D-6, D-7, D-11, B-09 and D-30 before I2-04 onwards; V-2 must still confirm invoice content, titles and rounding (OD-42, OD-45) before real invoices
 
 ### Housekeeping before more feature work
 
-`qa` holds Increment 0, I1-01, I1-11, I1-02 to I1-10 and the redesign UI-R1 to UI-R3 (PRs #1–#8); `main` is still at "Initial commit" (it moves only after UAT).
+`qa` holds Increment 0, Increment 1 (I1-01 to I1-11 and the exit test), I2-01, the redesign UI-R1 to UI-R5, self-hosted fonts and `user:password` (PRs #1–#12); `main` is still at "Initial commit" (it moves only after UAT).
 
 - [x] Finish I1-11: `npm run check` and `npm run test:e2e` pass, integrity review, commit (include `AGENTS.md`)
 - [x] Push `feature/increment-0` and `story/I1-11-app-shell` (I1-01 reached GitHub inside the I1-11 branch)
@@ -45,6 +45,8 @@ Status values: `not started` · `in progress` · `done (unmerged)` · `done` · 
 - [x] I1-10 pushed and merged into `qa` (PR #7)
 - [x] Increment 1 exit test pushed and merged into `qa` (PR #8)
 - [x] I2-01 pushed and merged into `qa`
+- [x] UI-R4 and UI-R5 merged into `qa` (PRs #9, #10)
+- [x] Fonts self-hosted (PR #11: builds and the dev server no longer need Google Fonts) and the development-only `npm run user:password` reset (PR #12) merged into `qa`
 - [ ] Never commit `.next-preview/` (the preview server's build cache, one file over 200 MB): branches older than `ui/redesign` do not ignore it, so `git add -A` there picks it up and GitHub refuses the push
 - [ ] Before committing yourself: `git add -A` first. `git commit -a` and most IDE defaults skip new files (this broke `qa` twice)
 - [ ] Rule from now on: every story branch is pushed the same day it is committed
@@ -120,8 +122,8 @@ Visual redesign from the owners' references (`docs/design/`): tokens, fonts and 
 | UI-R1 | Tokens, fonts, sidebar + workshop dashboard | M | I1-09 | done | `ui/redesign` | 2026-10-27 | Palette/status pairs/fonts as tokens (contrast tested), dark sidebar with icons and business name; dashboard from real figures (KPIs, 7-day revenue, status donut, bays, needs attention, open repair orders), money for partner/manager only; count-up, sparklines, bars, donut, progress; reduced motion; `npm run db:demo` sample data; branched from I1-09b |
 | UI-R2 | Workshop board | M | UI-R1 | done | `ui/redesign` | 2026-10-27 | Dark header, six status columns with counts, cards with plate, time (sent / promised / overdue / on site), "do not start" while awaiting the customer, job chips (waiting parts in purple) and assignment; next step per card (request QC in one step, otherwise a link), Deliver locked with its reason (OD-50); card pop and toast on status change, live refresh; T-34 |
 | UI-R3 | Technician bay screen | M | UI-R1 | done | `ui/redesign` | 2026-10-27 | Job card as a dark tablet screen (tokens scoped to `.bay`): bay, technician, clock; plate, car, status word; task ring; time in progress from the job history against approved labour; tick or "not performed" with a reason, kept in the form until Done (OD-50); Done locked saying what is missing (OD-31); advisor note with how and when the customer approved, "do not start" without one (AC2-01); up next; no prices (AC2-30); T-35 |
-| UI-R4 | Today dashboard, second pass | M | UI-R1 | done (unmerged) | `ui/R4-dashboard` | 2026-10-27 | Owner request: modernise the UX, keep the OD-49 colours. Workshop flow strip (cars per stage, overdue per stage, each stage filters the list) replaces the KPI cards and donut; Needs attention as one line per item, most urgent first, with how long it has waited; bays as tiles grouping each bay's jobs; repair orders with stage, overdue and search filters, "Overdue by" / "Due in", whole row opens the order, technicians hidden below 1100 px; compact revenue card for money holders; one motion moment (flow fill, count-up); T-38 |
-| UI-R5 | Workshop board, second pass | M | UI-R4 | done (unmerged) | `ui/R5-board` | 2026-10-27 | All six columns side by side from 1280 px (tablet: one column at a time, snapping), each scrolling under its header; compact cards (plate, time as "Overdue by" / "Due in", car, one line per job, flags, next step; "do not start" and the locked Deliver reason stay on the card); a side panel per card (native dialog: jobs in full with assignment, links); filter bar (search, technician or unassigned, overdue only) remembered per browser; arrows dropped from board buttons; fixed the board widening the page on tablet (hidden labels outside the scroll area); T-39 |
+| UI-R4 | Today dashboard, second pass | M | UI-R1 | done | `ui/R4-dashboard` | 2026-10-27 | Owner request: modernise the UX, keep the OD-49 colours. Workshop flow strip (cars per stage, overdue per stage, each stage filters the list) replaces the KPI cards and donut; Needs attention as one line per item, most urgent first, with how long it has waited; bays as tiles grouping each bay's jobs; repair orders with stage, overdue and search filters, "Overdue by" / "Due in", whole row opens the order, technicians hidden below 1100 px; compact revenue card for money holders; one motion moment (flow fill, count-up); T-38 |
+| UI-R5 | Workshop board, second pass | M | UI-R4 | done | `ui/R5-board` | 2026-10-27 | All six columns side by side from 1280 px (tablet: one column at a time, snapping), each scrolling under its header; compact cards (plate, time as "Overdue by" / "Due in", car, one line per job, flags, next step; "do not start" and the locked Deliver reason stay on the card); a side panel per card (native dialog: jobs in full with assignment, links); filter bar (search, technician or unassigned, overdue only) remembered per browser; arrows dropped from board buttons; fixed the board widening the page on tablet (hidden labels outside the scroll area); T-39 |
 
 ### Increment 2 — Approvals that hold up · in progress
 
@@ -307,3 +309,5 @@ versioned customer API built on P-01's sign-in.
 | 2026-10-27 | I2-01 merged into `qa`: done |
 | 2026-10-27 | Redesign second pass started on owner request (dashboard and board first, OD-49 colours kept); UI-R4 committed (done, unmerged); T-38 recorded |
 | 2026-10-27 | UI-R5 (workshop board) committed (done, unmerged); T-39 recorded |
+| 2026-10-30 | PRs #9 and #10 merged: UI-R4 and UI-R5 done (in `qa`) |
+| 2026-10-30 | PR #11 (fonts self-hosted with next/font/local after a Google Fonts response broke the dev server) and PR #12 (`npm run user:password`, development only) merged into `qa`; not stories, no status change |
