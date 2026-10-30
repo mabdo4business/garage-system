@@ -82,6 +82,7 @@ import {
 } from "../vehicle/service";
 import { isLocale, DEFAULT_LOCALE } from "../../i18n";
 import { createCustomerLink, revokeCustomerLink } from "../links/commands";
+import { changeContact } from "../repair-order/contact";
 import { customerLinkPhoto, requesterFrom } from "../links/customer";
 
 /**
@@ -161,6 +162,8 @@ const STATUS_BY_CODE: Record<string, number> = {
   possible_duplicate: 409,
   not_ready: 409,
   balance_due: 409,
+  contact_changed: 409,
+  repair_order_closed: 409,
   try_again: 503,
 };
 
@@ -1606,6 +1609,59 @@ export function createHandlers(db: Kysely<DB>, storage: MediaStorage = getMediaS
             supersedesId: body.supersedesId,
           },
           toStr(body.idempotencyKey),
+        );
+        return json(outcome.replayed ? 200 : 201, outcome.result);
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    // ------------------------------------------------------------------ I2-06 authorized contact change
+
+    /**
+     * POST /api/repair-orders/:id/contact — multipart: expectedName, expectedMobile, newName, newMobile,
+     * newRelationship, reason, authorizedBy (owner | current_contact), verification (in_person | callback), and
+     * signerName + signature (in person) or calledAt + spokenTo (callback), idempotencyKey (F-10, OD-64–OD-67).
+     */
+    async changeRepairOrderContact(request: Request, repairOrderId: string): Promise<Response> {
+      try {
+        if (!sameOrigin(request)) return json(403, { error: "forbidden" });
+        const session = await authorize(db, await currentSession(request), "repair_order.change_contact", {
+          entityType: "repair_order",
+          entityId: repairOrderId,
+        });
+        const body = await readLimited(request, 2 * 1024 * 1024 + 64 * 1024);
+        if (!body) {
+          return json(413, {
+            error: "validation_failed",
+            details: { field: "signature", reason: "too_large" },
+          });
+        }
+        const form = await new Response(body, {
+          headers: { "content-type": request.headers.get("content-type") ?? "" },
+        }).formData();
+        const signature = form.get("signature");
+        const outcome = await changeContact(
+          db,
+          storage,
+          session,
+          repairOrderId,
+          {
+            expectedName: form.get("expectedName"),
+            expectedMobile: form.get("expectedMobile"),
+            expectedRelationship: form.get("expectedRelationship"),
+            newName: form.get("newName"),
+            newMobile: form.get("newMobile"),
+            newRelationship: form.get("newRelationship"),
+            reason: form.get("reason"),
+            authorizedBy: form.get("authorizedBy"),
+            verification: form.get("verification"),
+            signerName: form.get("signerName"),
+            signature: signature instanceof Blob ? new Uint8Array(await signature.arrayBuffer()) : null,
+            calledAt: form.get("calledAt"),
+            spokenTo: form.get("spokenTo"),
+          },
+          toStr(form.get("idempotencyKey")),
         );
         return json(outcome.replayed ? 200 : 201, outcome.result);
       } catch (error) {

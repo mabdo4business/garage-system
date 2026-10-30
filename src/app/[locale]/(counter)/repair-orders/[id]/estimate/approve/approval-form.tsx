@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useState } from "react";
+import { useSignaturePad } from "../../../../../../../components/signature-pad";
 import { Alert, Button, Field } from "../../../../../../../components/ui";
 import { t, type Locale, type MessageKey } from "../../../../../../../i18n";
 
@@ -39,66 +40,18 @@ export function ApprovalForm({
 }) {
   const [choices, setChoices] = useState<Record<string, Choice>>({});
   const [name, setName] = useState("");
-  const [signed, setSigned] = useState(false);
   const [error, setError] = useState<MessageKey | null>(null);
   const [pending, setPending] = useState(false);
-  const canvas = useRef<HTMLCanvasElement>(null);
-  const drawing = useRef(false);
-
-  // Size the drawing surface to its box (and the screen's pixel density) once it is laid out.
-  useEffect(() => {
-    const element = canvas.current;
-    if (!element) return;
-    const ratio = window.devicePixelRatio || 1;
-    element.width = Math.round(element.clientWidth * ratio);
-    element.height = Math.round(element.clientHeight * ratio);
-    const context = element.getContext("2d");
-    if (!context) return;
-    context.scale(ratio, ratio);
-    context.lineWidth = 2.5;
-    context.lineCap = "round";
-    context.strokeStyle = "#111";
-  }, []);
-
-  const point = (event: ReactPointerEvent<HTMLCanvasElement>) => {
-    const box = event.currentTarget.getBoundingClientRect();
-    return { x: event.clientX - box.left, y: event.clientY - box.top };
-  };
-  const start = (event: ReactPointerEvent<HTMLCanvasElement>) => {
-    const context = event.currentTarget.getContext("2d");
-    if (!context) return;
-    event.currentTarget.setPointerCapture(event.pointerId);
-    drawing.current = true;
-    const { x, y } = point(event);
-    context.beginPath();
-    context.moveTo(x, y);
-  };
-  const move = (event: ReactPointerEvent<HTMLCanvasElement>) => {
-    if (!drawing.current) return;
-    const context = event.currentTarget.getContext("2d");
-    if (!context) return;
-    const { x, y } = point(event);
-    context.lineTo(x, y);
-    context.stroke();
-    setSigned(true);
-  };
-  const stop = () => {
-    drawing.current = false;
-  };
-  const clear = () => {
-    const element = canvas.current;
-    element?.getContext("2d")?.clearRect(0, 0, element.width, element.height);
-    setSigned(false);
-  };
+  const pad = useSignaturePad();
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
     if (!Object.values(choices).some((choice) => choice !== "")) return setError("approval.chooseOne");
-    if (!signed || !canvas.current) return setError("approval.signFirst");
+    if (!pad.signed) return setError("approval.signFirst");
     setPending(true);
     try {
-      const blob = await new Promise<Blob | null>((resolve) => canvas.current!.toBlob(resolve, "image/png"));
+      const blob = await pad.toBlob();
       if (!blob) return setError("approval.signFirst");
       const form = new FormData();
       form.set("contentHash", contentHash);
@@ -170,17 +123,9 @@ export function ApprovalForm({
       </Field>
       <div className="field">
         <span id="signature-label">{t(locale, "approval.signature")}</span>
-        <canvas
-          ref={canvas}
-          className="signature-pad"
-          aria-labelledby="signature-label"
-          onPointerDown={start}
-          onPointerMove={move}
-          onPointerUp={stop}
-          onPointerLeave={stop}
-        />
+        <canvas {...pad.canvasProps} className="signature-pad" aria-labelledby="signature-label" />
         <div className="form-actions">
-          <Button type="button" variant="quiet" onClick={clear}>
+          <Button type="button" variant="quiet" onClick={pad.clear}>
             {t(locale, "approval.clear")}
           </Button>
         </div>
