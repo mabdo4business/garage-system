@@ -180,6 +180,43 @@ export async function authorize(
   return session;
 }
 
+/**
+ * Sets a new password for an existing user and revokes all of their sessions in the same transaction, so
+ * anyone signed in with the old password is signed out. Like createUser, exposed only through the development
+ * CLI (scripts/reset-password.ts); staff-facing password management arrives with 2FA and bootstrap (I5-03).
+ * The audit event records that the password changed, never the password or its hash. A deactivated user stays
+ * deactivated.
+ */
+export async function resetPassword(
+  db: Kysely<DB>,
+  actor: Actor,
+  input: { username: string; password: string },
+): Promise<{ userId: string; sessionsRevoked: number }> {
+  const username = normaliseUsername(input.username);
+  const passwordHash = await hashPassword(input.password);
+
+  const outcome = await runCommand(db, { name: "user.reset_password", actor }, async (ctx) => {
+    const user = await ctx.tx
+      .updateTable("app_user")
+      .set({ password_hash: passwordHash })
+      .where("username", "=", username)
+      .returning("id")
+      .executeTakeFirst();
+    if (!user) {
+      throw new NotFoundError("app_user", username);
+    }
+    const revoked = await revokeSessionsForUser(ctx.tx, user.id);
+    await ctx.audit({
+      action: "user.password_reset",
+      entityType: "app_user",
+      entityId: user.id,
+      details: { sessionsRevoked: revoked },
+    });
+    return { userId: user.id, sessionsRevoked: revoked };
+  });
+  return outcome.result;
+}
+
 /** Deactivates a user and revokes all of their sessions in the same transaction (R0: immediate). */
 export async function deactivateUser(db: Kysely<DB>, actor: SessionUser, userId: string): Promise<void> {
   await runCommand(

@@ -46,6 +46,7 @@ Run the app locally:
 cp .env.example .env
 npm run db:dev              # embedded PostgreSQL in .data/pg; prints DATABASE_URL lines for .env
 npm run user:create -- --username partner.a --name "Partner A" --roles partner
+npm run user:password -- --username partner.a   # forgot it? sets a new one and signs that user out
 npm run dev                 # http://localhost:5001
 ```
 

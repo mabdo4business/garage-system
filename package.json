@@ -22,6 +22,7 @@
     "db:bootstrap": "tsx scripts/bootstrap-roles.ts",
     "db:migrate": "tsx scripts/migrate.ts",
     "user:create": "tsx scripts/create-user.ts",
+    "user:password": "tsx scripts/reset-password.ts",
     "test:e2e": "playwright test"
   },
   "dependencies": {
