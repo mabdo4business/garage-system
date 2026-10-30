@@ -194,8 +194,8 @@ export function parseWithdrawReason(input: { reasonCode?: unknown; reason?: unkn
 /**
  * Withdraws the sent version (§3.1 Sent → Withdrawn) with a reason (OD-57): decisions already recorded stay,
  * undecided revisions lapse (withdrawn) and their work cannot start (AC21-06). If the version had already passed
- * its expiry it is recorded as expired instead, and the result says so. The customer link is revoked with it once
- * links exist (I2-03).
+ * its expiry it is recorded as expired instead, and the result says so. Its customer link stops working with it:
+ * a link is valid only while its version is (T-40), so nothing is written to the link here.
  */
 export async function withdrawVersion(
   db: Kysely<DB>,

@@ -773,6 +773,34 @@ export interface VehicleDeliveryTable {
   business_date: ColumnType<string, string | undefined, never>;
 }
 
+// I2-03a: customer links (PRD v0.2 §6.4). Only the token's SHA-256 is stored.
+export type CustomerLinkPurpose = "estimate_approval";
+export type CustomerLinkRevokeReason = "manual" | "replaced";
+export type CustomerLinkAccessOutcome = "opened" | "invalid";
+
+export interface CustomerLinkTable {
+  id: Generated<string>;
+  purpose: CustomerLinkPurpose;
+  repair_order_id: string;
+  estimate_version_id: string;
+  token_hash: Buffer;
+  expires_at: Timestamp;
+  created_by: string;
+  created_at: Generated<Date>;
+  revoked_at: Timestamp | null;
+  revoked_by: string | null;
+  revoke_reason: CustomerLinkRevokeReason | null;
+}
+
+export interface CustomerLinkAccessTable {
+  id: Generated<string>;
+  customer_link_id: string | null;
+  outcome: CustomerLinkAccessOutcome;
+  ip: string;
+  user_agent: string | null;
+  at: Generated<Date>;
+}
+
 export interface DB {
   app_user: AppUserTable;
   user_role: UserRoleTable;
@@ -828,5 +856,7 @@ export interface DB {
   line_cogs_movement: LineCogsMovementTable;
   payment: PaymentTable;
   vehicle_delivery: VehicleDeliveryTable;
+  customer_link: CustomerLinkTable;
+  customer_link_access: CustomerLinkAccessTable;
   schema_migration: SchemaMigrationTable;
 }

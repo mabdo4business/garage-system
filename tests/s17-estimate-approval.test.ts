@@ -217,7 +217,7 @@ describe("S17 — estimate send and in-person approval", () => {
     expect(sha256Hex(canonicalJson(version.snapshot))).toBe(version.content_hash);
 
     const snapshot = version.snapshot as EstimateSnapshot;
-    expect(snapshot.schema).toBe(2);
+    expect(snapshot.schema).toBe(3);
     expect(snapshot.jobs.map((job) => [job.jobId, job.title, job.findingSeverity, job.total])).toEqual([
       [brakes, "Brake pads at 2 mm", "urgent", "249.70"],
       [ac, "AC service", null, "150.00"],

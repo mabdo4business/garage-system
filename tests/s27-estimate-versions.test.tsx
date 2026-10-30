@@ -6,7 +6,7 @@ import pg from "pg";
 import { sql } from "kysely";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { EstimateDocument } from "../src/app/[locale]/(counter)/repair-orders/[id]/estimate/approve/estimate-document";
+import { EstimateDocument } from "../src/components/estimate-document";
 import { SESSION_COOKIE } from "../src/server/auth/session";
 import { createItem, setPrice } from "../src/server/catalog/items";
 import { addTaxProfile, createTaxCode } from "../src/server/catalog/tax";
@@ -489,7 +489,7 @@ describe("S27 — estimate versions", () => {
 
     const version = (await versionsOf(ro))[1]!;
     const snapshot = version.snapshot as EstimateSnapshot;
-    expect(snapshot.schema).toBe(2);
+    expect(snapshot.schema).toBe(3);
     expect(snapshot.versionNo).toBe(2);
     expect(snapshot.jobs.map((job) => job.jobId)).toEqual([pins]);
     expect(snapshot.earlierApproved).toEqual([
@@ -1174,7 +1174,9 @@ describe("S27 — estimate versions", () => {
       ["en", "Already approved"],
       ["ar", "تمت الموافقة عليه سابقاً"],
     ] as const) {
-      const html = renderToStaticMarkup(<EstimateDocument snapshot={snapshot} locale={locale} />);
+      const html = renderToStaticMarkup(
+        <EstimateDocument snapshot={snapshot} locale={locale} photoUrl={(id) => `/api/media/${id}`} />,
+      );
       expect(html).toContain(heading);
       expect(html).toContain(`data-context-revision="${(await latestRevision(a)).id}"`);
       expect(html).toContain("Front brakes");

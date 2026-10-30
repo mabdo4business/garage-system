@@ -81,6 +81,8 @@ import {
   type VehicleInput,
 } from "../vehicle/service";
 import { isLocale, DEFAULT_LOCALE } from "../../i18n";
+import { createCustomerLink, revokeCustomerLink } from "../links/commands";
+import { customerLinkPhoto, requesterFrom } from "../links/customer";
 
 /**
  * HTTP handlers, independent of Next.js. Next route files only forward requests here, so the
@@ -1608,6 +1610,73 @@ export function createHandlers(db: Kysely<DB>, storage: MediaStorage = getMediaS
         return json(outcome.replayed ? 200 : 201, outcome.result);
       } catch (error) {
         return errorResponse(error);
+      }
+    },
+
+    // ------------------------------------------------------------------ I2-03a customer links
+
+    /**
+     * POST /api/repair-orders/:id/customer-link — creates the link to the sent estimate (replacing a live one).
+     * The response is the only place the token ever appears outside the customer's URL, so it is never cached.
+     */
+    async createCustomerLink(request: Request, repairOrderId: string): Promise<Response> {
+      try {
+        if (!sameOrigin(request)) return json(403, { error: "forbidden" });
+        const session = await authorize(db, await currentSession(request), "customer_link.create", {
+          entityType: "repair_order",
+          entityId: repairOrderId,
+        });
+        const outcome = await createCustomerLink(db, session, repairOrderId);
+        return json(201, outcome.result, { "cache-control": "no-store" });
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    /** POST /api/customer-links/:id/revoke — revokes a link by hand (§6.4). */
+    async revokeCustomerLink(request: Request, linkId: string): Promise<Response> {
+      try {
+        if (!sameOrigin(request)) return json(403, { error: "forbidden" });
+        const session = await authorize(db, await currentSession(request), "customer_link.revoke", {
+          entityType: "customer_link",
+          entityId: linkId,
+        });
+        const outcome = await revokeCustomerLink(db, session, linkId);
+        return json(200, outcome.result);
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    /**
+     * GET /c/:token/photo/:photoId — a photo on the customer's link page; no session, the token is the key. Every
+     * refusal is the same bare 404, so it reveals neither whether the link nor the photo exists.
+     */
+    async customerLinkPhoto(request: Request, token: string, photoId: string): Promise<Response> {
+      const notFound = () =>
+        new Response("Not found", {
+          status: 404,
+          headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
+        });
+      try {
+        const file = await customerLinkPhoto(db, token, photoId, requesterFrom(request.headers));
+        const bytes = file ? await storage.get(file.storageKey) : null;
+        if (!file || !bytes) return notFound();
+        return new Response(Buffer.from(bytes), {
+          status: 200,
+          headers: {
+            "content-type": file.contentType,
+            "cache-control": "private, no-store",
+            "x-content-type-options": "nosniff",
+            "content-security-policy": "default-src 'none'; sandbox",
+            "content-disposition": "inline",
+            "x-robots-tag": "noindex, nofollow",
+            "referrer-policy": "no-referrer",
+          },
+        });
+      } catch (error) {
+        logger.error("http.unhandled_error", { error });
+        return notFound();
       }
     },
   };

@@ -26,10 +26,10 @@ Status values: `not started` · `in progress` · `done (unmerged)` · `done` · 
 
 ## Current position
 
-- **Wave:** 2 · **Increment:** 2 · **Active story:** none; I2-01 (estimate versions) is in `qa`. Increment 1 is complete: every story and its exit test are in `qa` (PRs #1–#8), so the Wave 1 gate is passed
+- **Wave:** 2 · **Increment:** 2 · **Active story:** none; I2-03a (customer link and page) done, unmerged, on `story/I2-03-customer-links`; I2-03b (approval through the link) next; I2-01 (estimate versions) is in `qa`. Increment 1 is complete: every story and its exit test are in `qa` (PRs #1–#8), so the Wave 1 gate is passed
 - **Redesign:** UI-R1 (tokens, shell, dashboard), UI-R2 (workshop board) and UI-R3 (technician bay screen) done, in `qa` (PR #5); second pass on owner request: UI-R4 (dashboard) and UI-R5 (board) done, in `qa` (PRs #9, #10)
 - **Next story:** I2-02 (amendments, L: split first) or I2-03 (customer links), both unblocked by I2-01; I2-06 and I2-09 follow I2-03. I2-04, I2-05, I2-07 and I2-08 wait for D-5, D-6, D-7, D-11, B-09 and D-30
-- **Next decision needed:** D-5, D-6, D-7, D-11, B-09 and D-30 before I2-04 onwards; V-2 must still confirm invoice content, titles and rounding (OD-42, OD-45) before real invoices
+- **Next decision needed:** D-6, D-7, D-11, B-09 and D-30 before I2-04 onwards (D-5 decided: OD-60); V-2 must still confirm invoice content, titles and rounding (OD-42, OD-45) before real invoices
 
 ### Housekeeping before more feature work
 
@@ -133,7 +133,9 @@ Decisions first: D-5, D-6, D-7, D-11, B-09, D-30.
 |---|---|---|---|---|---|---|---|
 | I2-01 | Estimate versions | M | I1-05 | done | `story/I2-01-estimate-versions` | 2026-10-27 | Migration 0020; version 2 onwards while Awaiting approval or In progress (OD-56), one open at a time; withdraw with a reason (OD-57), expiry by the scheduler function or at the moment anyone acts on an overdue version (AC21-07), approval racing withdrawal (AC21-05), partial decision then withdrawal (AC21-06); declined or lapsed jobs offered again as new revisions at today's prices (OD-55); earlier approvals as snapshot context (schema 2); urgent findings in every version (OD-58); QC unblocked by withdrawal (X-12) and refused over an unsent draft (OD-59); decisions OD-55–OD-59, T-37; 385 tests (25 new in s27) + 42 e2e (2 new). Expiry runs on its own once the I2-09 worker calls `expireDueEstimates` |
 | I2-02 | Amendments | L | I2-01 | not started | | | Split before starting (L). Once amendments can change outcomes after QC, issuing must refuse a draft that leaves out a billable line (one invoice per repair order, I1-09a review) |
-| I2-03 | Customer links | M | I2-01 | not started | | | Track C1 |
+| I2-03 | Customer links | L | I2-01 | in progress | `story/I2-03-customer-links` | 2026-10-30 | Track C1. Split into I2-03a and I2-03b (L). Decisions OD-60–OD-63 (D-5 closed; T-13 confirmed) |
+| I2-03a | Customer link and page | M | I2-01 | done (unmerged) | `story/I2-03-customer-links` | 2026-10-30 | Migration 0021; links with only the token's hash stored, one live per version, expiring and superseded with their version (T-40, T-41); generic invalid page identical for unknown, malformed, revoked, expired and ended-order links (AC2-04); invalid attempts per IP and requests per link limited as settings, client IP from the trusted proxy (AC2-05, T-42); read-only customer page AR/EN with garage name, first name, masked plate, customer note, fault codes and shared photos (snapshot schema 3, OD-63, T-43); staff card to create, replace and revoke; decisions OD-60–OD-63, T-40–T-43; 419 tests (23 new in s28) + 44 e2e (2 new). Production needs a proxy that appends the client address (I5-09) |
+| I2-03b | Approval through the link | M | I2-03a | not started | | | Typed name, per-job decisions, evidence (IP, user agent, link), idempotent; AC2-02, AC2-03, AC21-05, AC21-07 through the link |
 | I2-04 | Step-up verification | M | I2-03, B-09, D-30 | not started | | | |
 | I2-05 | Phone approval | S | I2-04, D-7 | not started | | | |
 | I2-06 | Authorized contact change | S | I2-03 | not started | | | |
@@ -311,3 +313,4 @@ versioned customer API built on P-01's sign-in.
 | 2026-10-27 | UI-R5 (workshop board) committed (done, unmerged); T-39 recorded |
 | 2026-10-30 | PRs #9 and #10 merged: UI-R4 and UI-R5 done (in `qa`) |
 | 2026-10-30 | PR #11 (fonts self-hosted with next/font/local after a Google Fonts response broke the dev server) and PR #12 (`npm run user:password`, development only) merged into `qa`; not stories, no status change |
+| 2026-10-30 | D-5 decided (OD-60); I2-03 split into I2-03a and I2-03b; I2-03a committed (done, unmerged) after integrity review fixes; OD-60–OD-63, T-40–T-43 recorded |

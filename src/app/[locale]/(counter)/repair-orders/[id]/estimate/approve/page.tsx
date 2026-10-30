@@ -7,7 +7,7 @@ import { getDb } from "../../../../../../../server/db/client";
 import { approvalScreenView } from "../../../../../../../server/estimate/queries";
 import { requirePagePermission } from "../../../../../server-support";
 import { ApprovalForm } from "./approval-form";
-import { EstimateDocument } from "./estimate-document";
+import { EstimateDocument } from "../../../../../../../components/estimate-document";
 
 export const dynamic = "force-dynamic";
 
@@ -49,7 +49,11 @@ export default async function ApprovePage({ params }: { params: Promise<{ locale
         }
       />
       <p>{t(locale, "approval.intro")}</p>
-      <EstimateDocument snapshot={view.snapshot} locale={locale} />
+      <EstimateDocument
+        snapshot={view.snapshot}
+        locale={locale}
+        photoUrl={(photoId) => `/api/media/${photoId}`}
+      />
       {terms ? (
         <Card title={t(locale, "approval.terms")}>
           {/* The versioned text recorded in the snapshot, in the language shown (P0-11). */}
