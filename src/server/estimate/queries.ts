@@ -472,6 +472,8 @@ async function earlierJobs(
     // Approved revisions are all listed (context); otherwise only the latest settled one per job.
     if (row.status !== "approved" && (approved || seen.has(row.job_id))) continue;
     if (row.status !== "approved") seen.add(row.job_id);
+    // An approved revision whose lines were all replaced by a later approved one is not listed (as in the snapshot).
+    if (row.status === "approved" && !lines.some((line) => line.revision_id === row.revision_id)) continue;
     result.push({
       jobId: row.job_id,
       revisionId: row.revision_id,

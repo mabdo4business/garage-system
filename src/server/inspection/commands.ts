@@ -1,4 +1,4 @@
-import type { Kysely } from "kysely";
+import { sql, type Kysely } from "kysely";
 import type { SessionUser } from "../auth/session";
 import { runCommand, type CommandContext, type CommandOutcome } from "../command/runner";
 import { ConflictError, NotFoundError, ValidationError } from "../core/errors";
@@ -273,6 +273,7 @@ async function lockActiveFinding(
   staff: Staff,
   repairOrderId: string,
   findingId: string,
+  options: { editsShownContent?: boolean } = {},
 ) {
   await lockInspection(ctx, staff, repairOrderId);
   const row = await ctx.tx
@@ -281,6 +282,16 @@ async function lockActiveFinding(
     .where("id", "=", findingId)
     .executeTakeFirstOrThrow();
   if (row.status !== "active") throw new ConflictError("finding_withdrawn", "This finding was withdrawn");
+  // OD-10: a finding the customer was shown in a sent estimate is read-only (its text and photos are in the hashed
+  // snapshot). Findings are open during work since OD-72, so this is checked here and in the database.
+  if (options.editsShownContent) {
+    const sent = await sql<{
+      sent: boolean;
+    }>`SELECT finding_in_sent_estimate(${findingId}::uuid) AS sent`.execute(ctx.tx);
+    if (sent.rows[0]?.sent) {
+      throw new ConflictError("finding_sent", "The customer was shown this finding; it can no longer change");
+    }
+  }
   return row;
 }
 
@@ -293,7 +304,7 @@ export async function updateFinding(
   const finding = validateFinding(input);
   const repairOrderId = await findingParent(db, findingId);
   return runCommand(db, { name: "finding.update", actor: actorOf(staff) }, async (ctx) => {
-    const before = await lockActiveFinding(ctx, staff, repairOrderId, findingId);
+    const before = await lockActiveFinding(ctx, staff, repairOrderId, findingId, { editsShownContent: true });
     await ctx.tx
       .updateTable("finding")
       .set({ ...finding, updated_at: ctx.txTime, updated_by: staff.userId })
@@ -440,7 +451,7 @@ export async function setFindingPhotoVisibility(
   }
   const { findingId, repairOrderId } = await findingPhotoParent(db, mediaId);
   return runCommand(db, { name: "finding.photo_visibility", actor: actorOf(staff) }, async (ctx) => {
-    await lockActiveFinding(ctx, staff, repairOrderId, findingId);
+    await lockActiveFinding(ctx, staff, repairOrderId, findingId, { editsShownContent: true });
     const updated = await ctx.tx
       .updateTable("media_asset")
       .set({ visibility })
@@ -466,7 +477,7 @@ export async function discardFindingPhoto(
 ): Promise<CommandOutcome<{ mediaId: string }>> {
   const { findingId, repairOrderId } = await findingPhotoParent(db, mediaId);
   return runCommand(db, { name: "finding.discard_photo", actor: actorOf(staff) }, async (ctx) => {
-    await lockActiveFinding(ctx, staff, repairOrderId, findingId);
+    await lockActiveFinding(ctx, staff, repairOrderId, findingId, { editsShownContent: true });
     const updated = await ctx.tx
       .updateTable("media_asset")
       .set({ discarded_at: ctx.txTime })

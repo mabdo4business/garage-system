@@ -155,6 +155,7 @@ const ERROR_KEYS: Record<string, MessageKey> = {
   price_not_higher: "error.priceNotHigher",
   line_not_replaceable: "error.lineNotReplaceable",
   line_awaiting_decision: "error.lineAwaitingDecision",
+  finding_sent: "error.findingSent",
 };
 
 /**
