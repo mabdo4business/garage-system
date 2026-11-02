@@ -26,14 +26,14 @@ Status values: `not started` · `in progress` · `done (unmerged)` · `done` · 
 
 ## Current position
 
-- **Wave:** 2 · **Increment:** 2 · **Active story:** none; I2-06 (authorized contact change) done, unmerged, on `story/I2-06-contact-change`; I2-01 (estimate versions) and I2-03 (customer links, PR #13) are in `qa`. Increment 1 is complete: every story and its exit test are in `qa` (PRs #1–#8), so the Wave 1 gate is passed
+- **Wave:** 2 · **Increment:** 2 · **Active story:** none; I2-09 (sharing + worker) done, unmerged, on `story/I2-09-sharing-worker`; I2-01 (estimate versions), I2-03 (customer links, PR #13) and I2-06 (authorized contact change, PR #14) are in `qa`. Increment 1 is complete: every story and its exit test are in `qa` (PRs #1–#8), so the Wave 1 gate is passed
 - **Redesign:** UI-R1 (tokens, shell, dashboard), UI-R2 (workshop board) and UI-R3 (technician bay screen) done, in `qa` (PR #5); second pass on owner request: UI-R4 (dashboard) and UI-R5 (board) done, in `qa` (PRs #9, #10)
-- **Next story:** I2-02 (amendments, L: split first), I2-06 (authorized contact change) or I2-09 (sharing + worker), all unblocked; I2-04, I2-05, I2-07 and I2-08 wait for D-5, D-6, D-7, D-11, B-09 and D-30
+- **Next story:** I2-09 (sharing + worker) or I2-02 (amendments, L: split first), both unblocked; I2-04, I2-05, I2-07 and I2-08 wait for D-5, D-6, D-7, D-11, B-09 and D-30
 - **Next decision needed:** D-6, D-7, D-11, B-09 and D-30 before I2-04 onwards (D-5 decided: OD-60); V-2 must still confirm invoice content, titles and rounding (OD-42, OD-45) before real invoices
 
 ### Housekeeping before more feature work
 
-`qa` holds Increment 0, Increment 1 (I1-01 to I1-11 and the exit test), I2-01, I2-03, the redesign UI-R1 to UI-R5, self-hosted fonts and `user:password` (PRs #1–#13); `main` is still at "Initial commit" (it moves only after UAT).
+`qa` holds Increment 0, Increment 1 (I1-01 to I1-11 and the exit test), I2-01, I2-03, I2-06, the redesign UI-R1 to UI-R5, self-hosted fonts and `user:password` (PRs #1–#14); `main` is still at "Initial commit" (it moves only after UAT).
 
 - [x] Finish I1-11: `npm run check` and `npm run test:e2e` pass, integrity review, commit (include `AGENTS.md`)
 - [x] Push `feature/increment-0` and `story/I1-11-app-shell` (I1-01 reached GitHub inside the I1-11 branch)
@@ -48,6 +48,7 @@ Status values: `not started` · `in progress` · `done (unmerged)` · `done` · 
 - [x] UI-R4 and UI-R5 merged into `qa` (PRs #9, #10)
 - [x] Fonts self-hosted (PR #11: builds and the dev server no longer need Google Fonts) and the development-only `npm run user:password` reset (PR #12) merged into `qa`
 - [x] I2-03 (I2-03a and I2-03b) pushed and merged into `qa` (PR #13)
+- [x] I2-06 pushed and merged into `qa` (PR #14)
 - [ ] Never commit `.next-preview/` (the preview server's build cache, one file over 200 MB): branches older than `ui/redesign` do not ignore it, so `git add -A` there picks it up and GitHub refuses the push
 - [ ] Before committing yourself: `git add -A` first. `git commit -a` and most IDE defaults skip new files (this broke `qa` twice)
 - [ ] Rule from now on: every story branch is pushed the same day it is committed
@@ -139,10 +140,10 @@ Decisions first: D-5, D-6, D-7, D-11, B-09, D-30.
 | I2-03b | Approval through the link | M | I2-03a | done | `story/I2-03b-link-approval` | 2026-10-30 | Migration 0022; decision form on the link page (approve, decline or later per job, typed name, OD-60, OD-61), recorded at L1 with link, IP and browser under the repair-order lock (A.4), any amount until I2-04 (OD-62); in-person and link approvals share `recordDecisions`; one decision per form (AC2-03), withdrawn or superseded versions refused (AC2-02, AC21-05), expiry recorded at submission (AC21-07), tampering counted and submissions rate-limited (AC2-05, T-42); staff see "decided through the link"; T-44; 435 tests (16 new in s29) + 46 e2e (2 new). Fixed phone-width overflow in Arabic (estimate totals) |
 | I2-04 | Step-up verification | M | I2-03, B-09, D-30 | not started | | | A contact change must void pending ApprovalAttempts in the same transaction: extend `contact_change_apply` (0023, T-45) |
 | I2-05 | Phone approval | S | I2-04, D-7 | not started | | | |
-| I2-06 | Authorized contact change | S | I2-03 | done (unmerged) | `story/I2-06-contact-change` | 2026-10-31 | Migration 0023; contact changes only by recording one, verified in person (signature) or by callback to the authorizer's number on file (OD-64, OD-65), by advisors, managers and partners (OD-66), with a reason (OD-67); applying it revokes every live link in the same statement (F-10, T-08) and later approvals record the new contact (A.4); stale and no-op changes refused; history on the repair order; signature pad shared with the counter screen and now sized when it appears; T-45; ApprovalAttempts voided with I2-04 |
+| I2-06 | Authorized contact change | S | I2-03 | done | `story/I2-06-contact-change` | 2026-10-31 | Migration 0023; contact changes only by recording one, verified in person (signature) or by callback to the authorizer's number on file (OD-64, OD-65), by advisors, managers and partners (OD-66), with a reason (OD-67); applying it revokes every live link in the same statement (F-10, T-08) and later approvals record the new contact (A.4); stale and no-op changes refused; history on the repair order; signature pad shared with the counter screen and now sized when it appears; T-45; ApprovalAttempts voided with I2-04 |
 | I2-07 | Diagnostic & declined path | M | I2-01, D-11 | not started | | | |
 | I2-08 | Customer-supplied parts | S | D-6 | not started | | | Only if D-6 = yes |
-| I2-09 | Staff-initiated sharing + worker | S | I2-03 | not started | | | Track C1. The worker needs a handler for `alert.release_override` (I1-10, AC2-27): queued since I1-10, sent once messaging exists (I6-06) |
+| I2-09 | Staff-initiated sharing + worker | S | I2-03 | done (unmerged) | `story/I2-09-sharing-worker` | 2026-10-31 | Migration 0024; estimate message prepared with its link and a car-ready message (OD-68–OD-71), in the customer's language with a switch, sent from the staff device by WhatsApp or copy and confirmed "I sent it"; both texts kept as prepared, link stored as [link]; "Customer not yet informed" on the board after 15 minutes (AC2-28); links use PUBLIC_BASE_URL (T-46); worker (`npm run worker`) processes handled outbox topics only and expires overdue estimates every minute. `alert.release_override` waits for messaging (I6-06) |
 
 ### Increment 3 — Money corrections
 
@@ -318,3 +319,5 @@ versioned customer API built on P-01's sign-in.
 | 2026-10-30 | I2-03b committed (done, unmerged) after integrity review fixes; I2-03 complete; T-44 recorded |
 | 2026-10-31 | PR #13 merged: I2-03 (I2-03a, I2-03b) done (in `qa`) |
 | 2026-10-31 | I2-06 committed (done, unmerged) after integrity review fixes; OD-64–OD-67, T-45 recorded |
+| 2026-10-31 | PR #14 merged: I2-06 done (in `qa`) |
+| 2026-10-31 | I2-09 committed (done, unmerged) after integrity review fixes; OD-68–OD-71, T-46 recorded |

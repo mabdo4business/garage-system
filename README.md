@@ -48,7 +48,12 @@ npm run db:dev              # embedded PostgreSQL in .data/pg; prints DATABASE_U
 npm run user:create -- --username partner.a --name "Partner A" --roles partner
 npm run user:password -- --username partner.a   # forgot it? sets a new one and signs that user out
 npm run dev                 # http://localhost:5001
+npm run worker              # another terminal: outbox and estimate expiry (I2-09); Ctrl-C stops it
 ```
+
+Customer links in messages use `PUBLIC_BASE_URL` (e.g. `https://garage.example`): required in production, where
+links are refused without it; in development the address the app was reached on is used. Behind a proxy, set
+`TRUSTED_PROXY_HOPS` to the number of proxies that append to `x-forwarded-for` (default 1).
 
 To run tests against your own PostgreSQL (for example Docker) instead of the embedded one, set
 `TEST_DATABASE_ADMIN_URL` to a superuser URL. Tests create and drop databases named `garage_t_*`.

@@ -4,6 +4,7 @@ import { ConflictError, NotFoundError } from "../core/errors";
 import { isUuid } from "../core/ids";
 import type { DB } from "../db/schema";
 import { lockRepairOrder, requirePermission, type Staff } from "../estimate/commands";
+import { prepareEstimateMessage, type PreparedMessage } from "../messages/commands";
 import { linkPath, newLinkToken } from "./token";
 
 /**
@@ -52,7 +53,10 @@ export async function createCustomerLink(
   db: Kysely<DB>,
   staff: Staff,
   repairOrderId: string,
-): Promise<CommandOutcome<{ linkId: string; token: string; path: string; expiresAt: string }>> {
+  options: { baseUrl?: string } = {},
+): Promise<
+  CommandOutcome<{ linkId: string; token: string; path: string; expiresAt: string; message: PreparedMessage }>
+> {
   requirePermission(staff, "customer_link.create");
   if (!isUuid(repairOrderId)) throw new NotFoundError("repair_order", repairOrderId);
   return runCommand(db, { name: "link.create", actor: actorOf(staff) }, async (ctx) => {
@@ -111,11 +115,20 @@ export async function createCustomerLink(
       },
       details: { repairOrderId },
     });
+    // I2-09: the message to send with it, prepared now — the only moment the token exists (OD-70, T-41).
+    const expiresAt = version.expires_at;
+    const message = await prepareEstimateMessage(ctx, staff, {
+      repairOrderId,
+      linkId: link.id,
+      url: (locale) => `${options.baseUrl ?? ""}${linkPath(locale, token)}`,
+      expiresAt,
+    });
     return {
       linkId: link.id,
       token,
       path: linkPath(version.preferred_language, token),
-      expiresAt: version.expires_at.toISOString(),
+      expiresAt: expiresAt.toISOString(),
+      message,
     };
   });
 }
