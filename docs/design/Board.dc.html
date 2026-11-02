@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Workshop board</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=JetBrains+Mono:wght@500;700&amp;family=IBM+Plex+Sans+Arabic:wght@500;600&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#1D4ED8}a:hover{color:#1E3A8A}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes pop{0%{opacity:0;transform:scale(.92) translateY(-8px)}60%{opacity:1;transform:scale(1.02)}100%{transform:none}}
+@keyframes toast{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
+@keyframes glow{0%{box-shadow:0 0 0 0 rgba(194,65,12,.35)}100%{box-shadow:0 0 0 12px rgba(194,65,12,0)}}
+.rise{animation:rise .6s cubic-bezier(.2,.7,.2,1) both}
+.pop{animation:pop .55s cubic-bezier(.2,.7,.2,1) both, glow 1.2s ease-out .2s 1}
+.toast{animation:toast .35s cubic-bezier(.2,.7,.2,1) both}
+.card{transition:transform .2s ease, box-shadow .2s ease}
+.card:hover{transform:translateY(-2px);box-shadow:0 12px 26px rgba(11,18,32,.08)}
+.chipbtn{transition:background .2s ease,color .2s ease}
+.go{transition:background .2s ease}
+.go:hover{background:#1E293B}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+</style>
+</helmet>
+<div style="min-height: 1000px; background: #F4F6FA; color: #0B1220; font-family: 'Plus Jakarta Sans', system-ui, sans-serif;">
+  <header style="background: #0B1220; color: #FFFFFF;">
+    <div style="max-width: 1440px; margin: 0 auto; box-sizing: border-box; padding: 20px 32px; display: flex; flex-wrap: wrap; align-items: center; gap: 16px;">
+      <a href="Main.dc.html" style="display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; border-radius: 10px; background: #1E293B; color: #E2E8F0; text-decoration: none; font-size: 14px; font-weight: 700;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"></path><path d="M11 6l-6 6 6 6"></path></svg>
+        Dashboard
+      </a>
+      <div style="flex: 1 1 280px; display: flex; flex-direction: column;">
+        <h1 style="margin: 0; font-size: 26px; font-weight: 800; letter-spacing: -0.01em;">Workshop board</h1>
+        <span lang="ar" dir="rtl" style="align-self: flex-start; font-family: 'IBM Plex Sans Arabic', sans-serif; font-size: 15px; color: #CBD5E1;">لوحة الورشة</span>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px; font-size: 13px; font-weight: 700;">
+        <span style="padding: 8px 12px; border-radius: 999px; background: #1E293B; color: #E2E8F0;">{{inCount}} in workshop</span>
+        <span style="padding: 8px 12px; border-radius: 999px; background: #1E293B; color: #86EFAC;">{{delivered}} delivered today</span>
+        <span style="padding: 8px 12px; border-radius: 999px; background: #1E293B; color: #FDBA74;">Sample data</span>
+      </div>
+    </div>
+  </header>
+
+  <main style="max-width: 1440px; margin: 0 auto; box-sizing: border-box; padding: 24px 32px 48px; display: flex; flex-direction: column; gap: 20px;">
+    <div role="group" aria-label="Filter by department" style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px;">
+      <span style="font-size: 13px; font-weight: 700; color: #3B4556; margin-right: 4px;">Department</span>
+      <sc-for list="{{filters}}" as="f" hint-placeholder-count="5">
+        <sc-if value="{{f.on}}" hint-placeholder-val="{{false}}">
+          <button type="button" class="chipbtn" aria-pressed="true" onClick="{{f.pick}}" style="min-height: 44px; padding: 0 16px; border-radius: 999px; border: 1px solid #0B1220; background: #0B1220; color: #FFFFFF; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer;">{{f.label}}</button>
+        </sc-if>
+        <sc-if value="{{f.off}}" hint-placeholder-val="{{true}}">
+          <button type="button" class="chipbtn" aria-pressed="false" onClick="{{f.pick}}" style="min-height: 44px; padding: 0 16px; border-radius: 999px; border: 1px solid #DCE1E8; background: #FFFFFF; color: #0B1220; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;">{{f.label}}</button>
+        </sc-if>
+      </sc-for>
+    </div>
+
+    <div style="overflow-x: auto; padding-bottom: 8px;">
+      <div style="display: grid; grid-template-columns: repeat(6, minmax(210px, 1fr)); gap: 14px; min-width: 1330px; align-items: start;">
+        <sc-for list="{{columns}}" as="col" hint-placeholder-count="6">
+          <section class="rise" style="animation-delay: {{col.delay}}; display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 18px; background: #EAEEF4; min-height: 640px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 4px 6px;">
+              <h2 style="margin: 0; display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 800;">
+                <span style="width: 10px; height: 10px; border-radius: 3px; background: {{col.solid}};"></span>
+                {{col.label}}
+              </h2>
+              <span style="min-width: 26px; padding: 2px 8px; box-sizing: border-box; border-radius: 999px; background: {{col.bg}}; color: {{col.ink}}; font-size: 12px; font-weight: 800; text-align: center;">{{col.count}}</span>
+            </div>
+            <sc-if value="{{col.empty}}" hint-placeholder-val="{{false}}">
+              <p style="margin: 0; padding: 24px 12px; border: 1.5px dashed #C3CBD6; border-radius: 14px; text-align: center; font-size: 13px; color: #3B4556;">No cars here</p>
+            </sc-if>
+            <sc-for list="{{col.cards}}" as="c" hint-placeholder-count="2">
+              <article class="card {{c.anim}}" style="display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 14px; background: #FFFFFF; border: 1px solid #E4E8EF;">
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                  <span dir="ltr" style="padding: 3px 7px; border: 1.5px solid #0B1220; border-radius: 6px; font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 700;">{{c.plate}}</span>
+                  <span style="font-size: 12px; font-weight: 700; color: {{c.timeInk}};">{{c.time}}</span>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 2px;">
+                  <span style="font-size: 15px; font-weight: 800;">{{c.car}}</span>
+                  <span style="font-size: 13px; color: #3B4556;">{{c.service}}</span>
+                </div>
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                  <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: #3B4556;">
+                    <span style="width: 24px; height: 24px; border-radius: 999px; background: #334155; color: #FFFFFF; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800;">{{c.initials}}</span>
+                    {{c.tech}}
+                  </span>
+                  <span style="padding: 2px 8px; border-radius: 6px; background: #F1F5F9; color: #334155; font-size: 11px; font-weight: 700;">{{c.dept}}</span>
+                </div>
+                <sc-if value="{{c.waiting}}" hint-placeholder-val="{{false}}">
+                  <p style="margin: 0; padding: 8px 10px; border-radius: 10px; background: #FBE3C8; color: #5C2F09; font-size: 12px; font-weight: 700;">Waiting for customer decision — do not start</p>
+                </sc-if>
+                <sc-if value="{{c.canMove}}" hint-placeholder-val="{{true}}">
+                  <button type="button" class="go" onClick="{{c.move}}" style="min-height: 44px; border: none; border-radius: 10px; background: #0B1220; color: #FFFFFF; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">{{c.moveLabel}}</button>
+                </sc-if>
+                <sc-if value="{{c.blocked}}" hint-placeholder-val="{{false}}">
+                  <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <button type="button" disabled="disabled" style="min-height: 44px; border: none; border-radius: 10px; background: #DCE1E8; color: #3B4556; font: inherit; font-size: 13px; font-weight: 700;">{{c.blockLabel}}</button>
+                    <button type="button" onClick="{{c.pay}}" style="min-height: 44px; border: 1px solid #DCE1E8; border-radius: 10px; background: #FFFFFF; color: #1D4ED8; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">Take payment →</button>
+                  </div>
+                </sc-if>
+              </article>
+            </sc-for>
+          </section>
+        </sc-for>
+      </div>
+    </div>
+  </main>
+
+  <sc-if value="{{hasToast}}" hint-placeholder-val="{{false}}">
+    <div class="toast" role="status" style="position: fixed; left: 50%; bottom: 28px; margin-left: -180px; width: 360px; box-sizing: border-box; display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-radius: 14px; background: #0B1220; color: #FFFFFF; box-shadow: 0 16px 40px rgba(11,18,32,.25); font-size: 14px; font-weight: 600;">
+      <span style="width: 28px; height: 28px; border-radius: 999px; background: #16A34A; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"></path></svg>
+      </span>
+      {{toast}}
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+  initial() {
+    return [
+      ['RO-1053', 'DXB K · 55012', 'Toyota Land Cruiser 2023', 'Check-in inspection', '—', 'Mechanical', 'checked', '10 min', false],
+      ['RO-1054', 'SHJ 1 · 12840', 'Chevrolet Tahoe 2020', 'Noise from front axle', '—', 'Mechanical', 'checked', '25 min', false],
+      ['RO-1052', 'SHJ 2 · 66103', 'Hyundai Elantra 2019', 'Battery and starter', '—', 'Electrical', 'checked', '40 min', false],
+      ['RO-1048', 'SHJ 2 · 77310', 'Lexus ES 2020', 'Extra work: brake discs', '—', 'Mechanical', 'approval', '2 h', false],
+      ['RO-1049', 'AJM B · 40211', 'Ford Explorer 2021', 'Rear bumper repair', '—', 'Body', 'approval', '45 min', false],
+      ['RO-1051', 'SHJ 3 · 48217', 'Toyota Camry 2021', 'Brake pads and discs', 'Ahmed K.', 'Mechanical', 'progress', '1 h 20 min', false],
+      ['RO-1050', 'DXB L · 20941', 'Nissan Patrol 2019', 'AC regas and leak test', 'Ravi S.', 'AC', 'progress', '50 min', false],
+      ['RO-1047', 'SHJ 1 · 58820', 'Honda Accord 2020', 'Oil and filter service', 'Joseph M.', 'Mechanical', 'progress', '20 min', false],
+      ['RO-1043', 'SHJ 1 · 30672', 'Mitsubishi Pajero 2018', 'Rear shock absorbers', 'Bilal H.', 'Mechanical', 'parts', '3 h', false],
+      ['RO-1044', 'SHJ 3 · 21457', 'Mazda CX-5 2021', 'Headlight unit', 'Omar F.', 'Electrical', 'parts', '1 day', false],
+      ['RO-1046', 'AJM A · 11584', 'Kia Sportage 2022', 'Engine diagnostics', 'Omar F.', 'Mechanical', 'qc', '15 min', false],
+      ['RO-1039', 'SHJ 3 · 90215', 'Hyundai Tucson 2021', 'Major service', 'Joseph M.', 'Mechanical', 'ready', '1 h', false],
+      ['RO-1040', 'DXB F · 63390', 'Nissan Altima 2022', 'Four new tyres', 'Ravi S.', 'Mechanical', 'ready', '30 min', true]
+    ].map((r) => ({ id: r[0], plate: r[1], car: r[2], service: r[3], tech: r[4], dept: r[5], stage: r[6], time: r[7], paid: r[8] }));
+  }
+  snap(st) {
+    const p = st || {};
+    return { cards: p.cards || this.initial(), dept: p.dept || 'All', moved: p.moved || '', delivered: p.delivered || 0 };
+  }
+  showToast(text) {
+    if (this.toastTimer) clearTimeout(this.toastTimer);
+    this.setState({ toast: '' });
+    setTimeout(() => this.setState({ toast: text }), 30);
+    this.toastTimer = setTimeout(() => this.setState({ toast: '' }), 2800);
+  }
+  componentWillUnmount() {
+    if (this.toastTimer) clearTimeout(this.toastTimer);
+  }
+  renderVals() {
+    const d = this.snap(this.state);
+    const S = [
+      ['checked', 'Checked in', '#E3E7EC', '#2B3A48', '#64748B', 'Send estimate →'],
+      ['approval', 'Awaiting approval', '#FBE3C8', '#7A3E0C', '#C2410C', 'Record approval →'],
+      ['progress', 'In progress', '#D6E6F3', '#1B4A6E', '#2563EB', 'Send to quality check →'],
+      ['parts', 'Waiting parts', '#E7DDF3', '#4B2E73', '#7C3AED', 'Parts arrived · resume →'],
+      ['qc', 'Quality check', '#D4EDE8', '#1D5A4F', '#0D9488', 'Passed · mark ready →'],
+      ['ready', 'Ready', '#DCEFD6', '#2E5E1F', '#16A34A', 'Deliver →']
+    ];
+    const nextOf = { checked: 'approval', approval: 'progress', progress: 'qc', parts: 'progress', qc: 'ready' };
+    const labelOf = {};
+    S.forEach((s) => { labelOf[s[0]] = s[1]; });
+
+    const move = (id) => {
+      const cur = this.snap(this.state);
+      const card = cur.cards.find((c) => c.id === id);
+      if (!card) return;
+      if (card.stage === 'ready') {
+        this.setState({ cards: cur.cards.filter((c) => c.id !== id), delivered: cur.delivered + 1, moved: '' });
+        this.showToast(id + ' delivered · invoice closed');
+        return;
+      }
+      const to = nextOf[card.stage];
+      const cards = cur.cards.filter((c) => c.id !== id).concat([{ ...card, stage: to, time: 'just now', tech: card.tech === '—' && to === 'progress' ? 'Unassigned' : card.tech }]);
+      this.setState({ cards: cards, moved: id });
+      this.showToast(id + ' moved to ' + labelOf[to]);
+    };
+    const pay = (id) => {
+      const cur = this.snap(this.state);
+      this.setState({ cards: cur.cards.map((c) => (c.id === id ? { ...c, paid: true } : c)), moved: id });
+      this.showToast(id + ' · payment of AED 288.00 recorded');
+    };
+
+    const visible = d.cards.filter((c) => d.dept === 'All' || c.dept === d.dept);
+    const columns = S.map((s, i) => {
+      const cards = visible.filter((c) => c.stage === s[0]).map((c) => {
+        const isReady = c.stage === 'ready';
+        const blocked = isReady && !c.paid;
+        return {
+          plate: c.plate, car: c.car, service: c.service, tech: c.tech, dept: c.dept, time: c.time,
+          timeInk: c.stage === 'approval' || c.time === '1 day' ? '#9A3412' : '#3B4556',
+          initials: c.tech === '—' || c.tech === 'Unassigned' ? '—' : c.tech.split(' ').map((w) => w[0]).join('').replace('.', ''),
+          anim: c.id === d.moved ? 'pop' : '',
+          waiting: c.stage === 'approval',
+          canMove: !blocked,
+          moveLabel: s[5],
+          blocked: blocked,
+          blockLabel: 'Deliver — balance due AED 288.00',
+          move: () => move(c.id),
+          pay: () => pay(c.id)
+        };
+      });
+      return { label: s[1], bg: s[2], ink: s[3], solid: s[4], count: cards.length, empty: cards.length === 0, cards: cards, delay: (0.06 * i).toFixed(2) + 's' };
+    });
+
+    const filters = ['All', 'Mechanical', 'Electrical', 'Body', 'AC'].map((f) => ({
+      label: f, on: d.dept === f, off: d.dept !== f,
+      pick: () => this.setState({ cards: d.cards, dept: f, moved: '' })
+    }));
+
+    const toast = (this.state && this.state.toast) || '';
+    return { columns, filters, inCount: d.cards.length, delivered: d.delivered, toast, hasToast: !!toast };
+  }
+}
+</script>
+</body>
+</html>

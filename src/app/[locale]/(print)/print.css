@@ -1,0 +1,128 @@
+/* Printed documents (I1-09b): black on white on screen and on A4 paper, logical properties only. */
+
+.print-page {
+  max-inline-size: 210mm;
+  margin-inline: auto;
+  padding: var(--space-5) var(--space-4);
+  background: #fff;
+  color: #111;
+}
+
+.print-toolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-block-end: var(--space-4);
+}
+
+.invoice-print {
+  display: grid;
+  gap: var(--space-4);
+  font-size: 0.875rem;
+}
+
+.invoice-print .bilingual {
+  display: inline-flex;
+  flex-direction: column;
+}
+
+.invoice-print .bilingual > span + span {
+  font-size: 0.85em;
+  color: #444;
+}
+
+.invoice-print-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-4);
+  padding-block-end: var(--space-3);
+  border-block-end: 2px solid #111;
+}
+
+.invoice-print-head h2,
+.invoice-print-title {
+  margin: 0;
+}
+
+.invoice-print-head p {
+  margin-block: var(--space-1) 0;
+}
+
+.invoice-print-title {
+  font-size: 1.5rem;
+  text-align: end;
+}
+
+.invoice-print-facts,
+.invoice-print-totals {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+}
+
+.invoice-print-facts dd,
+.invoice-print-totals dd {
+  margin: 0;
+}
+
+.invoice-print-totals {
+  justify-self: end;
+  min-inline-size: 50%;
+}
+
+.invoice-print-totals dd {
+  text-align: end;
+}
+
+.invoice-print-lines {
+  inline-size: 100%;
+  border-collapse: collapse;
+}
+
+.invoice-print-lines th,
+.invoice-print-lines td {
+  padding: var(--space-2);
+  border: 1px solid #999;
+  text-align: start;
+  vertical-align: top;
+}
+
+.invoice-print-lines .num {
+  text-align: end;
+  white-space: nowrap;
+}
+
+.invoice-print-notes {
+  font-size: 0.8rem;
+  color: #444;
+}
+
+/* Tablet and phone: the line table scrolls rather than squeezing the columns. */
+@media (max-width: 720px) {
+  .invoice-print {
+    overflow-x: auto;
+  }
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+
+  .print-toolbar {
+    display: none;
+  }
+
+  .print-page {
+    max-inline-size: none;
+    padding: 0;
+  }
+
+  .invoice-print-lines tr {
+    break-inside: avoid;
+  }
+}

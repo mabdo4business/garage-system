@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Workshop overview</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=JetBrains+Mono:wght@500;700&amp;family=IBM+Plex+Sans+Arabic:wght@500;600&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#1D4ED8}a:hover{color:#1E3A8A}
+@keyframes rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+@keyframes grow{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+@keyframes fillx{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes draw{from{stroke-dashoffset:320}to{stroke-dashoffset:0}}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(22,163,74,.55)}70%{box-shadow:0 0 0 10px rgba(22,163,74,0)}100%{box-shadow:0 0 0 0 rgba(22,163,74,0)}}
+@keyframes shimmer{0%{opacity:.55}50%{opacity:1}100%{opacity:.55}}
+.rise{animation:rise .7s cubic-bezier(.2,.7,.2,1) both}
+.grow{transform-origin:bottom;animation:grow 1s cubic-bezier(.2,.7,.2,1) both}
+.fillx{transform-origin:left center;animation:fillx 1.2s cubic-bezier(.2,.7,.2,1) both}
+.draw{stroke-dasharray:320;animation:draw 1.8s ease-out both}
+.pulse{animation:pulse 2s infinite}
+.blink{animation:shimmer 1.6s ease-in-out infinite}
+.lift{transition:transform .25s ease, box-shadow .25s ease}
+.lift:hover{transform:translateY(-3px);box-shadow:0 14px 30px rgba(11,18,32,.09)}
+.navlink{transition:background .2s ease,color .2s ease}
+.navlink:hover{background:#1E293B;color:#FFFFFF}
+.trow{transition:background .15s ease}
+.trow:hover{background:#F8FAFC}
+.cta{transition:background .2s ease, transform .2s ease}
+.cta:hover{background:#9A3412;transform:translateY(-1px)}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+</style>
+</helmet>
+<div style="display: flex; flex-wrap: wrap; min-height: 1560px; background: #F4F6FA; color: #0B1220; font-family: 'Plus Jakarta Sans', system-ui, sans-serif;">
+
+  <aside style="flex: 1 1 248px; max-width: 100%; box-sizing: border-box; padding: 24px 16px; background: #0B1220; color: #CBD5E1; display: flex; flex-direction: column; gap: 28px;">
+    <div style="display: flex; align-items: center; gap: 12px; padding: 0 8px;">
+      <div style="width: 40px; height: 40px; border-radius: 12px; background: #FB923C; color: #0B1220; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 18px;">G</div>
+      <div style="display: flex; flex-direction: column;">
+        <span style="font-size: 16px; font-weight: 800; color: #FFFFFF;">[GARAGE NAME]</span>
+        <span style="font-size: 13px; color: #94A3B8;">Workshop system · Sharjah</span>
+      </div>
+    </div>
+    <nav aria-label="Main" style="display: flex; flex-direction: column; gap: 4px;">
+      <sc-for list="{{nav}}" as="n" hint-placeholder-count="8">
+        <sc-if value="{{n.active}}" hint-placeholder-val="{{false}}">
+          <a href="{{n.href}}" aria-current="page" style="display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 0 14px; border-radius: 12px; background: #FB923C; color: #0B1220; text-decoration: none; font-size: 15px; font-weight: 700;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{n.icon}}"></path></svg>
+            {{n.label}}
+          </a>
+        </sc-if>
+        <sc-if value="{{n.idle}}" hint-placeholder-val="{{true}}">
+          <a href="{{n.href}}" class="navlink" style="display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 0 14px; border-radius: 12px; color: #CBD5E1; text-decoration: none; font-size: 15px; font-weight: 600;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{n.icon}}"></path></svg>
+            <span style="flex-grow: 1;">{{n.label}}</span>
+            <sc-if value="{{n.hasBadge}}" hint-placeholder-val="{{false}}">
+              <span style="min-width: 24px; padding: 2px 8px; box-sizing: border-box; border-radius: 999px; background: #1E293B; color: #FDBA74; font-size: 12px; font-weight: 700; text-align: center;">{{n.badge}}</span>
+            </sc-if>
+          </a>
+        </sc-if>
+      </sc-for>
+    </nav>
+    <div style="margin-top: auto; display: flex; align-items: center; gap: 12px; padding: 14px; border-radius: 14px; background: #111A2E;">
+      <div style="width: 40px; height: 40px; border-radius: 999px; background: #334155; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700;">SM</div>
+      <div style="display: flex; flex-direction: column; min-width: 0;">
+        <span style="font-size: 14px; font-weight: 700; color: #FFFFFF;">Service manager</span>
+        <span style="font-size: 12px; color: #94A3B8;">English · العربية</span>
+      </div>
+    </div>
+  </aside>
+
+  <main style="flex: 999 1 640px; min-width: 0; box-sizing: border-box; padding: 28px 32px 56px; display: flex; flex-direction: column; gap: 24px;">
+
+    <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px;">
+      <div style="flex: 1 1 320px; position: relative; display: flex; align-items: center;">
+        <label for="global-search" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0);">Search</label>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5A6576" stroke-width="2" stroke-linecap="round" aria-hidden="true" style="position: absolute; left: 16px;"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+        <input id="global-search" type="search" placeholder="Search plate, mobile, name or VIN" style="width: 100%; min-height: 48px; box-sizing: border-box; padding: 0 16px 0 46px; border: 1px solid #DCE1E8; border-radius: 12px; background: #FFFFFF; font: inherit; font-size: 15px; color: #0B1220;">
+      </div>
+      <span style="display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 14px; border-radius: 999px; background: #FFFFFF; border: 1px solid #DCE1E8; font-size: 13px; font-weight: 600; color: #3B4556;">
+        <span class="pulse" style="width: 8px; height: 8px; border-radius: 999px; background: #16A34A;"></span>
+        Live · updated just now
+      </span>
+      <a href="#" class="cta" style="display: inline-flex; align-items: center; gap: 8px; min-height: 48px; padding: 0 20px; border-radius: 12px; background: #C2410C; color: #FFFFFF; text-decoration: none; font-size: 15px; font-weight: 700;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg>
+        New check-in
+      </a>
+    </div>
+
+    <div class="rise" style="display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px;">
+      <div style="display: flex; flex-direction: column; gap: 4px;">
+        <span style="font-size: 13px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #C2410C;">Tuesday 27 October</span>
+        <h1 style="margin: 0; font-size: 36px; line-height: 1.15; font-weight: 800; letter-spacing: -0.02em;">Workshop overview</h1>
+        <span lang="ar" dir="rtl" style="font-family: 'IBM Plex Sans Arabic', sans-serif; font-size: 18px; font-weight: 500; color: #3B4556;">نظرة عامة على الورشة</span>
+      </div>
+      <span style="padding: 6px 12px; border-radius: 999px; background: #E3E7EC; color: #2B3A48; font-size: 13px; font-weight: 700;">Sample data</span>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px;">
+      <sc-for list="{{kpis}}" as="k" hint-placeholder-count="4">
+        <div class="rise lift" style="animation-delay: {{k.delay}}; display: flex; flex-direction: column; gap: 14px; padding: 20px; border-radius: 18px; background: #FFFFFF; border: 1px solid #E4E8EF;">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+            <span style="font-size: 14px; font-weight: 700; color: #3B4556;">{{k.label}}</span>
+            <span style="width: 36px; height: 36px; border-radius: 10px; background: {{k.tint}}; color: {{k.ink}}; display: inline-flex; align-items: center; justify-content: center;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{k.icon}}"></path></svg>
+            </span>
+          </div>
+          <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 8px;">
+            <span style="font-size: 34px; line-height: 1; font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums;">{{k.value}}</span>
+            <svg width="120" height="36" viewBox="0 0 120 36" fill="none" aria-hidden="true"><path class="draw" d="{{k.spark}}" stroke="{{k.line}}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="animation-delay: {{k.delay}};"></path></svg>
+          </div>
+          <span style="font-size: 13px; font-weight: 600; color: #5A6576;">{{k.note}}</span>
+        </div>
+      </sc-for>
+    </div>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 16px;">
+      <section class="rise" style="animation-delay: 0.25s; flex: 2 1 520px; min-width: 0; padding: 24px; border-radius: 18px; background: #FFFFFF; border: 1px solid #E4E8EF; display: flex; flex-direction: column; gap: 20px;">
+        <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px;">
+          <div style="display: flex; flex-direction: column; gap: 2px;">
+            <h2 style="margin: 0; font-size: 18px; font-weight: 800;">Revenue · last 7 days</h2>
+            <span style="font-size: 13px; color: #5A6576;">AED, invoiced and paid · today so far</span>
+          </div>
+          <span style="font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums;">{{weekTotal}}</span>
+        </div>
+        <div style="display: flex; align-items: flex-end; gap: 14px; height: 230px; padding-top: 8px; border-bottom: 1px solid #E4E8EF;">
+          <sc-for list="{{bars}}" as="b" hint-placeholder-count="7">
+            <div style="flex: 1 1 0; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 8px;">
+              <span style="font-size: 12px; font-weight: 700; color: #3B4556; font-variant-numeric: tabular-nums;">{{b.value}}</span>
+              <div class="grow" style="width: 100%; max-width: 48px; height: {{b.h}}; border-radius: 10px 10px 4px 4px; background: {{b.color}}; animation-delay: {{b.delay}};"></div>
+            </div>
+          </sc-for>
+        </div>
+        <div style="display: flex; gap: 14px;">
+          <sc-for list="{{bars}}" as="b" hint-placeholder-count="7">
+            <span style="flex: 1 1 0; text-align: center; font-size: 12px; font-weight: 600; color: #5A6576;">{{b.day}}</span>
+          </sc-for>
+        </div>
+      </section>
+
+      <section class="rise" style="animation-delay: 0.35s; flex: 1 1 320px; min-width: 0; padding: 24px; border-radius: 18px; background: #FFFFFF; border: 1px solid #E4E8EF; display: flex; flex-direction: column; gap: 16px;">
+        <h2 style="margin: 0; font-size: 18px; font-weight: 800;">Cars by status</h2>
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 20px;">
+          <div style="position: relative; width: 160px; height: 160px; flex-shrink: 0;">
+            <svg width="160" height="160" viewBox="0 0 140 140" role="img" aria-label="Cars by status chart">
+              <circle cx="70" cy="70" r="54" fill="none" stroke="#EEF1F5" stroke-width="18"></circle>
+              <sc-for list="{{donut}}" as="d" hint-placeholder-count="6">
+                <circle cx="70" cy="70" r="54" fill="none" stroke="{{d.color}}" stroke-width="18" stroke-dasharray="{{d.dash}}" stroke-dashoffset="{{d.off}}" transform="rotate(-90 70 70)"></circle>
+              </sc-for>
+            </svg>
+            <div style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+              <span style="font-size: 30px; font-weight: 800; line-height: 1;">{{carsNow}}</span>
+              <span style="font-size: 12px; font-weight: 600; color: #5A6576;">cars in</span>
+            </div>
+          </div>
+          <div style="flex: 1 1 140px; display: flex; flex-direction: column; gap: 8px;">
+            <sc-for list="{{donut}}" as="d" hint-placeholder-count="6">
+              <div style="display: flex; align-items: center; gap: 10px; font-size: 14px;">
+                <span style="width: 10px; height: 10px; border-radius: 3px; background: {{d.color}}; flex-shrink: 0;"></span>
+                <span style="flex-grow: 1; font-weight: 600; color: #3B4556;">{{d.label}}</span>
+                <span style="font-weight: 800; font-variant-numeric: tabular-nums;">{{d.count}}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 16px;">
+      <section class="rise" style="animation-delay: 0.45s; flex: 3 1 520px; min-width: 0; padding: 24px; border-radius: 18px; background: #FFFFFF; border: 1px solid #E4E8EF; display: flex; flex-direction: column; gap: 14px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+          <h2 style="margin: 0; font-size: 18px; font-weight: 800;">Bays right now</h2>
+          <span style="font-size: 13px; font-weight: 700; color: #3B4556;">5 of 6 in use</span>
+        </div>
+        <sc-for list="{{bays}}" as="b" hint-placeholder-count="6">
+          <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; padding: 12px 0; border-top: 1px solid #EEF1F5;">
+            <span style="width: 56px; font-size: 13px; font-weight: 800; color: #3B4556;">{{b.bay}}</span>
+            <span style="width: 36px; height: 36px; border-radius: 999px; background: {{b.avatar}}; color: #FFFFFF; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800;">{{b.initials}}</span>
+            <div style="flex: 1 1 200px; min-width: 0; display: flex; flex-direction: column; gap: 2px;">
+              <span style="font-size: 14px; font-weight: 700;">{{b.job}}</span>
+              <span style="font-size: 13px; color: #5A6576;">{{b.who}}</span>
+            </div>
+            <div style="flex: 1 1 160px; display: flex; flex-direction: column; gap: 6px;">
+              <div style="display: flex; justify-content: space-between; gap: 8px; font-size: 12px; font-weight: 700;">
+                <span style="padding: 2px 8px; border-radius: 6px; background: {{b.bg}}; color: {{b.ink}};">{{b.status}}</span>
+                <span style="color: #3B4556;">{{b.left}}</span>
+              </div>
+              <div style="height: 8px; border-radius: 999px; background: #EEF1F5; overflow: hidden;">
+                <div class="fillx" style="width: {{b.pct}}; height: 100%; border-radius: 999px; background: {{b.bar}}; animation-delay: {{b.delay}};"></div>
+              </div>
+            </div>
+          </div>
+        </sc-for>
+      </section>
+
+      <section class="rise" style="animation-delay: 0.55s; flex: 2 1 340px; min-width: 0; padding: 24px; border-radius: 18px; background: #FFFFFF; border: 1px solid #E4E8EF; display: flex; flex-direction: column; gap: 12px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+          <h2 style="margin: 0; font-size: 18px; font-weight: 800;">Needs attention</h2>
+          <span class="blink" style="padding: 4px 10px; border-radius: 999px; background: #FBE3C8; color: #7A3E0C; font-size: 12px; font-weight: 800;">3 open</span>
+        </div>
+        <sc-for list="{{alerts}}" as="a" hint-placeholder-count="3">
+          <div class="lift" style="display: flex; flex-direction: column; gap: 6px; padding: 16px; border-radius: 14px; background: {{a.bg}};">
+            <span style="font-size: 12px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: {{a.ink}};">{{a.kind}}</span>
+            <span style="font-size: 15px; font-weight: 700; color: #0B1220;">{{a.title}}</span>
+            <span style="font-size: 13px; color: #3B4556;">{{a.meta}}</span>
+            <a href="#" style="align-self: flex-start; min-height: 32px; display: inline-flex; align-items: center; font-size: 14px; font-weight: 700; color: #1D4ED8; text-decoration: none;">{{a.action}}</a>
+          </div>
+        </sc-for>
+      </section>
+    </div>
+
+    <section class="rise" style="animation-delay: 0.65s; padding: 24px; border-radius: 18px; background: #FFFFFF; border: 1px solid #E4E8EF; display: flex; flex-direction: column; gap: 16px;">
+      <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px;">
+        <h2 style="margin: 0; font-size: 18px; font-weight: 800;">Today's repair orders</h2>
+        <a href="Board.dc.html" style="display: inline-flex; align-items: center; min-height: 44px; font-size: 14px; font-weight: 700; text-decoration: none;">Open workshop board →</a>
+      </div>
+      <div style="overflow-x: auto;">
+        <table style="width: 100%; min-width: 860px; border-collapse: collapse; font-size: 14px;">
+          <thead>
+            <tr style="text-align: left; color: #5A6576; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em;">
+              <th style="padding: 10px 12px; font-weight: 700;">Order</th>
+              <th style="padding: 10px 12px; font-weight: 700;">Plate</th>
+              <th style="padding: 10px 12px; font-weight: 700;">Car · service</th>
+              <th style="padding: 10px 12px; font-weight: 700;">Status</th>
+              <th style="padding: 10px 12px; font-weight: 700;">Technician</th>
+              <th style="padding: 10px 12px; font-weight: 700;">Promised</th>
+              <th style="padding: 10px 12px; font-weight: 700; text-align: right;">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            <sc-for list="{{orders}}" as="o" hint-placeholder-count="6">
+              <tr class="trow" style="border-top: 1px solid #EEF1F5;">
+                <td style="padding: 14px 12px; font-weight: 700;">{{o.id}}</td>
+                <td style="padding: 14px 12px;"><span dir="ltr" style="display: inline-block; padding: 4px 8px; border: 1.5px solid #0B1220; border-radius: 6px; font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 700;">{{o.plate}}</span></td>
+                <td style="padding: 14px 12px;"><div style="display: flex; flex-direction: column; gap: 2px;"><span style="font-weight: 700;">{{o.car}}</span><span style="color: #5A6576; font-size: 13px;">{{o.service}}</span></div></td>
+                <td style="padding: 14px 12px;"><span style="display: inline-block; padding: 4px 10px; border-radius: 8px; background: {{o.bg}}; color: {{o.ink}}; font-size: 13px; font-weight: 700; white-space: nowrap;">{{o.status}}</span></td>
+                <td style="padding: 14px 12px; color: #3B4556;">{{o.tech}}</td>
+                <td style="padding: 14px 12px; color: #3B4556; font-variant-numeric: tabular-nums;">{{o.due}}</td>
+                <td style="padding: 14px 12px; text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap;">{{o.amount}}</td>
+              </tr>
+            </sc-for>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1560}}'>
+class Component extends DCLogic {
+  componentDidMount() {
+    const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduce) return;
+    const start = performance.now();
+    this.setState({ t: 0 });
+    const tick = (now) => {
+      const p = Math.min(1, (now - start) / 1500);
+      this.setState({ t: 1 - Math.pow(1 - p, 3) });
+      if (p < 1) this.raf = requestAnimationFrame(tick);
+    };
+    this.raf = requestAnimationFrame(tick);
+  }
+  componentWillUnmount() {
+    if (this.raf) cancelAnimationFrame(this.raf);
+  }
+  renderVals() {
+    const t = this.state && this.state.t != null ? this.state.t : 1;
+    const money = (n) => 'AED ' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const S = {
+      checked: { label: 'Checked in', bg: '#E3E7EC', ink: '#2B3A48', solid: '#64748B' },
+      approval: { label: 'Awaiting approval', bg: '#FBE3C8', ink: '#7A3E0C', solid: '#C2410C' },
+      progress: { label: 'In progress', bg: '#D6E6F3', ink: '#1B4A6E', solid: '#2563EB' },
+      parts: { label: 'Waiting parts', bg: '#E7DDF3', ink: '#4B2E73', solid: '#7C3AED' },
+      qc: { label: 'Quality check', bg: '#D4EDE8', ink: '#1D5A4F', solid: '#0D9488' },
+      ready: { label: 'Ready', bg: '#DCEFD6', ink: '#2E5E1F', solid: '#16A34A' }
+    };
+
+    const nav = [
+      ['Dashboard', '#', 'M3 3h7v9H3z M14 3h7v5h-7z M14 12h7v9h-7z M3 16h7v5H3z', true, ''],
+      ['Workshop board', 'Board.dc.html', 'M4 4h4v16H4z M10 4h4v10h-4z M16 4h4v13h-4z', false, '29'],
+      ['Repair orders', '#', 'M9 3h6v3H9z M7 4.5H5V21h14V4.5h-2 M8 11h8 M8 15h5', false, ''],
+      ['Customers', '#', 'M16 20v-1a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v1 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8 M22 20v-1a4 4 0 0 0-3-3.9 M16 3.1a4 4 0 0 1 0 7.8', false, ''],
+      ['Invoices', '#', 'M6 2h12v20l-3-2-3 2-3-2-3 2z M9 7h6 M9 11h6 M9 15h4', false, '4'],
+      ['Parts', '#', 'M21 8l-9-5-9 5 9 5 9-5z M3 8v8l9 5 9-5V8 M12 13v8', false, ''],
+      ['Technician view', 'Bay.dc.html', 'M6 2h12v20H6z M11 18h2', false, ''],
+      ['Reports', '#', 'M4 20V10 M10 20V4 M16 20v-7 M2 20h20', false, '']
+    ].map((n) => ({ label: n[0], href: n[1], icon: n[2], active: n[3], idle: !n[3], badge: n[4], hasBadge: !!n[4] }));
+
+    const kpis = [
+      { label: 'Cars in workshop', v: 29, fmt: 'int', note: '+3 vs yesterday · 6 bays', icon: 'M5 17h14 M6 17v2 M18 17v2 M4 13l2-6h12l2 6v4H4z M7.5 14h.01 M16.5 14h.01', tint: '#DBEAFE', ink: '#1E3A8A', line: '#2563EB', spark: 'M2 28 L20 24 L38 26 L56 18 L74 20 L92 12 L118 8' },
+      { label: 'Awaiting approval', v: 5, fmt: 'int', note: 'Oldest link sent 2 h ago', icon: 'M12 7v5l3 2 M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18', tint: '#FFEDD5', ink: '#9A3412', line: '#C2410C', spark: 'M2 20 L20 22 L38 16 L56 24 L74 18 L92 22 L118 14' },
+      { label: 'Ready for pickup', v: 7, fmt: 'int', note: '3 paid · 4 balance due', icon: 'M20 6L9 17l-5-5', tint: '#DCFCE7', ink: '#14532D', line: '#16A34A', spark: 'M2 30 L20 26 L38 28 L56 20 L74 16 L92 14 L118 10' },
+      { label: "Today's revenue", v: 18420.5, fmt: 'money', note: '+8% vs last Tuesday', icon: 'M3 17l6-6 4 4 8-8 M15 7h6v6', tint: '#EDE9FE', ink: '#4C1D95', line: '#7C3AED', spark: 'M2 26 L20 22 L38 30 L56 20 L74 16 L92 14 L118 6' }
+    ].map((k, i) => ({
+      ...k,
+      value: k.fmt === 'money' ? money(k.v * t) : String(Math.round(k.v * t)),
+      delay: (0.08 * i).toFixed(2) + 's'
+    }));
+
+    const week = [['Wed 21', 14.2], ['Thu 22', 16.8], ['Fri 23', 7.4], ['Sat 24', 12.9], ['Sun 25', 15.6], ['Mon 26', 17.1], ['Today', 18.4]];
+    const bars = week.map((w, i) => ({
+      day: w[0],
+      value: w[1].toFixed(1) + 'k',
+      h: Math.round((w[1] / 20) * 82) + '%',
+      color: i === week.length - 1 ? '#C2410C' : '#2563EB',
+      delay: (0.3 + 0.07 * i).toFixed(2) + 's'
+    }));
+    const weekTotal = money(week.reduce((s, w) => s + w[1], 0) * 1000 * t);
+
+    const counts = [['checked', 4], ['approval', 5], ['progress', 8], ['parts', 3], ['qc', 2], ['ready', 7]];
+    const total = counts.reduce((s, c) => s + c[1], 0);
+    const C = 2 * Math.PI * 54;
+    let acc = 0;
+    const donut = counts.map((c) => {
+      const len = (c[1] / total) * C;
+      const seg = Math.max(0, len - 2) * t;
+      const item = { label: S[c[0]].label, count: c[1], color: S[c[0]].solid, dash: seg.toFixed(2) + ' ' + C.toFixed(2), off: (-acc * t).toFixed(2) };
+      acc += len;
+      return item;
+    });
+
+    const bays = [
+      ['Bay 1', 'AK', '#2563EB', 'Front brake pads and discs', 'Ahmed K. · Toyota Camry 2021', 'progress', 72, '25 min left'],
+      ['Bay 2', 'RS', '#7C3AED', 'AC regas and leak test', 'Ravi S. · Nissan Patrol 2019', 'progress', 38, '1 h 10 min left'],
+      ['Bay 3', 'OF', '#0D9488', 'Engine diagnostics', 'Omar F. · Kia Sportage 2022', 'qc', 92, 'Quality check'],
+      ['Bay 4', 'JM', '#C2410C', 'Oil and filter service', 'Joseph M. · Honda Accord 2020', 'progress', 18, '40 min left'],
+      ['Bay 5', 'BH', '#475569', 'Rear shock absorbers', 'Bilal H. · Mitsubishi Pajero 2018', 'parts', 45, 'Paused · parts at 14:00'],
+      ['Bay 6', '—', '#94A3B8', 'Free', 'Next: Hyundai Elantra · 11:30 booking', 'checked', 0, 'Available']
+    ].map((b, i) => ({
+      bay: b[0], initials: b[1], avatar: b[2], job: b[3], who: b[4],
+      status: b[5] === 'checked' ? 'Free' : S[b[5]].label, bg: S[b[5]].bg, ink: S[b[5]].ink, bar: S[b[5]].solid,
+      pct: b[6] + '%', left: b[7], delay: (0.5 + 0.08 * i).toFixed(2) + 's'
+    }));
+
+    const alerts = [
+      { kind: 'Waiting for customer', title: 'Extra work found — do not start', meta: 'RO-1048 · front brake discs · link sent 2 h ago', action: 'Resend approval link →', bg: '#FFF4E6', ink: '#9A3412' },
+      { kind: 'Parts late', title: 'Shock absorbers due 14:00', meta: 'RO-1043 · Bay 5 paused · supplier: [SUPPLIER]', action: 'Call supplier →', bg: '#F3EEFB', ink: '#4B2E73' },
+      { kind: 'Ready · balance due', title: 'Deliver — balance due AED 288.00', meta: 'RO-1039 · customer not answering', action: 'Send payment reminder →', bg: '#EAF5E6', ink: '#2E5E1F' }
+    ];
+
+    const orders = [
+      ['RO-1051', 'SHJ 3 · 48217', 'Toyota Camry 2021', 'Brake service', 'progress', 'Ahmed K.', '13:30', 1240],
+      ['RO-1050', 'DXB L · 20941', 'Nissan Patrol 2019', 'AC regas', 'progress', 'Ravi S.', '15:00', 560],
+      ['RO-1048', 'SHJ 2 · 77310', 'Lexus ES 2020', 'Brake inspection', 'approval', '—', 'Waiting', 1890],
+      ['RO-1046', 'AJM A · 11584', 'Kia Sportage 2022', 'Engine diagnostics', 'qc', 'Omar F.', '12:00', 420],
+      ['RO-1043', 'SHJ 1 · 30672', 'Mitsubishi Pajero 2018', 'Rear suspension', 'parts', 'Bilal H.', '17:30', 2310],
+      ['RO-1039', 'SHJ 3 · 90215', 'Hyundai Tucson 2021', 'Major service', 'ready', 'Joseph M.', 'Ready', 988]
+    ].map((o) => ({ id: o[0], plate: o[1], car: o[2], service: o[3], status: S[o[4]].label, bg: S[o[4]].bg, ink: S[o[4]].ink, tech: o[5], due: o[6], amount: money(o[7]) }));
+
+    return { nav, kpis, bars, weekTotal, donut, carsNow: String(Math.round(total * t)), bays, alerts, orders };
+  }
+}
+</script>
+</body>
+</html>

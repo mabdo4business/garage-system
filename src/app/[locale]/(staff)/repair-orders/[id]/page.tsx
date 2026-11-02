@@ -1,0 +1,378 @@
+import { notFound } from "next/navigation";
+import { Card, PageHeader, PlateBadge, StatusChip } from "../../../../../components/ui";
+import { isLocale, t, type MessageKey } from "../../../../../i18n";
+import { formatDubaiDateTime } from "../../../../../i18n/format";
+import { hasPermission } from "../../../../../server/auth/permissions";
+import { getDb } from "../../../../../server/db/client";
+import { getRepairOrder } from "../../../../../server/repair-order/queries";
+import { requirePagePermission } from "../../../server-support";
+import { ExcludePhotoForm } from "./exclude-photo-form";
+import { getInspection, listTechnicians } from "../../../../../server/inspection/queries";
+import { AssignInspectionForm } from "./inspection/inspection-forms";
+import { estimateView } from "../../../../../server/estimate/queries";
+import { Money } from "../../../../../server/core/money";
+import { formatAed } from "../../../../../i18n/format";
+import { qcView } from "../../../../../server/quality/queries";
+import { ActionForm } from "../../../action-form";
+import { requestQcAction } from "./qc/actions";
+import { InvoiceCard } from "./invoice/invoice-card";
+import { SettlementCard } from "./payments/settlement-card";
+import { randomUUID } from "node:crypto";
+import { ContactChangeForm } from "./contact-change-form";
+import { ReadyMessageCard } from "./ready-message-card";
+import { latestMessage } from "../../../../../server/messages/queries";
+import {
+  CONTACT_CHANGE_OPEN,
+  contactHistory,
+  ownerForContactChange,
+} from "../../../../../server/repair-order/contact";
+
+export const dynamic = "force-dynamic";
+
+export default async function RepairOrderPage({
+  params,
+}: {
+  params: Promise<{ locale: string; id: string }>;
+}) {
+  const { locale, id } = await params;
+  if (!isLocale(locale)) notFound();
+  const session = await requirePagePermission(locale, "repair_order.read", {
+    entityType: "repair_order",
+    entityId: id,
+  });
+
+  const ro = await getRepairOrder(getDb(), session.roles, id);
+  if (!ro) notFound();
+  const canExclude = hasPermission(session.roles, "media.exclude");
+  const canAssign = hasPermission(session.roles, "inspection.assign");
+  const inspection = await getInspection(getDb(), id);
+  const technicians = canAssign ? await listTechnicians(getDb()) : [];
+  const estimate = hasPermission(session.roles, "estimate.read") ? await estimateView(getDb(), id) : null;
+  const qc = await qcView(getDb(), id);
+  const latestQc = qc?.records[0] ?? null;
+  const activeFindings = inspection?.findings.filter((finding) => finding.status === "active") ?? [];
+  const countOf = (severity: string) =>
+    activeFindings.filter((finding) => finding.severity === severity).length;
+  const vehicleTitle = t(locale, "vehicle.summary", {
+    make: ro.make,
+    model: ro.model,
+    year: String(ro.year),
+  });
+  const none = t(locale, "repairOrder.none");
+  const canChangeContact =
+    hasPermission(session.roles, "repair_order.change_contact") &&
+    CONTACT_CHANGE_OPEN.includes(ro.status) &&
+    ro.contactMobile !== null;
+  const owner = canChangeContact ? await ownerForContactChange(getDb(), ro.customerId, locale) : null;
+  const contactChanges = await contactHistory(getDb(), id);
+  // I2-09 (OD-71): while the car is Ready, the message telling the customer, and what happened to the last one.
+  const lastReady =
+    ro.status === "ready" && hasPermission(session.roles, "message.share")
+      ? await latestMessage(getDb(), id, "vehicle_ready")
+      : undefined;
+  const readyMessage =
+    lastReady === undefined
+      ? null
+      : {
+          status: !lastReady
+            ? null
+            : lastReady.sharedAt
+              ? t(locale, "share.lastSent", {
+                  time: formatDubaiDateTime(lastReady.sharedAt, locale),
+                  name: `\u2068${lastReady.sharedByName ?? ""}\u2069`,
+                })
+              : t(locale, "share.unsent", { time: formatDubaiDateTime(lastReady.preparedAt, locale) }),
+        };
+
+  return (
+    <>
+      <PageHeader
+        title={
+          <>
+            {t(locale, "repairOrder.title")} <bdi dir="ltr">{ro.number}</bdi>
+          </>
+        }
+        subtitle={
+          <>
+            {ro.plate ? <PlateBadge locale={locale} plate={ro.plate} /> : null}{" "}
+            <bdi dir="ltr">{vehicleTitle}</bdi>{" "}
+            <StatusChip>{t(locale, `repairOrder.status.${ro.status}` as MessageKey)}</StatusChip>
+          </>
+        }
+      />
+
+      <Card title={t(locale, "checkIn.section.contact")}>
+        <dl className="detail-list">
+          <dt>{t(locale, "checkIn.customer")}</dt>
+          <dd>
+            <a href={`/${locale}/customers/${ro.customerId}`}>{ro.customerName}</a>
+          </dd>
+          <dt>{t(locale, "checkIn.contactName")}</dt>
+          <dd dir="auto">{ro.contactName}</dd>
+          <dt>{t(locale, "checkIn.relationship")}</dt>
+          <dd>
+            {ro.contactRelationship ? t(locale, `checkIn.relationship.${ro.contactRelationship}`) : none}
+          </dd>
+          {ro.contactMobile ? (
+            <>
+              <dt>{t(locale, "customer.new.mobile")}</dt>
+              <dd>
+                <bdi dir="ltr">{ro.contactMobile}</bdi>
+              </dd>
+            </>
+          ) : null}
+        </dl>
+        {contactChanges.length > 0 ? (
+          <section className="contact-history" data-testid="contact-history">
+            <h3>{t(locale, "contact.history")}</h3>
+            <ul className="result-list">
+              {contactChanges.map((change) => (
+                <li key={change.id}>
+                  <p>
+                    {t(locale, "contact.historyChange", {
+                      old: `\u2068${change.oldName}\u2069`,
+                      new: `\u2068${change.newName}\u2069`,
+                    })}{" "}
+                    ({t(locale, `checkIn.relationship.${change.newRelationship}`)}):{" "}
+                    <bdi>{change.reason}</bdi>
+                  </p>
+                  <p className="muted">
+                    {t(locale, `contact.authorizedShort.${change.authorizedBy}`)} ·{" "}
+                    {change.verification === "callback"
+                      ? t(locale, "contact.verifiedCallback", { name: `⁨${change.spokenTo ?? ""}⁩` })
+                      : t(locale, "contact.verifiedInPerson", { name: `⁨${change.signerName ?? ""}⁩` })}{" "}
+                    · <bdi>{change.changedByName}</bdi>, {formatDubaiDateTime(change.changedAt, locale)}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+        {canChangeContact && owner && ro.contactName && ro.contactMobile ? (
+          <details className="disclosure">
+            <summary>{t(locale, "contact.change")}</summary>
+            <ContactChangeForm
+              locale={locale}
+              repairOrderId={id}
+              current={{
+                name: ro.contactName,
+                mobile: ro.contactMobile,
+                relationship: ro.contactRelationship ?? "",
+              }}
+              owner={owner}
+              idempotencyKey={randomUUID()}
+            />
+          </details>
+        ) : null}
+      </Card>
+
+      <Card title={t(locale, "checkIn.section.arrival")}>
+        <dl className="detail-list">
+          <dt>{t(locale, "repairOrder.checkedIn")}</dt>
+          <dd>
+            <bdi>{formatDubaiDateTime(ro.checkedInAt, locale)}</bdi>
+            {ro.checkedInByName ? (
+              <>
+                {t(locale, "common.listSeparator")}
+                {ro.checkedInByName}
+              </>
+            ) : null}
+          </dd>
+          <dt>{t(locale, "checkIn.odometer")}</dt>
+          <dd>
+            <bdi dir="ltr">{ro.odometerKm}</bdi>
+          </dd>
+          <dt>{t(locale, "checkIn.fuel")}</dt>
+          <dd>
+            {ro.fuelEighths === null ? none : t(locale, `checkIn.fuel.${ro.fuelEighths}` as MessageKey)}
+          </dd>
+          <dt>{t(locale, "checkIn.concerns")}</dt>
+          <dd dir="auto">{ro.concerns}</dd>
+          <dt>{t(locale, "checkIn.warningLights")}</dt>
+          <dd dir="auto">{ro.warningLights ?? none}</dd>
+          <dt>{t(locale, "checkIn.belongings")}</dt>
+          <dd dir="auto">{ro.belongings ?? none}</dd>
+          <dt>{t(locale, "checkIn.keysReceived")}</dt>
+          <dd>
+            {ro.keysReceived === null ? none : <bdi dir="ltr">{ro.keysReceived}</bdi>}
+            {ro.keyTag ? (
+              <>
+                {t(locale, "common.listSeparator")}
+                <bdi dir="ltr">{ro.keyTag}</bdi>
+              </>
+            ) : null}
+          </dd>
+          <dt>{t(locale, "checkIn.promisedAt")}</dt>
+          <dd>
+            {ro.promisedAt ? (
+              <bdi>{formatDubaiDateTime(ro.promisedAt, locale)}</bdi>
+            ) : (
+              t(locale, "checkIn.promisedTbc")
+            )}
+          </dd>
+          {ro.photoShortfallReason ? (
+            <>
+              <dt>{t(locale, "checkIn.shortfallReason")}</dt>
+              <dd dir="auto">{ro.photoShortfallReason}</dd>
+            </>
+          ) : null}
+        </dl>
+      </Card>
+
+      <Card
+        title={t(locale, "inspection.title")}
+        actions={
+          <a className="btn btn-secondary" href={`/${locale}/repair-orders/${ro.id}/inspection`}>
+            {t(locale, "inspection.open")}
+          </a>
+        }
+      >
+        <dl className="detail-list">
+          <dt>{t(locale, "inspection.technician")}</dt>
+          <dd>{inspection?.technician?.displayName ?? t(locale, "inspection.unassigned")}</dd>
+          <dt>{t(locale, "inspection.findings")}</dt>
+          <dd>
+            {activeFindings.length === 0
+              ? t(locale, "inspection.noFindings")
+              : t(locale, "inspection.findingCounts", {
+                  urgent: String(countOf("urgent")),
+                  soon: String(countOf("soon")),
+                  ok: String(countOf("ok")),
+                })}
+          </dd>
+        </dl>
+        {canAssign && (ro.status === "checked_in" || ro.status === "diagnosing") ? (
+          <AssignInspectionForm
+            locale={locale}
+            repairOrderId={ro.id}
+            technicians={technicians}
+            currentTechnicianId={inspection?.technician?.userId ?? null}
+          />
+        ) : null}
+      </Card>
+
+      {qc && (qc.status === "in_progress" || qc.status === "qc" || latestQc) ? (
+        <Card
+          title={t(locale, "qc.title")}
+          actions={
+            hasPermission(session.roles, "qc.decide") ? (
+              <a className="btn btn-secondary" href={`/${locale}/repair-orders/${ro.id}/qc`}>
+                {t(locale, "qc.open")}
+              </a>
+            ) : undefined
+          }
+        >
+          <p>
+            {latestQc
+              ? t(locale, `qc.status.${latestQc.status}` as MessageKey)
+              : t(locale, `qc.blocker.${qc.blocker ?? "ready"}` as MessageKey)}
+          </p>
+          {!latestQc &&
+          (qc.blocker === "decision_pending" || qc.blocker === "draft_open") &&
+          hasPermission(session.roles, "estimate.send") ? (
+            // X-12 / OD-59: withdraw a version nobody answers, or send or discard an unsent draft (I2-01).
+            <p>
+              <a href={`/${locale}/repair-orders/${ro.id}/estimate`}>{t(locale, "qc.openEstimate")}</a>
+            </p>
+          ) : null}
+          {qc.blocker === null && hasPermission(session.roles, "qc.request") ? (
+            <ActionForm
+              locale={locale}
+              action={requestQcAction}
+              hidden={{ repairOrderId: ro.id, idempotencyKey: randomUUID() }}
+              submit="qc.request"
+              variant="primary"
+            />
+          ) : null}
+        </Card>
+      ) : null}
+
+      {hasPermission(session.roles, "invoice.read") ? (
+        <InvoiceCard
+          locale={locale}
+          repairOrderId={ro.id}
+          canIssue={hasPermission(session.roles, "invoice.issue")}
+          qcPassed={latestQc?.status === "passed"}
+        />
+      ) : null}
+
+      {readyMessage ? (
+        <ReadyMessageCard locale={locale} repairOrderId={ro.id} status={readyMessage.status} />
+      ) : null}
+
+      {hasPermission(session.roles, "invoice.read") ? (
+        <SettlementCard
+          locale={locale}
+          repairOrderId={ro.id}
+          status={ro.status}
+          roles={session.roles}
+          qc={
+            latestQc?.status === "passed"
+              ? { oldParts: latestQc.oldParts, odometerOutKm: latestQc.odometerOutKm }
+              : null
+          }
+        />
+      ) : null}
+
+      {hasPermission(session.roles, "estimate.read") ? (
+        <Card
+          title={t(locale, "estimate.title")}
+          actions={
+            <a className="btn btn-secondary" href={`/${locale}/repair-orders/${ro.id}/estimate`}>
+              {t(locale, "estimate.open")}
+            </a>
+          }
+        >
+          {estimate ? (
+            <dl className="detail-list">
+              <dt>{t(locale, "estimate.version", { no: String(estimate.versionNo) })}</dt>
+              <dd>{t(locale, `estimate.status.${estimate.status}` as MessageKey)}</dd>
+              <dt>{t(locale, "estimate.jobs")}</dt>
+              <dd>
+                <bdi dir="ltr">{estimate.jobs.length}</bdi>
+              </dd>
+              <dt>{t(locale, "estimate.total")}</dt>
+              <dd>
+                <bdi>{formatAed(Money.parse(estimate.totals.total), locale)}</bdi>
+              </dd>
+            </dl>
+          ) : (
+            <p className="muted">{t(locale, "estimate.none")}</p>
+          )}
+        </Card>
+      ) : null}
+
+      <Card title={t(locale, "checkIn.section.photos")}>
+        <p className="muted">{t(locale, "repairOrder.photosLocked")}</p>
+        <div className="photo-grid">
+          {ro.photos.map((photo) => {
+            const label = t(locale, `checkIn.slot.${photo.slot}` as MessageKey);
+            return (
+              <div
+                key={photo.id}
+                className={photo.excluded ? "photo-slot filled excluded" : "photo-slot filled"}
+              >
+                <span className="slot-name">{label}</span>
+                <a href={`/api/media/${photo.id}`} target="_blank" rel="noreferrer">
+                  {/* A plain <img>: the photo comes from the private, authorized /api/media endpoint. */}
+                  <img src={`/api/media/${photo.id}`} alt={label} />
+                </a>
+                {photo.excluded ? (
+                  <p>
+                    <StatusChip tone="neutral">{t(locale, "repairOrder.excluded")}</StatusChip>{" "}
+                    {photo.excluded.reason}
+                  </p>
+                ) : canExclude ? (
+                  <details className="disclosure">
+                    <summary>{t(locale, "repairOrder.excludePhoto")}</summary>
+                    <ExcludePhotoForm locale={locale} repairOrderId={ro.id} mediaId={photo.id} />
+                  </details>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      </Card>
+    </>
+  );
+}
