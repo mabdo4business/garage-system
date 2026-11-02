@@ -62,6 +62,12 @@ export default async function PartsPage({ params }: { params: Promise<{ locale: 
                 <StatusChip tone={line.stockTracked ? "info" : "neutral"}>
                   {t(locale, line.stockTracked ? "parts.stockPart" : "parts.nonStock")}
                 </StatusChip>
+                {line.frozen ? (
+                  <>
+                    {" "}
+                    <StatusChip tone="warning">{t(locale, "parts.lineFrozen")}</StatusChip>
+                  </>
+                ) : null}
               </p>
               <p className="muted">
                 {t(locale, "parts.progress", {
@@ -77,7 +83,8 @@ export default async function PartsPage({ params }: { params: Promise<{ locale: 
                 {t(locale, "common.listSeparator")}
                 {t(locale, "parts.cost")}: <bdi>{formatAed(Money.parse(line.cost), locale)}</bdi>
               </p>
-              {canIssue ? (
+              {/* AC21-08: a line awaiting the customer's decision takes no parts (refused on the server too). */}
+              {canIssue && !line.frozen ? (
                 <div className="form-actions">
                   {line.stockTracked ? (
                     <details className="disclosure">

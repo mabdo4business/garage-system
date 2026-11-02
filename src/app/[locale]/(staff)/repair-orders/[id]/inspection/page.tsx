@@ -6,6 +6,7 @@ import { formatDubaiDateTime } from "../../../../../../i18n/format";
 import { NotFoundError } from "../../../../../../server/core/errors";
 import { getDb } from "../../../../../../server/db/client";
 import { requireRepairOrderAccess } from "../../../../../../server/inspection/access";
+import { OPEN_FOR_FINDINGS } from "../../../../../../server/inspection/commands";
 import {
   getInspection,
   listChecklistTemplates,
@@ -42,7 +43,8 @@ export default async function InspectionPage({
   const inspection = await getInspection(db, id);
   if (!inspection) notFound();
 
-  const open = inspection.status === "checked_in" || inspection.status === "diagnosing";
+  // OD-72: findings are recorded during work too.
+  const open = (OPEN_FOR_FINDINGS as readonly string[]).includes(inspection.status);
   const templates = await listChecklistTemplates(db);
   const query = await searchParams;
   const templateCode = typeof query.template === "string" ? query.template : "";

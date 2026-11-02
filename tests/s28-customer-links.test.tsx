@@ -516,7 +516,7 @@ describe("S28 — customer links", () => {
       .where("estimate.repair_order_id", "=", ro)
       .executeTakeFirstOrThrow();
     const snapshot = version.snapshot as EstimateSnapshot;
-    expect(snapshot.schema).toBe(3);
+    expect(snapshot.schema).toBe(4);
     expect(snapshot.jobs.map((job) => job.finding)).toEqual([
       { customerNote: "CUSTOMER-NOTE: pads are at 2 mm", faultCodes: ["C1234", "B0001"], photoIds: [shown] },
       null,

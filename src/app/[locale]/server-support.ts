@@ -143,6 +143,18 @@ const ERROR_KEYS: Record<string, MessageKey> = {
   possible_duplicate: "error.possibleDuplicate",
   not_ready: "error.notReady",
   balance_due: "error.balanceDue",
+  // I2-02a amendments
+  not_amendable: "error.notAmendable",
+  amendment_open: "error.amendmentOpen",
+  no_amendment: "error.noAmendment",
+  line_not_authorized: "error.lineNotAuthorized",
+  line_already_replaced: "error.lineAlreadyReplaced",
+  line_billed: "error.lineBilled",
+  line_has_parts: "error.lineHasParts",
+  line_type_differs: "error.lineTypeDiffers",
+  price_not_higher: "error.priceNotHigher",
+  line_not_replaceable: "error.lineNotReplaceable",
+  line_awaiting_decision: "error.lineAwaitingDecision",
 };
 
 /**

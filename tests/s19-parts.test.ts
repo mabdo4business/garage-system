@@ -394,7 +394,8 @@ describe("S19 — parts for a job", () => {
       await sql`ALTER TABLE job_revision ENABLE TRIGGER USER`.execute(tx);
       await sql`ALTER TABLE revision_line ENABLE TRIGGER USER`.execute(tx);
     });
-    await expect(issue(frozen.partLines[0]!, "1")).rejects.toMatchObject({ code: "line_not_issuable" });
+    // I2-02a: the refusal names the reason (AC21-08 "Line awaiting customer decision").
+    await expect(issue(frozen.partLines[0]!, "1")).rejects.toMatchObject({ code: "line_awaiting_decision" });
     // The database refuses too.
     const forged = await sqlErrorAs(
       db.appUrl,

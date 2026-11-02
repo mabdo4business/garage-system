@@ -8,12 +8,14 @@ import { EMPTY_FORM_STATE } from "../../../../form-state";
 import {
   addJobAction,
   addLineAction,
+  amendJobAction,
   discardDraftAction,
   discountAction,
   excludeFindingAction,
   openEstimateAction,
   removeJobAction,
   removeLineAction,
+  replaceLineAction,
   reproposeAction,
   sendEstimateAction,
   startVersionAction,
@@ -40,6 +42,8 @@ const ACTIONS = {
   withdraw: withdrawAction,
   discard: discardDraftAction,
   repropose: reproposeAction,
+  amend: amendJobAction,
+  replace: replaceLineAction,
 } as const;
 
 export interface StepField {

@@ -9,7 +9,7 @@ import type {
   JobExecutionStatus,
   RepairOrderStatus,
 } from "../db/schema";
-import { authorizedScope } from "../estimate/approval";
+import { authorizedScope, frozenLines, hasPendingAmendment } from "../estimate/approval";
 import { notInformed } from "../messages/queries";
 import { qcBlockerOf, type QcBlocker } from "../quality/queries";
 
@@ -260,7 +260,11 @@ export interface JobCard {
     partsQty: string | null;
     outcome: "done" | "not_performed" | null;
     reason: string | null;
+    /** Replaced by a change awaiting the customer (AC21-08): no parts until they decide. */
+    frozen: boolean;
   }[];
+  /** A change of this job awaits the customer's decision (I2-02a); its work is not shown until approved. */
+  changeAwaitingCustomer: boolean;
   /** Approved labour hours of the job in seconds (UI-R3 timer); null without a labour line. */
   bookedSeconds: number | null;
   /** The latest approval of a still-approved revision of this job (AC2-01): how and when, nothing about amounts. */
@@ -362,6 +366,10 @@ export async function jobCard(db: Kysely<DB>, jobId: string): Promise<JobCard | 
           .where("revision_line.id", "in", scope)
           .orderBy("revision_line.created_at")
           .execute();
+  const frozen = await frozenLines(
+    db,
+    lines.map((line) => line.id),
+  );
   const history = await db
     .selectFrom("job_status_event")
     .leftJoin("app_user", "app_user.id", "job_status_event.actor_id")
@@ -431,7 +439,9 @@ export async function jobCard(db: Kysely<DB>, jobId: string): Promise<JobCard | 
       partsQty: line.line_type === "part" ? (line.parts_qty ?? "0.000") : null,
       outcome: line.outcome,
       reason: line.reason,
+      frozen: frozen.has(line.id),
     })),
+    changeAwaitingCustomer: await hasPendingAmendment(db, jobId),
     bookedSeconds: bookedSecondsOf(lines),
     approval: approval ? { method: approval.method, recordedAt: approval.recorded_at } : null,
     history: history.map((event) => ({

@@ -1,4 +1,4 @@
-import type { Kysely } from "kysely";
+import { sql, type Kysely } from "kysely";
 import { canonicalJson, sha256Hex } from "../core/json";
 import { Money } from "../core/money";
 import type { DB, Emirate } from "../db/schema";
@@ -18,8 +18,10 @@ import { sumLines } from "./pricing";
  * 2 (I2-01): adds `earlierApproved`, the work approved in earlier versions, shown as context only.
  * 3 (I2-03a): adds `finding` per job — what the customer is shown about the inspection finding a job comes from
  * (customer note, fault codes per OD-63, the photos marked for the customer, OD-11), so the hash covers it too.
+ * 4 (I2-02a): a line of an amendment names the approved line it replaces (`replaces`), and `earlierApproved` totals
+ * count only the lines still authorized (a replaced line counts under the revision that replaced it).
  */
-export const SNAPSHOT_SCHEMA = 3;
+export const SNAPSHOT_SCHEMA = 4;
 
 export interface SnapshotLine {
   lineId: string;
@@ -36,6 +38,17 @@ export interface SnapshotLine {
   vat: string;
   taxCode: string;
   taxRate: string;
+  /** Since schema 4: the approved line this one replaces (price change or substitution), as approved. */
+  replaces?: SnapshotReplacedLine;
+}
+
+export interface SnapshotReplacedLine {
+  lineId: string;
+  descriptionEn: string;
+  descriptionAr: string;
+  unit: string | null;
+  qty: string;
+  total: string;
 }
 
 export interface SnapshotJob {
@@ -143,7 +156,9 @@ export async function buildSnapshot(
       "finding.customer_note",
       "finding.fault_codes",
       "job_revision.id as revision_id",
-      "job_revision.kind",
+      // A draft amendment's kind follows from its lines (T-47); sending fixes the same value on the revision.
+      sql<string>`CASE WHEN job_revision.status = 'draft' AND job_revision.kind = 'add_scope'
+                   THEN amendment_kind(job_revision.id) ELSE job_revision.kind END`.as("kind"),
     ])
     .where("job_revision.proposed_in_version_id", "=", versionId)
     .where("repair_job.removed_at", "is", null)
@@ -198,18 +213,40 @@ export async function buildSnapshot(
     .orderBy("repair_job.created_at")
     .orderBy("repair_job.id")
     .execute();
+  // Lines still authorized: not superseded by a line of another approved revision (§2.1 #7).
   const approvedLines =
     approved.length === 0
       ? []
       : await db
           .selectFrom("revision_line")
           .select(["revision_id", "line_total"])
+          .where(({ not, exists, selectFrom }) =>
+            not(
+              exists(
+                selectFrom("revision_line as s")
+                  .innerJoin("job_revision as sr", "sr.id", "s.revision_id")
+                  .select("s.id")
+                  .whereRef("s.supersedes_line_id", "=", "revision_line.id")
+                  .where("sr.status", "=", "approved"),
+              ),
+            ),
+          )
           .where(
             "revision_id",
             "in",
             approved.map((row) => row.revision_id),
           )
           .where("removed_at", "is", null)
+          .execute();
+
+  const replacedIds = lines.flatMap((line) => (line.supersedes_line_id ? [line.supersedes_line_id] : []));
+  const replaced =
+    replacedIds.length === 0
+      ? []
+      : await db
+          .selectFrom("revision_line")
+          .select(["id", "description_en", "description_ar", "unit", "qty", "line_total"])
+          .where("id", "in", replacedIds)
           .execute();
 
   const amounts = lines.map((line) => ({
@@ -221,6 +258,22 @@ export async function buildSnapshot(
     rate: line.tax_rate,
   }));
   const totals = sumLines(amounts);
+
+  const replacesOf = (lineId: string | null): { replaces?: SnapshotReplacedLine } => {
+    const row = lineId === null ? undefined : replaced.find((candidate) => candidate.id === lineId);
+    return row
+      ? {
+          replaces: {
+            lineId: row.id,
+            descriptionEn: row.description_en,
+            descriptionAr: row.description_ar,
+            unit: row.unit,
+            qty: row.qty,
+            total: row.line_total,
+          },
+        }
+      : {};
+  };
 
   return {
     schema: SNAPSHOT_SCHEMA,
@@ -271,19 +324,22 @@ export async function buildSnapshot(
           vat: line.vat,
           taxCode: line.tax_code,
           taxRate: line.tax_rate,
+          ...replacesOf(line.supersedes_line_id),
         })),
       };
     }),
-    earlierApproved: approved.map((row) => ({
-      jobId: row.job_id,
-      revisionId: row.revision_id,
-      title: row.title,
-      versionNo: row.version_no,
-      total: approvedLines
-        .filter((line) => line.revision_id === row.revision_id)
-        .reduce((sum, line) => sum.add(Money.parse(line.line_total)), Money.ZERO)
-        .toString(),
-    })),
+    earlierApproved: approved
+      .filter((row) => approvedLines.some((line) => line.revision_id === row.revision_id))
+      .map((row) => ({
+        jobId: row.job_id,
+        revisionId: row.revision_id,
+        title: row.title,
+        versionNo: row.version_no,
+        total: approvedLines
+          .filter((line) => line.revision_id === row.revision_id)
+          .reduce((sum, line) => sum.add(Money.parse(line.line_total)), Money.ZERO)
+          .toString(),
+      })),
     totals: {
       gross: totals.gross.toString(),
       discount: totals.discount.toString(),

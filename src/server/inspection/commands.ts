@@ -20,13 +20,21 @@ import { canAccessRepairOrder } from "./access";
 export type Staff = Pick<SessionUser, "userId" | "roles">;
 
 export const SEVERITIES: readonly FindingSeverity[] = ["ok", "soon", "urgent"];
+/** The inspection is assigned while the car is checked in or diagnosed (OD-8). */
 const OPEN_FOR_INSPECTION = ["checked_in", "diagnosing"] as const;
+/** Findings are recorded, edited and withdrawn during work too (OD-72), so extra work reaches the next version. */
+export const OPEN_FOR_FINDINGS = ["checked_in", "diagnosing", "in_progress"] as const;
 const FAULT_CODE = /^[A-Z0-9-]{2,12}$/;
 
 const actorOf = (staff: Staff) => ({ kind: "user" as const, userId: staff.userId });
 
 /** Locks the repair order and checks it is open for inspection and visible to this person. */
-async function lockInspection(ctx: CommandContext, staff: Staff, repairOrderId: string) {
+async function lockInspection(
+  ctx: CommandContext,
+  staff: Staff,
+  repairOrderId: string,
+  open: readonly string[] = OPEN_FOR_FINDINGS,
+) {
   await ctx.locks.acquire("repair_order", [repairOrderId]);
   const ro = await ctx.tx
     .selectFrom("repair_order")
@@ -36,7 +44,7 @@ async function lockInspection(ctx: CommandContext, staff: Staff, repairOrderId: 
   if (!(await canAccessRepairOrder(ctx.tx, staff, repairOrderId))) {
     throw new NotFoundError("repair_order", repairOrderId);
   }
-  if (!(OPEN_FOR_INSPECTION as readonly string[]).includes(ro.status)) {
+  if (!open.includes(ro.status)) {
     throw new ConflictError("inspection_closed", `Repair order is ${ro.status}`, { status: ro.status });
   }
   return ro;
@@ -55,7 +63,7 @@ export async function assignInspection(
     throw new ValidationError("Choose a technician", { field: "technicianUserId" });
   }
   return runCommand(db, { name: "inspection.assign", actor: actorOf(staff) }, async (ctx) => {
-    const ro = await lockInspection(ctx, staff, repairOrderId);
+    const ro = await lockInspection(ctx, staff, repairOrderId, OPEN_FOR_INSPECTION);
     const technician = await ctx.tx
       .selectFrom("app_user")
       .innerJoin("user_role", "user_role.user_id", "app_user.id")

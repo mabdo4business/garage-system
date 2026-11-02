@@ -13,6 +13,7 @@ import {
   updateLineQty,
 } from "../../../../../../server/estimate/commands";
 import { sendVersion } from "../../../../../../server/estimate/approval";
+import { amendJob, replaceLine } from "../../../../../../server/estimate/amendments";
 import {
   discardDraft,
   reproposeJob,
@@ -192,5 +193,27 @@ export async function reproposeAction(previous: FormState, formData: FormData): 
   return run(previous, formData, [], async () => {
     const session = await requireActionPermission("estimate.edit");
     await reproposeJob(getDb(), session, field(formData, "jobId"), field(formData, "idempotencyKey"));
+  });
+}
+
+// --------------------------------------------------------------------------- I2-02a amendments
+
+export async function amendJobAction(previous: FormState, formData: FormData): Promise<FormState> {
+  return run(previous, formData, [], async () => {
+    const session = await requireActionPermission("estimate.edit");
+    await amendJob(getDb(), session, field(formData, "jobId"), field(formData, "idempotencyKey"));
+  });
+}
+
+export async function replaceLineAction(previous: FormState, formData: FormData): Promise<FormState> {
+  return run(previous, formData, ["itemId", "qty"], async (_, values) => {
+    const session = await requireActionPermission("estimate.edit");
+    await replaceLine(
+      getDb(),
+      session,
+      field(formData, "lineId"),
+      { itemId: values.itemId, qty: values.qty },
+      field(formData, "idempotencyKey"),
+    );
   });
 }

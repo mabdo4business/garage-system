@@ -199,7 +199,7 @@ export default async function EstimatePage({ params }: { params: Promise<{ local
     { name: "qty", label: "estimate.qty", required: true, inputMode: "decimal", defaultValue: "1" },
   ];
 
-  const unitLabel = (line: EstimateLineView) =>
+  const unitLabel = (line: Pick<EstimateLineView, "unit">) =>
     line.unit === "hour"
       ? t(locale, "estimate.unit.hour")
       : line.unit
@@ -328,7 +328,22 @@ export default async function EstimatePage({ params }: { params: Promise<{ local
       {view.earlierApproved.length > 0 ? (
         <Card title={t(locale, "estimate.approvedEarlier")}>
           <p className="muted">{t(locale, "estimate.approvedEarlierHint")}</p>
-          <EarlierList locale={locale} jobs={view.earlierApproved} />
+          <EarlierList
+            locale={locale}
+            jobs={view.earlierApproved}
+            action={(job) =>
+              canEdit && job.amendable ? (
+                // I2-02a: a change of approved work (added scope, price change, substitution).
+                <StepForm
+                  locale={locale}
+                  action="amend"
+                  hidden={{ repairOrderId: id, jobId: job.jobId, idempotencyKey: randomUUID() }}
+                  submit="estimate.amend"
+                  inline
+                />
+              ) : null
+            }
+          />
         </Card>
       ) : null}
       {view.reofferable.length > 0 ? (
@@ -456,6 +471,16 @@ export default async function EstimatePage({ params }: { params: Promise<{ local
                   {t(locale, `finding.severity.${job.findingSeverity}` as MessageKey)}
                 </StatusChip>
               ) : null}{" "}
+              {job.revisionKind !== "original" ? (
+                <StatusChip tone="info">
+                  {t(
+                    locale,
+                    (job.revisionStatus === "draft"
+                      ? "estimate.kind.amendment"
+                      : `estimate.kind.${job.revisionKind}`) as MessageKey,
+                  )}
+                </StatusChip>
+              ) : null}{" "}
               {job.revisionStatus !== "draft" ? (
                 <StatusChip tone={REVISION_TONE[job.revisionStatus] ?? "neutral"}>
                   {t(locale, `estimate.revision.${job.revisionStatus}` as MessageKey)}
@@ -484,6 +509,16 @@ export default async function EstimatePage({ params }: { params: Promise<{ local
                     <tr key={line.id}>
                       <td>
                         <bdi>{name(line)}</bdi>
+                        {line.replaces ? (
+                          <span className="estimate-replaces muted">
+                            {t(locale, "estimate.line.replaces")} <bdi>{name(line.replaces)}</bdi>
+                            {t(locale, "common.listSeparator")}
+                            <bdi dir="ltr">{line.replaces.qty.replace(/\.?0+$/, "")}</bdi>{" "}
+                            {unitLabel(line.replaces)}
+                            {t(locale, "common.listSeparator")}
+                            {aed(line.replaces.total, locale)}
+                          </span>
+                        ) : null}
                       </td>
                       <td className="num">
                         <bdi dir="ltr">{line.qty.replace(/\.?0+$/, "")}</bdi> {unitLabel(line)}
@@ -546,6 +581,57 @@ export default async function EstimatePage({ params }: { params: Promise<{ local
           <p className="estimate-job-total">
             {t(locale, "estimate.jobTotal")} <strong>{aed(job.total, locale)}</strong>
           </p>
+          {job.lines.some((line) => line.replaces) ? (
+            <p className="estimate-job-difference muted">
+              {(() => {
+                const replaced = job.lines.reduce(
+                  (sum, line) => (line.replaces ? sum.add(Money.parse(line.replaces.total)) : sum),
+                  Money.ZERO,
+                );
+                const difference = Money.parse(job.total).sub(replaced);
+                return (
+                  <>
+                    {t(locale, "estimate.replacedWorth")} {aed(replaced.toString(), locale)}
+                    {t(locale, "common.listSeparator")}
+                    {t(locale, "estimate.difference")} {difference.isNegative() ? "−" : "+"}{" "}
+                    {aed(
+                      (difference.isNegative() ? Money.ZERO.sub(difference) : difference).toString(),
+                      locale,
+                    )}
+                  </>
+                );
+              })()}
+            </p>
+          ) : null}
+          {canEdit && job.replaceable.length > 0 ? (
+            <details className="disclosure">
+              <summary>{t(locale, "estimate.replaceLine")}</summary>
+              <p className="muted">{t(locale, "estimate.replaceHint")}</p>
+              <ul className="result-list replace-lines">
+                {job.replaceable.map((line) => (
+                  <li key={line.id}>
+                    <span>
+                      <bdi>{name(line)}</bdi>
+                      {t(locale, "common.listSeparator")}
+                      <bdi dir="ltr">{line.qty.replace(/\.?0+$/, "")}</bdi> {unitLabel(line)}
+                      {t(locale, "common.listSeparator")}
+                      {aed(line.total, locale)}
+                    </span>
+                    <StepForm
+                      locale={locale}
+                      action="replace"
+                      hidden={{ repairOrderId: id, lineId: line.id, idempotencyKey: randomUUID() }}
+                      fields={[
+                        { ...lineFields[0]!, defaultValue: line.itemId ?? "" },
+                        { ...lineFields[1]!, defaultValue: line.qty.replace(/\.?0+$/, "") },
+                      ]}
+                      submit="estimate.replace"
+                    />
+                  </li>
+                ))}
+              </ul>
+            </details>
+          ) : null}
           {canEdit ? (
             <>
               <details className="disclosure">
@@ -559,22 +645,36 @@ export default async function EstimatePage({ params }: { params: Promise<{ local
                   variant="primary"
                 />
               </details>
-              <details className="disclosure">
-                <summary>{t(locale, "estimate.removeJob")}</summary>
-                <StepForm
-                  locale={locale}
-                  action="removeJob"
-                  hidden={{ repairOrderId: id, jobId: job.id, idempotencyKey: randomUUID() }}
-                  fields={[
-                    {
-                      name: "reason",
-                      label: "estimate.removeReason",
-                      required: job.findingSeverity === "urgent",
-                    },
-                  ]}
-                  submit="estimate.removeJob"
-                />
-              </details>
+              {job.revisionKind !== "original" ? (
+                <details className="disclosure">
+                  <summary>{t(locale, "estimate.discardChange")}</summary>
+                  <p className="muted">{t(locale, "estimate.discardChangeHint")}</p>
+                  <StepForm
+                    locale={locale}
+                    action="removeJob"
+                    hidden={{ repairOrderId: id, jobId: job.id, idempotencyKey: randomUUID() }}
+                    submit="estimate.discardChange"
+                    variant="quiet"
+                  />
+                </details>
+              ) : (
+                <details className="disclosure">
+                  <summary>{t(locale, "estimate.removeJob")}</summary>
+                  <StepForm
+                    locale={locale}
+                    action="removeJob"
+                    hidden={{ repairOrderId: id, jobId: job.id, idempotencyKey: randomUUID() }}
+                    fields={[
+                      {
+                        name: "reason",
+                        label: "estimate.removeReason",
+                        required: job.findingSeverity === "urgent",
+                      },
+                    ]}
+                    submit="estimate.removeJob"
+                  />
+                </details>
+              )}
             </>
           ) : null}
         </Card>

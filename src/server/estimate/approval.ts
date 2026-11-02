@@ -2,6 +2,7 @@ import { sql, type Kysely } from "kysely";
 import { runCommand, type CommandContext, type CommandOutcome } from "../command/runner";
 import { ConflictError, NotFoundError, ValidationError } from "../core/errors";
 import { isUuid } from "../core/ids";
+import { Money } from "../core/money";
 import { taxCodeRateOn, taxProfileOn } from "../catalog/tax";
 import type { DB } from "../db/schema";
 import { inspectImage } from "../media/image";
@@ -115,6 +116,46 @@ export async function sendVersion(
         "urgent_finding_open",
         "Include or leave out every urgent finding before sending",
       );
+    }
+
+    // I2-02a (§2.3 guards, also enforced by the database on send): every line an amendment replaces may still be
+    // replaced — nothing billed and no parts or costs booked since it was drafted — and a price change on the same
+    // item still costs more after any quantity or discount edits.
+    const replacing = await ctx.tx
+      .selectFrom("revision_line as n")
+      .innerJoin("revision_line as o", "o.id", "n.supersedes_line_id")
+      .select([
+        "o.id as old_id",
+        "o.line_total as old_total",
+        "o.catalogue_item_id as old_item",
+        "n.line_total as new_total",
+        "n.catalogue_item_id as new_item",
+        "n.revision_id",
+        sql<boolean>`line_supersedable(o.id, n.revision_id)`.as("supersedable"),
+      ])
+      .where(
+        "n.revision_id",
+        "in",
+        jobs.map((job) => job.revision_id),
+      )
+      .where("n.removed_at", "is", null)
+      .execute();
+    for (const row of replacing) {
+      if (!row.supersedable) {
+        throw new ConflictError(
+          "line_not_replaceable",
+          "A replaced line was invoiced or has parts recorded since; take the replacement out",
+        );
+      }
+      if (
+        row.new_item === row.old_item &&
+        Money.parse(row.new_total).compare(Money.parse(row.old_total)) <= 0
+      ) {
+        throw new ConflictError(
+          "price_not_higher",
+          "The same item at the same or a lower amount is not a price change",
+        );
+      }
     }
 
     // T-21: the VAT rate on every line is the one in force today.
@@ -410,7 +451,13 @@ export async function recordDecisions(
     .selectFrom("job_revision")
     .innerJoin("repair_job", "repair_job.id", "job_revision.job_id")
     .leftJoin("finding", "finding.id", "repair_job.finding_id")
-    .select(["job_revision.id", "job_revision.job_id", "repair_job.title", "finding.severity"])
+    .select([
+      "job_revision.id",
+      "job_revision.job_id",
+      "job_revision.kind",
+      "repair_job.title",
+      "finding.severity",
+    ])
     .where("job_revision.proposed_in_version_id", "=", versionId)
     .where("job_revision.status", "=", "pending")
     .execute();
@@ -475,6 +522,26 @@ export async function recordDecisions(
         .where("id", "=", revision.job_id)
         .where("execution_status", "=", "not_authorized")
         .execute();
+      // v0.2.1 §3.3: an approved amendment of a done job adds work it has not done yet (new lines carry no
+      // outcome), so the job goes back to In progress for its assignee (I2-02a).
+      if (revision.kind !== "original") {
+        const reopened = await ctx.tx
+          .updateTable("repair_job")
+          .set({ execution_status: "in_progress", execution_reason: null, updated_by: evidence.recordedBy })
+          .where("id", "=", revision.job_id)
+          .where("execution_status", "=", "done")
+          .returning("id")
+          .executeTakeFirst();
+        if (reopened) {
+          await ctx.audit({
+            action: "job.reopened",
+            entityType: "repair_job",
+            entityId: revision.job_id,
+            before: { status: "done" },
+            after: { status: "in_progress", revisionId },
+          });
+        }
+      }
     }
     recorded.push({ jobId: revision.job_id, revisionId, decision, urgentAckPending });
   }
@@ -546,4 +613,33 @@ export async function authorizedScope(db: Kysely<DB>, jobId: string): Promise<st
 /** AC2-01: work may start only on a job with an approved revision. */
 export async function isJobAuthorized(db: Kysely<DB>, jobId: string): Promise<boolean> {
   return (await authorizedScope(db, jobId)).length > 0;
+}
+
+/**
+ * Of the given lines, those frozen (v0.2.1 §3.2, AC21-08): replaced by a line of an amendment still awaiting the
+ * customer's decision. They stay authorized but take no parts; the technician is told.
+ */
+export async function frozenLines(db: Kysely<DB>, lineIds: readonly string[]): Promise<Set<string>> {
+  if (lineIds.length === 0) return new Set();
+  const rows = await db
+    .selectFrom("revision_line")
+    .innerJoin("job_revision", "job_revision.id", "revision_line.revision_id")
+    .select("revision_line.supersedes_line_id")
+    .where("revision_line.supersedes_line_id", "in", [...lineIds])
+    .where("revision_line.removed_at", "is", null)
+    .where("job_revision.status", "=", "pending")
+    .execute();
+  return new Set(rows.flatMap((row) => (row.supersedes_line_id ? [row.supersedes_line_id] : [])));
+}
+
+/** Whether the job has an amendment awaiting the customer's decision (shown on the job card, I2-02a). */
+export async function hasPendingAmendment(db: Kysely<DB>, jobId: string): Promise<boolean> {
+  const row = await db
+    .selectFrom("job_revision")
+    .select("id")
+    .where("job_id", "=", jobId)
+    .where("status", "=", "pending")
+    .where("kind", "<>", "original")
+    .executeTakeFirst();
+  return row !== undefined;
 }
