@@ -996,6 +996,24 @@ textarea.internal {
   text-align: end;
 }
 
+/* I2-02a: the approved line a replacement replaces, under its description; the difference under the job total. */
+.estimate-replaces {
+  display: block;
+  margin-block-start: var(--space-1);
+  font-size: 0.875em;
+}
+.estimate-job-difference {
+  margin-block: var(--space-1) 0;
+  text-align: end;
+}
+.replace-lines li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
 /* I2-01: the version history line ("v1 Withdrawn · No response from customer"). */
 .estimate-versions ol {
   display: flex;

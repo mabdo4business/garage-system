@@ -948,5 +948,6 @@
   "error.lineTypeDiffers": "Replace a line with an item of the same type.",
   "error.priceNotHigher": "The same item at the same or a lower amount is not a price change.",
   "error.lineNotReplaceable": "A replaced line was invoiced or had parts recorded since. Take that replacement out.",
-  "error.lineAwaitingDecision": "Line awaiting customer decision."
+  "error.lineAwaitingDecision": "Line awaiting customer decision.",
+  "error.findingSent": "The customer has been shown this finding in an estimate, so it can no longer be changed. Record a new finding instead."
 }
