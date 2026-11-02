@@ -11,6 +11,18 @@ import type { EstimateSnapshot } from "../server/estimate/snapshot";
 
 const aed = (amount: string, locale: Locale) => <bdi>{formatAed(Money.parse(amount), locale)}</bdi>;
 const trimQty = (qty: string) => qty.replace(/\.?0+$/, "");
+/** A signed amount: "+30.00 AED" / "−20.00 AED" (the sign kept outside the bidi-isolated amount). */
+const signedAed = (amount: Money, locale: Locale) =>
+  amount.isNegative() ? (
+    <>
+      − <bdi>{formatAed(Money.ZERO.sub(amount), locale)}</bdi>
+    </>
+  ) : (
+    <>
+      + <bdi>{formatAed(amount, locale)}</bdi>
+    </>
+  );
+const AMENDMENT_KINDS = ["add_scope", "price_change", "substitution"];
 
 export function EstimateDocument({
   snapshot,
@@ -94,6 +106,12 @@ export function EstimateDocument({
         <section key={job.jobId} className="card estimate-document-job" data-revision={job.revisionId}>
           <header className="finding-head">
             <h2 dir="auto">{job.title}</h2>
+            {AMENDMENT_KINDS.includes(job.revisionKind) ? (
+              // Schema 4 (I2-02a): a change to work the customer already approved.
+              <StatusChip tone="info">
+                {t(locale, `estimate.kind.${job.revisionKind}` as MessageKey)}
+              </StatusChip>
+            ) : null}
             {job.findingSeverity === "urgent" ? (
               <StatusChip tone="danger">{t(locale, "finding.severity.urgent")}</StatusChip>
             ) : null}
@@ -120,6 +138,18 @@ export function EstimateDocument({
                   <tr key={line.lineId}>
                     <td>
                       <bdi>{locale === "ar" ? line.descriptionAr : line.descriptionEn}</bdi>
+                      {line.replaces ? (
+                        <span className="estimate-replaces muted" data-replaces={line.replaces.lineId}>
+                          {t(locale, "estimate.line.replaces")}{" "}
+                          <bdi>
+                            {locale === "ar" ? line.replaces.descriptionAr : line.replaces.descriptionEn}
+                          </bdi>
+                          {t(locale, "common.listSeparator")}
+                          <bdi dir="ltr">{trimQty(line.replaces.qty)}</bdi> {unit(line.replaces.unit)}
+                          {t(locale, "common.listSeparator")}
+                          {aed(line.replaces.total, locale)}
+                        </span>
+                      ) : null}
                     </td>
                     <td className="num">
                       <bdi dir="ltr">{trimQty(line.qty)}</bdi> {unit(line.unit)}
@@ -135,6 +165,20 @@ export function EstimateDocument({
           <p className="estimate-job-total">
             {t(locale, "estimate.jobTotal")} <strong>{aed(job.total, locale)}</strong>
           </p>
+          {(() => {
+            const replaced = job.lines.reduce(
+              (sum, line) => (line.replaces ? sum.add(Money.parse(line.replaces.total)) : sum),
+              Money.ZERO,
+            );
+            if (!job.lines.some((line) => line.replaces)) return null;
+            return (
+              <p className="estimate-job-difference muted" data-testid="job-difference">
+                {t(locale, "estimate.replacedWorth")} {aed(replaced.toString(), locale)}
+                {t(locale, "common.listSeparator")}
+                {t(locale, "estimate.difference")} {signedAed(Money.parse(job.total).sub(replaced), locale)}
+              </p>
+            );
+          })()}
         </section>
       ))}
       <section className="card">

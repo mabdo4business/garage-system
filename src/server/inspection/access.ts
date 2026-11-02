@@ -7,8 +7,9 @@ import { isUuid } from "../core/ids";
 import type { DB } from "../db/schema";
 
 /**
- * Who may see a repair order (AC2-30): staff with repair_order.read, or the technician currently
- * assigned to its inspection (OD-8). Anyone else gets "not found" — the response does not confirm
+ * Who may see a repair order's inspection (AC2-30): staff with repair_order.read, the technician currently
+ * assigned to its inspection (OD-8) while it is checked in or diagnosed, or — while the work runs — a technician
+ * holding one of its jobs, who may record findings found during work (OD-72). Anyone else gets "not found" — the response does not confirm
  * that the repair order exists — and the attempt is written to the audit log.
  */
 
@@ -35,15 +36,28 @@ export async function canAccessRepairOrder(
   if (!isUuid(repairOrderId)) return false;
   if (hasPermission(session.roles, "repair_order.read")) return true;
   if (!session.roles.includes("technician")) return false;
-  // A technician's access is the inspection only: it ends when the repair order leaves Checked-in or
-  // Diagnosing. Workshop jobs (I1-06) get their own scoping rule; do not reuse this one for them.
+  // A technician's access is the inspection only (findings and their photos). Workshop jobs (I1-06) have their
+  // own scoping rule; do not reuse this one for them.
   const ro = await db
     .selectFrom("repair_order")
     .select("status")
     .where("id", "=", repairOrderId)
     .executeTakeFirst();
-  if (!ro || (ro.status !== "checked_in" && ro.status !== "diagnosing")) return false;
-  return (await assignedTechnician(db, repairOrderId))?.userId === session.userId;
+  if (!ro) return false;
+  if (ro.status === "checked_in" || ro.status === "diagnosing") {
+    return (await assignedTechnician(db, repairOrderId))?.userId === session.userId;
+  }
+  if (ro.status !== "in_progress") return false;
+  const job = await db
+    .selectFrom("job_assignment")
+    .innerJoin("repair_job", "repair_job.id", "job_assignment.job_id")
+    .select("job_assignment.id")
+    .where("repair_job.repair_order_id", "=", repairOrderId)
+    .where("repair_job.removed_at", "is", null)
+    .where("job_assignment.assignee_id", "=", session.userId)
+    .where("job_assignment.ended_at", "is", null)
+    .executeTakeFirst();
+  return job !== undefined;
 }
 
 /** Audits a denied attempt and answers "not found" (AC2-30), without saying whether the record exists. */

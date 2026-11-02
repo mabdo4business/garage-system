@@ -180,6 +180,20 @@ async function lockLine(ctx: CommandContext, head: Awaited<ReturnType<typeof lin
     ctx.tx,
   );
   if (!accepts.rows[0]?.ok) {
+    // AC21-08 / F-13: re-read under the line lock — a line an amendment awaiting the customer replaces is frozen.
+    const frozen = await ctx.tx
+      .selectFrom("revision_line")
+      .innerJoin("job_revision", "job_revision.id", "revision_line.revision_id")
+      .select("revision_line.id")
+      .where("revision_line.supersedes_line_id", "=", head.id)
+      .where("revision_line.removed_at", "is", null)
+      .where("job_revision.status", "=", "pending")
+      .executeTakeFirst();
+    if (frozen) {
+      throw new ConflictError("line_awaiting_decision", "Line awaiting customer decision", {
+        reason: "line_awaiting_decision",
+      });
+    }
     throw new ConflictError(
       "line_not_issuable",
       "Parts go only to an approved, unchanged part line of running work",

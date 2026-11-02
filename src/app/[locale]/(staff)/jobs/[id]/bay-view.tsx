@@ -71,6 +71,8 @@ export function BayView({
     [
       `${trimQty(line.qty)} ${unit(line.unit)}`.trim(),
       line.partsQty !== null ? t(locale, "job.partsIssued", { qty: trimQty(line.partsQty) || "0" }) : null,
+      // AC21-08: replaced by a change awaiting the customer — no parts until they decide.
+      line.frozen ? t(locale, "workshop.line.frozen") : null,
     ]
       .filter(Boolean)
       .join(t(locale, "common.listSeparator"));
@@ -163,7 +165,10 @@ export function BayView({
         locale={locale}
         action={completeAction}
         hidden={completeHidden}
-        lines={job.lines.map((line): BayLine => ({ id: line.id, label: name(line), detail: detail(line) }))}
+        // A job reopened by an approved change (I2-02a) asks only for the lines that have no outcome yet.
+        lines={job.lines
+          .filter((line) => line.outcome === null)
+          .map((line): BayLine => ({ id: line.id, label: name(line), detail: detail(line) }))}
         car={car}
         timer={timer}
         actions={forms.pause()}
@@ -275,6 +280,11 @@ export function BayView({
             ) : (
               <p className="bay-stop">{t(locale, "bay.notApproved")}</p>
             )}
+            {job.changeAwaitingCustomer ? (
+              <p className="bay-stop" data-testid="change-awaiting">
+                {t(locale, "bay.changeAwaiting")}
+              </p>
+            ) : null}
             {job.finding ? (
               <div className="bay-finding">
                 <div className="finding-head">
@@ -291,6 +301,17 @@ export function BayView({
                   </p>
                 ) : null}
               </div>
+            ) : null}
+            {mine && job.repairOrderStatus === "in_progress" ? (
+              // OD-72: something else found under the car goes to the advisor as a finding.
+              <p>
+                <a
+                  className="btn btn-secondary"
+                  href={`/${locale}/repair-orders/${job.repairOrderId}/inspection`}
+                >
+                  {t(locale, "bay.recordFinding")}
+                </a>
+              </p>
             ) : null}
             <dl className="bay-facts">
               <dt>{t(locale, "checkIn.concerns")}</dt>

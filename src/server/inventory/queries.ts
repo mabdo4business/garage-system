@@ -2,7 +2,7 @@ import type { Kysely } from "kysely";
 import { Money, Qty } from "../core/money";
 import { poolUnitCost } from "../core/pool";
 import type { DB, Emirate, JobExecutionStatus } from "../db/schema";
-import { authorizedScope } from "../estimate/approval";
+import { authorizedScope, frozenLines } from "../estimate/approval";
 
 /**
  * Stock and parts-for-jobs reads (I1-07). They contain costs, so callers check stock.read first (T-24): never
@@ -76,6 +76,8 @@ export interface PartLine {
   repairOrderId: string;
   repairOrderNumber: string;
   plate: { emirate: Emirate; code: string; number: string } | null;
+  /** Replaced by a change awaiting the customer (AC21-08): parts are refused until they decide. */
+  frozen: boolean;
 }
 
 /** Approved part lines of running or finished-but-unbilled work — the store keeper's to-do list. */
@@ -160,6 +162,10 @@ export async function partsForOpenJobs(db: Kysely<DB>): Promise<PartLine[]> {
       )
       .orderBy("revision_line.created_at")
       .execute();
+    const frozen = await frozenLines(
+      db,
+      lines.map((line) => line.id),
+    );
     for (const line of lines) {
       result.push({
         lineId: line.id,
@@ -181,6 +187,7 @@ export async function partsForOpenJobs(db: Kysely<DB>): Promise<PartLine[]> {
           job.emirate && job.code !== null && job.plate_number !== null
             ? { emirate: job.emirate, code: job.code, number: job.plate_number }
             : null,
+        frozen: frozen.has(line.id),
       });
     }
   }

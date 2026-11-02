@@ -489,7 +489,7 @@ describe("S27 — estimate versions", () => {
 
     const version = (await versionsOf(ro))[1]!;
     const snapshot = version.snapshot as EstimateSnapshot;
-    expect(snapshot.schema).toBe(3);
+    expect(snapshot.schema).toBe(4);
     expect(snapshot.versionNo).toBe(2);
     expect(snapshot.jobs.map((job) => job.jobId)).toEqual([pins]);
     expect(snapshot.earlierApproved).toEqual([

@@ -342,9 +342,24 @@ export async function completeJob(
   };
   return runCommand(db, options, async (ctx) => {
     const before = await lockForTransition(ctx, staff, job.repair_order_id, jobId, "complete");
+    // Lines that already carry a live outcome keep it: a job reopened by an approved amendment (I2-02a, §3.3)
+    // asks only for the lines it added. Otherwise every authorized line is open here.
     const scope = await authorizedScope(ctx.tx, jobId);
+    const settled = new Set(
+      scope.length === 0
+        ? []
+        : (
+            await ctx.tx
+              .selectFrom("job_line_outcome")
+              .select("revision_line_id")
+              .where("revision_line_id", "in", scope)
+              .where("superseded_at", "is", null)
+              .execute()
+          ).map((row) => row.revision_line_id),
+    );
+    const open = scope.filter((id) => !settled.has(id));
     const given = new Set(lines.map((line) => line.lineId));
-    if (given.size !== lines.length || scope.length !== lines.length || scope.some((id) => !given.has(id))) {
+    if (given.size !== lines.length || open.length !== lines.length || open.some((id) => !given.has(id))) {
       throw new ValidationError("Mark every item done or not performed", { field: "lines" });
     }
     for (const line of lines) {

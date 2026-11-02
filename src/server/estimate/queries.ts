@@ -10,6 +10,7 @@ import type {
   WithdrawReasonCode,
 } from "../db/schema";
 import { findingsForEstimate } from "../inspection/queries";
+import { authorizedScope } from "./approval";
 import { sumLines, type EstimateTotals } from "./pricing";
 import type { EstimateSnapshot } from "./snapshot";
 
@@ -33,11 +34,29 @@ export interface EstimateLineView {
   vat: string;
   taxCode: string;
   taxRate: string;
+  /** I2-02a: the approved line this line of an amendment replaces. */
+  replaces: ReplaceableLine | null;
+}
+
+/** An authorized line of an approved job, as approved (what an amendment can replace). */
+export interface ReplaceableLine {
+  id: string;
+  itemId: string | null;
+  lineType: RevisionLineType;
+  descriptionEn: string;
+  descriptionAr: string;
+  unit: string | null;
+  qty: string;
+  total: string;
 }
 
 export interface EstimateJobView {
   id: string;
   revisionId: string;
+  /** "original", or an amendment of approved work (I2-02a: drafts show "add_scope" until sent). */
+  revisionKind: string;
+  /** For an amendment: the job's authorized lines not yet replaced in it (draft only). */
+  replaceable: ReplaceableLine[];
   title: string;
   findingId: string | null;
   findingSeverity: FindingSeverity | null;
@@ -80,6 +99,8 @@ export interface EarlierJob {
   status: "approved" | "declined" | "lapsed";
   lapseReason: "withdrawn" | "expired" | null;
   total: string;
+  /** Approved work whose job has nothing open: a change of it may be drafted (I2-02a). */
+  amendable: boolean;
 }
 
 export interface EstimateView {
@@ -155,6 +176,7 @@ export async function estimateView(db: Kysely<DB>, repairOrderId: string): Promi
       "finding.severity",
       "job_revision.id as revision_id",
       "job_revision.status as revision_status",
+      "job_revision.kind as revision_kind",
     ])
     .where("job_revision.proposed_in_version_id", "=", version.id)
     .where("job_revision.status", "<>", "discarded")
@@ -178,6 +200,41 @@ export async function estimateView(db: Kysely<DB>, repairOrderId: string): Promi
           .orderBy("id")
           .execute();
 
+  const replacedIds = lines.flatMap((line) => (line.supersedes_line_id ? [line.supersedes_line_id] : []));
+  const amendedJobs = jobs.filter((job) => job.revision_kind !== "original");
+  const scopes = new Map<string, string[]>();
+  for (const job of amendedJobs) scopes.set(job.id, await authorizedScope(db, job.id));
+  const scopeIds = [...new Set([...replacedIds, ...[...scopes.values()].flat()])];
+  const scopeLines =
+    scopeIds.length === 0
+      ? []
+      : await db
+          .selectFrom("revision_line")
+          .select([
+            "id",
+            "catalogue_item_id",
+            "line_type",
+            "description_en",
+            "description_ar",
+            "unit",
+            "qty",
+            "line_total",
+          ])
+          .where("id", "in", scopeIds)
+          .orderBy("created_at")
+          .orderBy("id")
+          .execute();
+  const replaceableOf = (row: (typeof scopeLines)[number]): ReplaceableLine => ({
+    id: row.id,
+    itemId: row.catalogue_item_id,
+    lineType: row.line_type,
+    descriptionEn: row.description_en,
+    descriptionAr: row.description_ar,
+    unit: row.unit,
+    qty: row.qty,
+    total: row.line_total,
+  });
+
   const allAmounts = [];
   const jobViews: EstimateJobView[] = [];
   for (const job of jobs) {
@@ -198,6 +255,17 @@ export async function estimateView(db: Kysely<DB>, repairOrderId: string): Promi
       findingId: job.finding_id,
       findingSeverity: job.severity,
       revisionStatus: job.revision_status,
+      revisionKind: job.revision_kind,
+      replaceable:
+        job.revision_status === "draft" && job.revision_kind !== "original"
+          ? scopeLines
+              .filter(
+                (row) =>
+                  scopes.get(job.id)?.includes(row.id) &&
+                  !own.some((line) => line.supersedes_line_id === row.id),
+              )
+              .map(replaceableOf)
+          : [],
       total: sumLines(amounts).total.toString(),
       lines: own.map((line) => ({
         id: line.id,
@@ -214,6 +282,10 @@ export async function estimateView(db: Kysely<DB>, repairOrderId: string): Promi
         vat: line.vat,
         taxCode: line.tax_code,
         taxRate: line.tax_rate,
+        replaces: (() => {
+          const row = scopeLines.find((candidate) => candidate.id === line.supersedes_line_id);
+          return row ? replaceableOf(row) : null;
+        })(),
       })),
     });
   }
@@ -300,6 +372,7 @@ const earlierJob = (job: EarlierJob): EarlierJob => ({
   status: job.status,
   lapseReason: job.lapseReason,
   total: job.total,
+  amendable: job.amendable,
 });
 
 async function versionHistory(db: Kysely<DB>, estimateId: string): Promise<VersionSummary[]> {
@@ -378,6 +451,18 @@ async function earlierJobs(
             settled.map((row) => row.revision_id),
           )
           .where("removed_at", "is", null)
+          // A line replaced by an approved amendment counts under the revision that replaced it (I2-02a).
+          .where(({ not, exists, selectFrom }) =>
+            not(
+              exists(
+                selectFrom("revision_line as s")
+                  .innerJoin("job_revision as sr", "sr.id", "s.revision_id")
+                  .select("s.id")
+                  .whereRef("s.supersedes_line_id", "=", "revision_line.id")
+                  .where("sr.status", "=", "approved"),
+              ),
+            ),
+          )
           .execute();
   const result: (EarlierJob & { findingId: string | null; reofferable: boolean })[] = [];
   const seen = new Set<string>();
@@ -402,6 +487,10 @@ async function earlierJobs(
         .toString(),
       reofferable:
         row.status !== "approved" && !own.some((other) => ["draft", "pending"].includes(other.status)),
+      amendable:
+        row.status === "approved" &&
+        own.find((other) => other.status === "approved")?.revision_id === row.revision_id &&
+        !own.some((other) => ["draft", "pending"].includes(other.status)),
     });
   }
   return result;

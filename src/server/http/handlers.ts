@@ -43,6 +43,7 @@ import { addJob, addLine, openEstimate, setLineDiscount } from "../estimate/comm
 import { estimateView } from "../estimate/queries";
 import { recordInPersonApproval, sendVersion } from "../estimate/approval";
 import { discardDraft, reproposeJob, startVersion, withdrawVersion } from "../estimate/versions";
+import { amendJob, replaceLine } from "../estimate/amendments";
 import {
   assignJob,
   completeJob,
@@ -1064,6 +1065,47 @@ export function createHandlers(db: Kysely<DB>, storage: MediaStorage = getMediaS
         });
         const body = await readBody(request);
         const outcome = await reproposeJob(db, session, jobId, toStr(body.idempotencyKey));
+        return json(outcome.replayed ? 200 : 201, outcome.result);
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    /** POST /api/repair-jobs/:id/amend — { idempotencyKey }; opens a change of approved work (I2-02a). */
+    async amendEstimateJob(request: Request, jobId: string): Promise<Response> {
+      try {
+        if (!sameOrigin(request)) return json(403, { error: "forbidden" });
+        const session = await authorize(db, await currentSession(request), "estimate.edit", {
+          entityType: "repair_job",
+          entityId: jobId,
+        });
+        const body = await readBody(request);
+        const outcome = await amendJob(db, session, jobId, toStr(body.idempotencyKey));
+        return json(outcome.replayed ? 200 : 201, outcome.result);
+      } catch (error) {
+        return errorResponse(error);
+      }
+    },
+
+    /**
+     * POST /api/revision-lines/:id/replace — { itemId?, qty, idempotencyKey }; replaces an approved line in the
+     * job's open change (price change or substitution, I2-02a).
+     */
+    async replaceEstimateLine(request: Request, lineId: string): Promise<Response> {
+      try {
+        if (!sameOrigin(request)) return json(403, { error: "forbidden" });
+        const session = await authorize(db, await currentSession(request), "estimate.edit", {
+          entityType: "revision_line",
+          entityId: lineId,
+        });
+        const body = await readBody(request);
+        const outcome = await replaceLine(
+          db,
+          session,
+          lineId,
+          { itemId: body.itemId, qty: body.qty },
+          toStr(body.idempotencyKey),
+        );
         return json(outcome.replayed ? 200 : 201, outcome.result);
       } catch (error) {
         return errorResponse(error);

@@ -123,6 +123,7 @@ async function draftJob(ctx: CommandContext, jobId: string, versionId: string) {
       "repair_job.removed_at",
       "job_revision.id as revision_id",
       "job_revision.revision_no",
+      "job_revision.kind",
     ])
     .where("repair_job.id", "=", jobId)
     .where("job_revision.status", "=", "draft")
@@ -370,8 +371,10 @@ export async function removeJob(
   return runCommand(db, options, async (ctx) => {
     const { versionId } = await lockDraft(ctx, repairOrderId);
     const job = await draftJob(ctx, jobId, versionId);
+    // An amendment of approved work (I2-02a) is only taken out: its finding was decided by the customer already.
+    const amendment = job.kind !== "original";
     let excluded = false;
-    if (job.finding_id) {
+    if (job.finding_id && !amendment) {
       const finding = await ctx.tx
         .selectFrom("finding")
         .select(["severity", "status"])
@@ -426,6 +429,7 @@ export async function removeJob(
         reoffered || excluded
           ? {
               ...(reoffered ? { revisionDiscarded: job.revision_id } : {}),
+              ...(amendment ? { amendmentDiscarded: true } : {}),
               ...(excluded ? { urgentFindingExcluded: job.finding_id, reason } : {}),
             }
           : null,
@@ -626,13 +630,17 @@ export async function priceCatalogueLine(
   };
 }
 
-/** Inserts a priced line into a draft revision, with its audit event. */
+/**
+ * Inserts a priced line into a draft revision, with its audit event. With `replaces`, the line supersedes that
+ * authorized line of the same job (an amendment, I2-02a); the database checks it may.
+ */
 export async function insertPricedLine(
   ctx: CommandContext,
   staff: Staff,
   jobId: string,
   revisionId: string,
   priced: PricedLine,
+  replaces?: { lineId: string; itemId: string | null; qty: string; total: string },
 ): Promise<string> {
   const line = await ctx.tx
     .insertInto("revision_line")
@@ -653,7 +661,7 @@ export async function insertPricedLine(
       vat: priced.amounts.vat.toString(),
       tax_code: priced.taxCode,
       tax_rate: priced.rate,
-      supersedes_line_id: null,
+      supersedes_line_id: replaces?.lineId ?? null,
       removed_at: null,
       created_by: staff.userId,
       updated_by: staff.userId,
@@ -661,9 +669,12 @@ export async function insertPricedLine(
     .returning("id")
     .executeTakeFirstOrThrow();
   await ctx.audit({
-    action: "estimate.line_added",
+    action: replaces ? "estimate.line_replaced" : "estimate.line_added",
     entityType: "revision_line",
     entityId: line.id,
+    before: replaces
+      ? { lineId: replaces.lineId, itemId: replaces.itemId, qty: replaces.qty, total: replaces.total }
+      : undefined,
     after: {
       jobId,
       itemId: priced.itemId,
